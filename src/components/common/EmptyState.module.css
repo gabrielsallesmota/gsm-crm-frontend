@@ -1,0 +1,29 @@
+.wrap {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.icon {
+  font-size: 26px;
+  color: var(--muted-2);
+  margin-bottom: 10px;
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.message {
+  font-size: 13.5px;
+  max-width: 420px;
+  margin: 0 auto;
+  line-height: 1.6;
+}

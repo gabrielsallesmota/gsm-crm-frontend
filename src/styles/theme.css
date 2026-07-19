@@ -1,0 +1,30 @@
+:root {
+  --bg: #0a0e12;
+  --card-bg: #10171d;
+  --card-bg-alt: #0c1217;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --accent: #2ee66e;
+  --accent-bg: rgba(46, 230, 110, 0.14);
+  --accent-soft: #bfeecd;
+  --blue: #4aa3ff;
+  --amber: #f5b13d;
+  --purple: #a78bfa;
+  --pink: #e1719c;
+  --red: #ff6b6b;
+
+  --text: #e6edf2;
+  --text-dim: #cdd6df;
+  --muted: #9aa6b2;
+  --muted-2: #7f8b96;
+  --faint: #5f6b76;
+
+  --font-body: "Sora", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-heading: "Space Grotesk", sans-serif;
+
+  --radius-card: 15px;
+  --radius-input: 11px;
+  --radius-pill: 100px;
+}

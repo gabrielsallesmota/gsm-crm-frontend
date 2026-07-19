@@ -1,0 +1,46 @@
+.row {
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+
+.row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.row td {
+  padding: 12px 10px;
+  vertical-align: middle;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nameText {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.company {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.origin {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.value {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.prob {
+  font-size: 12.5px;
+  color: var(--muted);
+}

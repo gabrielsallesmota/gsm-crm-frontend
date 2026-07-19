@@ -1,0 +1,127 @@
+.pageTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.pageSubtitle {
+  margin: 4px 0 24px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.loading {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.section {
+  margin-bottom: 28px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sectionTitle {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 14px;
+}
+
+.sectionHeader .sectionTitle {
+  margin: 0;
+}
+
+.inlineForm {
+  display: flex;
+  gap: 8px;
+}
+
+.input {
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  padding: 9px 13px;
+  font-size: 13px;
+  min-width: 220px;
+}
+
+.pipelineGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.pipelineCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 15px;
+}
+
+.pipelineHeader {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.pipelineDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.pipelineName {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.setDefaultBtn {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stageChip {
+  font-size: 11.5px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.originChip {
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+}

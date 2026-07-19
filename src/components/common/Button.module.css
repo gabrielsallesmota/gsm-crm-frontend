@@ -1,0 +1,35 @@
+.btn {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 10px 18px;
+  border-radius: var(--radius-input);
+  border: 1px solid transparent;
+  transition: opacity 0.15s ease;
+}
+
+.btn:hover {
+  opacity: 0.88;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: var(--accent);
+  color: #04130a;
+}
+
+.ghost {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.danger {
+  background: transparent;
+  border-color: rgba(255, 107, 107, 0.4);
+  color: var(--red);
+}

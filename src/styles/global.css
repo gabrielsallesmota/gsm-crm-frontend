@@ -1,0 +1,94 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  font-family: var(--font-body);
+  color: var(--text-dim);
+}
+
+::selection {
+  background: var(--accent);
+  color: #04130a;
+}
+
+input,
+button,
+textarea,
+select {
+  font-family: inherit;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: rgba(46, 230, 110, 0.5) !important;
+}
+
+a {
+  color: var(--accent);
+}
+
+a:hover {
+  color: #63f295;
+}
+
+button {
+  cursor: pointer;
+}
+
+.gsm-scroll::-webkit-scrollbar {
+  height: 9px;
+  width: 9px;
+}
+
+.gsm-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.gsm-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes gsmFade {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gsmPop {
+  0% {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes gsmToast {
+  0% {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

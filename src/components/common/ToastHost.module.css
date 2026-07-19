@@ -1,0 +1,30 @@
+.host {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.toast {
+  background: var(--card-bg);
+  border: 1px solid rgba(46, 230, 110, 0.3);
+  border-left: 3px solid var(--accent);
+  border-radius: 11px;
+  padding: 13px 18px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  animation: gsmToast 0.2s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 230px;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.check {
+  color: var(--accent);
+  font-size: 15px;
+}
