@@ -4,6 +4,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: string;
+  mustChangePassword: boolean;
 }
 
 export interface LoginInput {
@@ -19,4 +20,18 @@ export interface TokenResponse {
 export interface Session {
   user: AuthUser;
   tokens: TokenResponse;
+}
+
+export interface RequestPasswordResetInput {
+  email: string;
+}
+
+export interface ResetPasswordInput {
+  token: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
 }

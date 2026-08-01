@@ -25,12 +25,13 @@ async function readErrorDetail(resp: Response): Promise<string> {
   }
 }
 
-async function rawRequest(path: string, options: RequestInit): Promise<Response> {
+async function rawRequest(path: string, options: RequestInit, tokenOverride?: string): Promise<Response> {
   const headers = new Headers(options.headers);
   if (!headers.has("Content-Type") && options.body) {
     headers.set("Content-Type", "application/json");
   }
-  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  const token = tokenOverride ?? accessToken;
+  if (token) headers.set("Authorization", `Bearer ${token}`);
   return fetch(`${BASE_URL}${path}`, { ...options, headers });
 }
 
@@ -48,14 +49,24 @@ async function tryRefresh(): Promise<boolean> {
   return true;
 }
 
-export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  let resp = await rawRequest(path, options);
+export async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+  tokenOverride?: string,
+): Promise<T> {
+  let resp = await rawRequest(path, options, tokenOverride);
   if (resp.status === 401 && refreshTokenValue) {
     const refreshed = await tryRefresh();
-    resp = refreshed ? await rawRequest(path, options) : resp;
-  }
-  if (resp.status === 401) {
-    onSessionExpired?.();
+    if (refreshed) {
+      // Token renovado com sucesso — a sessão é válida. Se a nova
+      // tentativa AINDA voltar 401, é um 401 de regra de negócio do
+      // próprio endpoint (ex.: senha atual incorreta em
+      // /auth/change-password), não sessão expirada — não desloga o
+      // usuário por isso, só deixa o ApiError subir pra tela tratar.
+      resp = await rawRequest(path, options, tokenOverride);
+    } else {
+      onSessionExpired?.();
+    }
   }
   if (!resp.ok) {
     throw new ApiError(resp.status, await readErrorDetail(resp));

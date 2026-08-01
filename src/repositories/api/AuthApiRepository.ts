@@ -1,6 +1,13 @@
 import type { AuthRepository } from "../AuthRepository";
-import type { AuthUser, LoginInput, Session } from "../../types/auth";
-import type { User } from "../../types/user";
+import type {
+  AuthUser,
+  ChangePasswordInput,
+  LoginInput,
+  RequestPasswordResetInput,
+  ResetPasswordInput,
+  Session,
+} from "../../types/auth";
+import type { CreateUserInput, User } from "../../types/user";
 import { apiRequest } from "./ApiClient";
 
 interface TokenResponseDto {
@@ -14,6 +21,7 @@ interface UserResponseDto {
   email: string;
   name: string;
   role: string;
+  must_change_password: boolean;
 }
 
 function toSession(dto: TokenResponseDto, user: AuthUser): Session {
@@ -24,11 +32,22 @@ function toSession(dto: TokenResponseDto, user: AuthUser): Session {
 }
 
 function toAuthUser(dto: UserResponseDto): AuthUser {
-  return { id: dto.id, tenantId: dto.tenant_id, email: dto.email, name: dto.name, role: dto.role };
+  return {
+    id: dto.id,
+    tenantId: dto.tenant_id,
+    email: dto.email,
+    name: dto.name,
+    role: dto.role,
+    mustChangePassword: dto.must_change_password,
+  };
+}
+
+function toRole(role: string): User["role"] {
+  return role === "admin" || role === "gestor" || role === "vendedor" ? role : "vendedor";
 }
 
 function toUser(dto: UserResponseDto): User {
-  const role = dto.role === "admin" ? "admin" : "vendedor";
+  const role = toRole(dto.role);
   return {
     id: dto.id,
     tenantId: dto.tenant_id,
@@ -67,8 +86,8 @@ export class AuthApiRepository implements AuthRepository {
     });
   }
 
-  async me(_accessToken: string): Promise<AuthUser> {
-    const dto = await apiRequest<UserResponseDto>("/api/v1/auth/me");
+  async me(accessToken: string): Promise<AuthUser> {
+    const dto = await apiRequest<UserResponseDto>("/api/v1/auth/me", {}, accessToken);
     return toAuthUser(dto);
   }
 
@@ -77,16 +96,40 @@ export class AuthApiRepository implements AuthRepository {
     return dtos.map(toUser);
   }
 
-  async createUser(input: Pick<User, "name" | "email" | "role" | "team">): Promise<User> {
+  async createUser(input: CreateUserInput): Promise<User> {
     const dto = await apiRequest<UserResponseDto>("/api/v1/users", {
       method: "POST",
       body: JSON.stringify({
         name: input.name,
         email: input.email,
         role: input.role,
-        password: crypto.randomUUID(),
+        password: input.password,
       }),
     });
     return toUser(dto);
+  }
+
+  async requestPasswordReset(input: RequestPasswordResetInput): Promise<void> {
+    await apiRequest<{ detail: string }>("/api/v1/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email: input.email }),
+    });
+  }
+
+  async confirmPasswordReset(input: ResetPasswordInput): Promise<void> {
+    await apiRequest<{ detail: string }>("/api/v1/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token: input.token, new_password: input.newPassword }),
+    });
+  }
+
+  async changePassword(input: ChangePasswordInput): Promise<void> {
+    await apiRequest<{ detail: string }>("/api/v1/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({
+        current_password: input.currentPassword,
+        new_password: input.newPassword,
+      }),
+    });
   }
 }

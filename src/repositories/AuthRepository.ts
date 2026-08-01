@@ -1,5 +1,12 @@
-import type { AuthUser, LoginInput, Session } from "../types/auth";
-import type { User } from "../types/user";
+import type {
+  AuthUser,
+  ChangePasswordInput,
+  LoginInput,
+  RequestPasswordResetInput,
+  ResetPasswordInput,
+  Session,
+} from "../types/auth";
+import type { CreateUserInput, User } from "../types/user";
 
 export interface AuthRepository {
   login(input: LoginInput): Promise<Session>;
@@ -7,5 +14,8 @@ export interface AuthRepository {
   logout(refreshToken: string): Promise<void>;
   me(accessToken: string): Promise<AuthUser>;
   listUsers(): Promise<User[]>;
-  createUser(input: Pick<User, "name" | "email" | "role" | "team">): Promise<User>;
+  createUser(input: CreateUserInput): Promise<User>;
+  requestPasswordReset(input: RequestPasswordResetInput): Promise<void>;
+  confirmPasswordReset(input: ResetPasswordInput): Promise<void>;
+  changePassword(input: ChangePasswordInput): Promise<void>;
 }

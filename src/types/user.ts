@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "vendedor";
+export type UserRole = "admin" | "gestor" | "vendedor";
 
 export interface User {
   id: string;
@@ -10,3 +10,7 @@ export interface User {
   bg: string;
   color: string;
 }
+
+export type CreateUserInput = Pick<User, "name" | "email" | "role" | "team"> & {
+  password: string;
+};

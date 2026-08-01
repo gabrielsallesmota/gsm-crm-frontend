@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { useAuth } from "../hooks/useAuth";
 import { isDemoMode } from "../services/factory";
@@ -56,6 +56,12 @@ export function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+
+          {!isDemoMode && (
+            <Link to={ROUTES.forgotPassword} className={styles.hint}>
+              Esqueci minha senha
+            </Link>
+          )}
 
           {error && <div className={styles.error}>{error}</div>}
 

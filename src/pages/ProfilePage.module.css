@@ -45,3 +45,17 @@
 .editSection {
   max-width: 520px;
 }
+
+.sectionTitle {
+  margin: 0 0 14px;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.success {
+  font-size: 13px;
+  color: var(--accent);
+  margin-bottom: 14px;
+}

@@ -21,7 +21,15 @@
   display: flex;
   flex-wrap: wrap;
   gap: 9px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
+}
+
+.hint {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  margin: 0 0 20px;
+  max-width: 560px;
+  line-height: 1.5;
 }
 
 .input {

@@ -1,6 +1,13 @@
 import type { AuthRepository } from "../AuthRepository";
-import type { AuthUser, LoginInput, Session } from "../../types/auth";
-import type { User } from "../../types/user";
+import type {
+  AuthUser,
+  ChangePasswordInput,
+  LoginInput,
+  RequestPasswordResetInput,
+  ResetPasswordInput,
+  Session,
+} from "../../types/auth";
+import type { CreateUserInput, User } from "../../types/user";
 import { delay } from "../../utils/errors";
 import { mockState, nextUserId } from "./state";
 
@@ -24,6 +31,7 @@ export class AuthMockRepository implements AuthRepository {
         email: "admin@gsmautomacao.com.br",
         name: "Admin GSM",
         role: "gsm_admin",
+        mustChangePassword: false,
       };
       return { user, tokens: DEMO_TOKENS };
     }
@@ -35,6 +43,7 @@ export class AuthMockRepository implements AuthRepository {
       email: seed.email,
       name: seed.name,
       role: seed.role,
+      mustChangePassword: false,
     };
     return { user, tokens: DEMO_TOKENS };
   }
@@ -52,7 +61,14 @@ export class AuthMockRepository implements AuthRepository {
     await delay(100);
     const seed = mockState.users[0];
     if (!seed) throw new Error("Nenhum usuário demo configurado.");
-    return { id: seed.id, tenantId: seed.tenantId, email: seed.email, name: seed.name, role: seed.role };
+    return {
+      id: seed.id,
+      tenantId: seed.tenantId,
+      email: seed.email,
+      name: seed.name,
+      role: seed.role,
+      mustChangePassword: false,
+    };
   }
 
   async listUsers(): Promise<User[]> {
@@ -60,7 +76,7 @@ export class AuthMockRepository implements AuthRepository {
     return mockState.users.filter((u) => u.tenantId === mockState.currentTenantId);
   }
 
-  async createUser(input: Pick<User, "name" | "email" | "role" | "team">): Promise<User> {
+  async createUser(input: CreateUserInput): Promise<User> {
     await delay(200);
     const user: User = {
       id: nextUserId(),
@@ -74,5 +90,17 @@ export class AuthMockRepository implements AuthRepository {
     };
     mockState.users.push(user);
     return user;
+  }
+
+  async requestPasswordReset(_input: RequestPasswordResetInput): Promise<void> {
+    await delay(300);
+  }
+
+  async confirmPasswordReset(_input: ResetPasswordInput): Promise<void> {
+    await delay(300);
+  }
+
+  async changePassword(_input: ChangePasswordInput): Promise<void> {
+    await delay(200);
   }
 }

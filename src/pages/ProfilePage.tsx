@@ -1,12 +1,34 @@
+import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { authService } from "../services/AuthService";
 import { Avatar } from "../components/common/Avatar";
-import { EmptyState } from "../components/common/EmptyState";
+import { ChangePasswordForm } from "../components/auth/ChangePasswordForm";
 import styles from "./ProfilePage.module.css";
 
 export function ProfilePage() {
   const { user, currentTenant } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   if (!user) return null;
+
+  async function handleChangePassword(values: { currentPassword?: string; newPassword: string }) {
+    setLoading(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      await authService.changePassword({
+        currentPassword: values.currentPassword ?? "",
+        newPassword: values.newPassword,
+      });
+      setSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível trocar a senha.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div>
@@ -25,9 +47,14 @@ export function ProfilePage() {
       </div>
 
       <div className={styles.editSection}>
-        <EmptyState
-          title="Edição de perfil ainda não implementada"
-          message="O backend só expõe leitura do perfil (/auth/me) — não há endpoint de atualização ainda, então esta seção fica somente leitura tanto em Demo quanto em produção até esse endpoint existir."
+        <h2 className={styles.sectionTitle}>Trocar senha</h2>
+        {success && <div className={styles.success}>Senha atualizada com sucesso.</div>}
+        <ChangePasswordForm
+          mode="change"
+          loading={loading}
+          error={error}
+          submitLabel="Trocar senha"
+          onSubmit={handleChangePassword}
         />
       </div>
     </div>

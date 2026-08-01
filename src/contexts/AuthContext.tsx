@@ -38,6 +38,7 @@ export interface AuthContextValue {
   login: (input: LoginInput) => Promise<void>;
   logout: () => Promise<void>;
   switchTenant: (tenantId: string) => void;
+  markPasswordChanged: () => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -93,6 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     [],
   );
 
+  const markPasswordChanged = useCallback(() => {
+    if (!user) return;
+    const updated = { ...user, mustChangePassword: false };
+    setUser(updated);
+    if (tokens) saveStoredSession({ user: updated, tokens });
+  }, [user, tokens]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -104,8 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       login,
       logout,
       switchTenant,
+      markPasswordChanged,
     }),
-    [user, loading, currentTenantId, login, logout, switchTenant],
+    [user, loading, currentTenantId, login, logout, switchTenant, markPasswordChanged],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

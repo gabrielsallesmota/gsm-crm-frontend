@@ -23,7 +23,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { user, tenants, currentTenant, canSwitchTenant, switchTenant, logout } = useAuth();
   const navigate = useNavigate();
 
-  const isAdmin = user?.role === "admin" || user?.role === "gsm_admin";
+  const isAdmin = user?.role === "admin" || user?.role === "gestor" || user?.role === "gsm_admin";
 
   async function handleLogout() {
     await logout();

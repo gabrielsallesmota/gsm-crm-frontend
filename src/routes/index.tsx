@@ -2,6 +2,9 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { ROUTES } from "../constants/routes";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { LoginPage } from "../pages/LoginPage";
+import { ForgotPasswordPage } from "../pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "../pages/ResetPasswordPage";
+import { ForcedPasswordChangePage } from "../pages/ForcedPasswordChangePage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { PipelinePage } from "../pages/PipelinePage";
 import { LeadsPage } from "../pages/LeadsPage";
@@ -14,6 +17,9 @@ import { ProfilePage } from "../pages/ProfilePage";
 
 export const router = createBrowserRouter([
   { path: ROUTES.login, element: <LoginPage /> },
+  { path: ROUTES.forgotPassword, element: <ForgotPasswordPage /> },
+  { path: ROUTES.resetPassword, element: <ResetPasswordPage /> },
+  { path: ROUTES.forcedPasswordChange, element: <ForcedPasswordChangePage /> },
   {
     element: <ProtectedRoute />,
     children: [

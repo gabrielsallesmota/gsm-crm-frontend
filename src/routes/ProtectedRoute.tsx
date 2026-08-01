@@ -8,6 +8,7 @@ export function ProtectedRoute() {
 
   if (loading) return null;
   if (!user) return <Navigate to={ROUTES.login} replace />;
+  if (user.mustChangePassword) return <Navigate to={ROUTES.forcedPasswordChange} replace />;
 
   return (
     <AppLayout>
