@@ -68,12 +68,17 @@ src/
 
 ## Lacuna atual do backend
 
-O `gsm-crm-backend` hoje só implementa os módulos `auth`, `leads` e `pipelines`. As telas de
-**Dashboard, Tarefas, Agenda e Relatórios** não têm endpoint ainda — o `ApiRepository` desses
-domínios lança um erro tipado (`NotImplementedError`) e a página mostra um empty-state
-explicando isso, em vez de tela branca ou dado inventado. Essas telas funcionam de verdade hoje
-apenas no modo Demo; passam a funcionar em produção automaticamente, sem tocar em código de UI,
-assim que o backend ganhar os endpoints correspondentes.
+O `gsm-crm-backend` hoje implementa os módulos `auth`, `leads`, `pipelines` e `dashboard`
+(métricas agregadas). As telas de **Tarefas, Agenda e Relatórios** ainda não têm endpoint — o
+`ApiRepository` desses domínios lança um erro tipado (`NotImplementedError`) e a página mostra
+um empty-state explicando isso, em vez de tela branca ou dado inventado. Essas telas funcionam
+de verdade hoje apenas no modo Demo; passam a funcionar em produção automaticamente, sem tocar
+em código de UI, assim que o backend ganhar os endpoints correspondentes.
+
+O Dashboard já consome `GET /api/v1/dashboard` de verdade em modo produção
+(`DashboardApiRepository`), com uma única ressalva: o KPI "1º atendimento"
+(`avgFirstContactHours`) fica fixo em `0`, porque o backend ainda não registra o momento do
+primeiro contato de um lead — mesma lacuna do campo `firstContactHours` em `LeadsApiRepository`.
 
 Da mesma forma, o cadastro de Lead no backend real é mais enxuto que o mock (sem timeline de
 atividades, IA, sentimento, objeções ou campos customizados) — essas seções aparecem vazias em
