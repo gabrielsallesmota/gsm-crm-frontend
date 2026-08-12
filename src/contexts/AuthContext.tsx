@@ -57,8 +57,25 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       setApiTokens(stored.tokens);
       setCurrentTenantId(stored.user.tenantId);
       mockState.currentTenantId = stored.user.tenantId;
+      setLoading(false);
+    } else if (isDemoMode) {
+      // Modo demo: entra automaticamente como a empresa de demonstração,
+      // sem passar pela tela de login fictícia.
+      authService
+        .login({ email: "voce@empresa.com.br", password: "demodemo" })
+        .then((session) => {
+          setUser(session.user);
+          setTokens(session.tokens);
+          setApiTokens(session.tokens);
+          setCurrentTenantId(session.user.tenantId);
+          mockState.currentTenantId = session.user.tenantId;
+          saveStoredSession(session);
+        })
+        .catch(() => undefined)
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
     setOnSessionExpired(() => {
       setUser(null);
       setTokens(null);
