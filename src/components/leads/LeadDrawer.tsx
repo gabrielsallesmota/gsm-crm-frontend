@@ -1,14 +1,63 @@
-import type { Lead } from "../../types/lead";
+import { useState } from "react";
+import type { Lead, UpdateLeadInput } from "../../types/lead";
 import { Avatar } from "../common/Avatar";
 import { Badge } from "../common/Badge";
+import { Button } from "../common/Button";
 import { STAGES } from "../../constants/stages";
 import { TEMP } from "../../constants/temperature";
 import { brl } from "../../utils/currency";
+import { leadsService } from "../../services/LeadsService";
+import { useToast } from "../../hooks/useToast";
 import styles from "./LeadDrawer.module.css";
 
-export function LeadDrawer({ lead, onClose }: { lead: Lead; onClose: () => void }) {
+export function LeadDrawer({
+  lead,
+  onClose,
+  onSaved,
+}: {
+  lead: Lead;
+  onClose: () => void;
+  onSaved?: (lead: Lead) => void;
+}) {
+  const { toast } = useToast();
   const stage = STAGES[lead.stage];
   const temp = TEMP[lead.temperature];
+
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(() => fromLead(lead));
+
+  function startEdit() {
+    setForm(fromLead(lead));
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const input: UpdateLeadInput = {
+        name: form.name.trim(),
+        company: form.company.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        value: Number(form.value) || 0,
+        probability: Math.min(100, Math.max(0, Number(form.probability) || 0)),
+        notes: form.notes,
+      };
+      const updated = await leadsService.update(lead.id, input);
+      toast("Lead atualizado com sucesso");
+      onSaved?.(updated);
+      setEditing(false);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível salvar as alterações");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -19,40 +68,124 @@ export function LeadDrawer({ lead, onClose }: { lead: Lead; onClose: () => void 
 
         <div className={styles.header}>
           <Avatar name={lead.name} bg="rgba(74,163,255,.14)" color="#4aa3ff" size={48} />
-          <div>
-            <div className={styles.name}>{lead.name}</div>
-            <div className={styles.company}>{lead.company !== "—" ? lead.company : lead.role}</div>
+          <div style={{ flex: 1 }}>
+            {editing ? (
+              <>
+                <input
+                  className={styles.editInput}
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Nome"
+                />
+                <input
+                  className={styles.editInput}
+                  value={form.company}
+                  onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+                  placeholder="Empresa"
+                />
+              </>
+            ) : (
+              <>
+                <div className={styles.name}>{lead.name}</div>
+                <div className={styles.company}>{lead.company !== "—" ? lead.company : lead.role}</div>
+              </>
+            )}
           </div>
         </div>
 
         <div className={styles.badges}>
           <Badge label={stage.label} color={stage.color} bg={stage.bg} />
           <Badge label={temp.label} color={temp.color} bg="rgba(255,255,255,.06)" />
+          {!editing && (
+            <button className={styles.editToggle} onClick={startEdit}>
+              ✎ Editar
+            </button>
+          )}
         </div>
 
         <div className={styles.grid}>
           <div className={styles.field}>
             <div className={styles.fieldLabel}>Valor</div>
-            <div className={styles.fieldValue}>R$ {brl(lead.value)}</div>
+            {editing ? (
+              <input
+                className={styles.editInputSmall}
+                type="number"
+                value={form.value}
+                onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
+              />
+            ) : (
+              <div className={styles.fieldValue}>R$ {brl(lead.value)}</div>
+            )}
           </div>
           <div className={styles.field}>
             <div className={styles.fieldLabel}>Probabilidade</div>
-            <div className={styles.fieldValue}>{lead.probability}%</div>
+            {editing ? (
+              <input
+                className={styles.editInputSmall}
+                type="number"
+                min={0}
+                max={100}
+                value={form.probability}
+                onChange={(e) => setForm((f) => ({ ...f, probability: e.target.value }))}
+              />
+            ) : (
+              <div className={styles.fieldValue}>{lead.probability}%</div>
+            )}
           </div>
           <div className={styles.field}>
             <div className={styles.fieldLabel}>Telefone</div>
-            <div className={styles.fieldValue}>{lead.phone || "—"}</div>
+            {editing ? (
+              <input
+                className={styles.editInputSmall}
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              />
+            ) : (
+              <div className={styles.fieldValue}>{lead.phone || "—"}</div>
+            )}
           </div>
           <div className={styles.field}>
             <div className={styles.fieldLabel}>E-mail</div>
-            <div className={styles.fieldValue}>{lead.email || "—"}</div>
+            {editing ? (
+              <input
+                className={styles.editInputSmall}
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            ) : (
+              <div className={styles.fieldValue}>{lead.email || "—"}</div>
+            )}
           </div>
         </div>
 
-        {lead.notes && (
+        {editing ? (
           <div className={styles.section}>
             <div className={styles.sectionTitle}>Notas</div>
-            <p className={styles.notes}>{lead.notes}</p>
+            <textarea
+              className={styles.editTextarea}
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              rows={4}
+              placeholder="Anotações sobre o lead…"
+            />
+          </div>
+        ) : (
+          lead.notes && (
+            <div className={styles.section}>
+              <div className={styles.sectionTitle}>Notas</div>
+              <p className={styles.notes}>{lead.notes}</p>
+            </div>
+          )
+        )}
+
+        {editing && (
+          <div className={styles.editActions}>
+            <Button onClick={cancelEdit} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={() => void handleSave()} disabled={saving || !form.name.trim()}>
+              {saving ? "Salvando…" : "Salvar alterações"}
+            </Button>
           </div>
         )}
 
@@ -98,4 +231,16 @@ export function LeadDrawer({ lead, onClose }: { lead: Lead; onClose: () => void 
       </div>
     </div>
   );
+}
+
+function fromLead(lead: Lead) {
+  return {
+    name: lead.name,
+    company: lead.company === "—" ? "" : lead.company,
+    phone: lead.phone,
+    email: lead.email,
+    value: String(lead.value),
+    probability: String(lead.probability),
+    notes: lead.notes,
+  };
 }

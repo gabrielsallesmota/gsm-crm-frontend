@@ -79,7 +79,9 @@ export function LeadsPage() {
         </div>
       )}
 
-      {selected && <LeadDrawer lead={selected} onClose={() => navigate(ROUTES.leads)} />}
+      {selected && (
+        <LeadDrawer lead={selected} onClose={() => navigate(ROUTES.leads)} onSaved={() => reload()} />
+      )}
 
       {creating && (
         <QuickCreateModal onClose={() => setCreating(false)} onSubmit={handleCreate} />
