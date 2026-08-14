@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { AuthLayout } from "../layouts/AuthLayout";
-import { authService } from "../services/AuthService";
 import { useAuth } from "../hooks/useAuth";
 import { ROUTES } from "../constants/routes";
 import { ChangePasswordForm } from "../components/auth/ChangePasswordForm";
 import styles from "./LoginPage.module.css";
 
 export function ForcedPasswordChangePage() {
-  const { user, loading: authLoading, markPasswordChanged } = useAuth();
+  const { user, loading: authLoading, markPasswordChanged, changePassword } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +19,7 @@ export function ForcedPasswordChangePage() {
     setLoading(true);
     setError(null);
     try {
-      await authService.changePassword({
+      await changePassword({
         currentPassword: values.currentPassword ?? "",
         newPassword: values.newPassword,
       });

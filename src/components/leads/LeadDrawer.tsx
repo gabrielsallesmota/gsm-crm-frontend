@@ -6,7 +6,7 @@ import { Button } from "../common/Button";
 import { STAGES } from "../../constants/stages";
 import { TEMP } from "../../constants/temperature";
 import { brl } from "../../utils/currency";
-import { leadsService } from "../../services/LeadsService";
+import { useLeadActions } from "../../hooks/useLeadActions";
 import { useToast } from "../../hooks/useToast";
 import styles from "./LeadDrawer.module.css";
 
@@ -20,6 +20,7 @@ export function LeadDrawer({
   onSaved?: (lead: Lead) => void;
 }) {
   const { toast } = useToast();
+  const { update } = useLeadActions();
   const stage = STAGES[lead.stage];
   const temp = TEMP[lead.temperature];
 
@@ -48,7 +49,7 @@ export function LeadDrawer({
         probability: Math.min(100, Math.max(0, Number(form.probability) || 0)),
         notes: form.notes,
       };
-      const updated = await leadsService.update(lead.id, input);
+      const updated = await update(lead.id, input);
       toast("Lead atualizado com sucesso");
       onSaved?.(updated);
       setEditing(false);

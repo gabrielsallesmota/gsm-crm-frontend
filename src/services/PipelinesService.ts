@@ -1,10 +1,13 @@
 import type { PipelinesRepository } from "../repositories/PipelinesRepository";
 import { PipelinesApiRepository } from "../repositories/api/PipelinesApiRepository";
 import { PipelinesMockRepository } from "../repositories/mock/PipelinesMockRepository";
-import { CRM_MODE } from "./factory";
+import { selectRepository } from "./factory";
 import type { Pipeline, PipelineStage } from "../types/pipeline";
 
-const repo: PipelinesRepository = CRM_MODE === "demo" ? new PipelinesMockRepository() : new PipelinesApiRepository();
+const repo: PipelinesRepository = selectRepository(
+  () => new PipelinesMockRepository(),
+  () => new PipelinesApiRepository(),
+);
 
 export class PipelinesService {
   list(): Promise<Pipeline[]> {

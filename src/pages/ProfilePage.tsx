@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { authService } from "../services/AuthService";
 import { Avatar } from "../components/common/Avatar";
 import { ChangePasswordForm } from "../components/auth/ChangePasswordForm";
 import styles from "./ProfilePage.module.css";
 
 export function ProfilePage() {
-  const { user, currentTenant } = useAuth();
+  const { user, currentTenant, changePassword } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -18,7 +17,7 @@ export function ProfilePage() {
     setError(null);
     setSuccess(false);
     try {
-      await authService.changePassword({
+      await changePassword({
         currentPassword: values.currentPassword ?? "",
         newPassword: values.newPassword,
       });

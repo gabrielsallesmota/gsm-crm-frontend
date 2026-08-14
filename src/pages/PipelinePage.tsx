@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { usePipelines } from "../hooks/usePipelines";
 import { useLeads } from "../hooks/useLeads";
-import { leadsService } from "../services/LeadsService";
+import { useLeadActions } from "../hooks/useLeadActions";
 import { EmptyState } from "../components/common/EmptyState";
 import { Badge } from "../components/common/Badge";
 import { LeadDrawer } from "../components/leads/LeadDrawer";
@@ -13,6 +13,7 @@ import styles from "./PipelinePage.module.css";
 
 export function PipelinePage() {
   const { data: pipelines, loading: loadingPipelines, error: pipelineError } = usePipelines();
+  const { move } = useLeadActions();
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const pipeline = pipelines?.find((p) => p.id === selectedPipelineId) ?? pipelines?.[0];
 
@@ -28,7 +29,7 @@ export function PipelinePage() {
     if (!dragId) return;
     const leadId = dragId;
     setDragId(null);
-    await leadsService.move(leadId, stage);
+    await move(leadId, stage);
     reload();
   }
 

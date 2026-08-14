@@ -7,9 +7,8 @@ import type {
   ResetPasswordInput,
   Session,
 } from "../../types/auth";
-import type { CreateUserInput, User } from "../../types/user";
 import { delay } from "../../utils/errors";
-import { mockState, nextUserId } from "./state";
+import { mockState } from "./state";
 
 const DEMO_TOKENS = { accessToken: "demo-access-token", refreshToken: "demo-refresh-token" };
 
@@ -69,27 +68,6 @@ export class AuthMockRepository implements AuthRepository {
       role: seed.role,
       mustChangePassword: false,
     };
-  }
-
-  async listUsers(): Promise<User[]> {
-    await delay(200);
-    return mockState.users.filter((u) => u.tenantId === mockState.currentTenantId);
-  }
-
-  async createUser(input: CreateUserInput): Promise<User> {
-    await delay(200);
-    const user: User = {
-      id: nextUserId(),
-      tenantId: mockState.currentTenantId,
-      name: input.name,
-      email: input.email,
-      team: input.team,
-      role: input.role,
-      bg: "rgba(74,163,255,.14)",
-      color: "#4aa3ff",
-    };
-    mockState.users.push(user);
-    return user;
   }
 
   async requestPasswordReset(_input: RequestPasswordResetInput): Promise<void> {

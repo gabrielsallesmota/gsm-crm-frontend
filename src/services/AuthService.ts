@@ -1,7 +1,7 @@
 import type { AuthRepository } from "../repositories/AuthRepository";
 import { AuthApiRepository } from "../repositories/api/AuthApiRepository";
 import { AuthMockRepository } from "../repositories/mock/AuthMockRepository";
-import { CRM_MODE } from "./factory";
+import { selectRepository } from "./factory";
 import type {
   ChangePasswordInput,
   LoginInput,
@@ -10,7 +10,10 @@ import type {
   Session,
 } from "../types/auth";
 
-const repo: AuthRepository = CRM_MODE === "demo" ? new AuthMockRepository() : new AuthApiRepository();
+const repo: AuthRepository = selectRepository(
+  () => new AuthMockRepository(),
+  () => new AuthApiRepository(),
+);
 
 export class AuthService {
   login(input: LoginInput): Promise<Session> {

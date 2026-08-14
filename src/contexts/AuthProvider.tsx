@@ -1,13 +1,25 @@
-import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { AuthUser, LoginInput, Session } from "../types/auth";
-import type { Tenant } from "../types/tenant";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import type {
+  AuthUser,
+  ChangePasswordInput,
+  LoginInput,
+  RequestPasswordResetInput,
+  ResetPasswordInput,
+  Session,
+} from "../types/auth";
 import { authService } from "../services/AuthService";
 import { setApiTokens, setOnSessionExpired } from "../repositories/api/ApiClient";
 import { mockState } from "../repositories/mock/state";
 import { mockTenants } from "../mock/tenants";
 import { isDemoMode } from "../services/factory";
+import { AuthContext, type AuthContextValue } from "./AuthContext";
+import type { Tenant } from "../types/tenant";
 
 const STORAGE_KEY = "gsm_crm_session";
+
+// Referência estável (não um array literal novo a cada render) — ver uso
+// em `tenants` abaixo, evita invalidar o `useMemo` de `value` sem motivo.
+const EMPTY_TENANTS: Tenant[] = [];
 
 interface StoredSession {
   user: AuthUser;
@@ -27,21 +39,6 @@ function saveStoredSession(session: StoredSession | null): void {
   if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   else localStorage.removeItem(STORAGE_KEY);
 }
-
-export interface AuthContextValue {
-  user: AuthUser | null;
-  loading: boolean;
-  tenants: Tenant[];
-  currentTenantId: string;
-  currentTenant: Tenant | undefined;
-  canSwitchTenant: boolean;
-  login: (input: LoginInput) => Promise<void>;
-  logout: () => Promise<void>;
-  switchTenant: (tenantId: string) => void;
-  markPasswordChanged: () => void;
-}
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }): React.JSX.Element {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -118,20 +115,59 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     if (tokens) saveStoredSession({ user: updated, tokens });
   }, [user, tokens]);
 
+  const requestPasswordReset = useCallback((input: RequestPasswordResetInput) => {
+    return authService.requestPasswordReset(input);
+  }, []);
+
+  const confirmPasswordReset = useCallback((input: ResetPasswordInput) => {
+    return authService.confirmPasswordReset(input);
+  }, []);
+
+  const changePassword = useCallback((input: ChangePasswordInput) => {
+    return authService.changePassword(input);
+  }, []);
+
+  // A troca de tenant (`mockTenants`) é um recurso exclusivo do modo demo
+  // (ver `canSwitchTenant` abaixo) — em produção cada usuário pertence a um
+  // único tenant real, e hoje o backend não expõe nome/categoria desse
+  // tenant (só `tenantId` via JWT/`/auth/me`, ver `types/auth.ts`). Usar a
+  // lista fake aqui em produção faria `currentTenant` resolver para
+  // `undefined` silenciosamente (o `tenantId` real nunca bate com
+  // "c1"/"c2"/"c3") — melhor não fingir que existe um tenant selecionável
+  // até o backend ganhar um jeito de expor o nome do tenant do usuário.
+  const tenants = isDemoMode ? mockTenants : EMPTY_TENANTS;
+  const currentTenant = isDemoMode ? mockTenants.find((t) => t.id === currentTenantId) : undefined;
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       loading,
-      tenants: mockTenants,
+      tenants,
       currentTenantId,
-      currentTenant: mockTenants.find((t) => t.id === currentTenantId),
+      currentTenant,
       canSwitchTenant: isDemoMode && user?.role === "gsm_admin",
       login,
       logout,
       switchTenant,
       markPasswordChanged,
+      requestPasswordReset,
+      confirmPasswordReset,
+      changePassword,
     }),
-    [user, loading, currentTenantId, login, logout, switchTenant, markPasswordChanged],
+    [
+      user,
+      loading,
+      tenants,
+      currentTenantId,
+      currentTenant,
+      login,
+      logout,
+      switchTenant,
+      markPasswordChanged,
+      requestPasswordReset,
+      confirmPasswordReset,
+      changePassword,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

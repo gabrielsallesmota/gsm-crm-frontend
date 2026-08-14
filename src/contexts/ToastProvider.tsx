@@ -1,16 +1,10 @@
-import { createContext, useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { ToastContext, type ToastContextValue } from "./ToastContext";
 
 interface ToastItem {
   id: number;
   message: string;
 }
-
-export interface ToastContextValue {
-  toasts: ToastItem[];
-  toast: (message: string) => void;
-}
-
-export const ToastContext = createContext<ToastContextValue | null>(null);
 
 let seq = 0;
 

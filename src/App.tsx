@@ -1,7 +1,7 @@
 import { RouterProvider } from "react-router-dom";
 import { router } from "./routes";
-import { AuthProvider } from "./contexts/AuthContext";
-import { ToastProvider } from "./contexts/ToastContext";
+import { AuthProvider } from "./contexts/AuthProvider";
+import { ToastProvider } from "./contexts/ToastProvider";
 
 function App() {
   return (

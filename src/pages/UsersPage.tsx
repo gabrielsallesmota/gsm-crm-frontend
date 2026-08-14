@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useUsers } from "../hooks/useUsers";
-import { usersService } from "../services/UsersService";
+import { useUserActions } from "../hooks/useUserActions";
 import { EmptyState } from "../components/common/EmptyState";
 import { Avatar } from "../components/common/Avatar";
 import { Badge } from "../components/common/Badge";
@@ -19,6 +19,7 @@ const MIN_PASSWORD_LENGTH = 8;
 
 export function UsersPage() {
   const { data, loading, error, reload } = useUsers();
+  const { create: createUser } = useUserActions();
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -33,7 +34,7 @@ export function UsersPage() {
     if (!name.trim() || !email.trim() || !passwordValid) return;
     setSubmitting(true);
     try {
-      await usersService.create({ name, email, role, team: team || "—", password });
+      await createUser({ name, email, role, team: team || "—", password });
       toast(`Usuário adicionado — compartilhe a senha temporária "${password}" com ${name} por um canal seguro.`);
       setName("");
       setEmail("");

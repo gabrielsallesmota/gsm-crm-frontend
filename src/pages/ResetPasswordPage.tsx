@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AuthLayout } from "../layouts/AuthLayout";
-import { authService } from "../services/AuthService";
+import { useAuth } from "../hooks/useAuth";
 import { ROUTES } from "../constants/routes";
 import { ChangePasswordForm } from "../components/auth/ChangePasswordForm";
 import styles from "./LoginPage.module.css";
 
 export function ResetPasswordPage() {
+  const { confirmPasswordReset } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get("token");
@@ -18,7 +19,7 @@ export function ResetPasswordPage() {
     setLoading(true);
     setError(null);
     try {
-      await authService.confirmPasswordReset({ token, newPassword: values.newPassword });
+      await confirmPasswordReset({ token, newPassword: values.newPassword });
       navigate(ROUTES.login);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível redefinir a senha.");
