@@ -1,18 +1,82 @@
+import { useState } from "react";
 import { useDashboard } from "../hooks/useDashboard";
+import { useAuth } from "../hooks/useAuth";
 import { KpiCard } from "../components/kpi/KpiCard";
 import { WeekBarChart } from "../components/charts/WeekBarChart";
 import { OriginDonut } from "../components/charts/OriginDonut";
 import { SalesFunnel } from "../components/charts/SalesFunnel";
+import { Badge } from "../components/common/Badge";
 import { EmptyState } from "../components/common/EmptyState";
+import { PeriodFilter } from "../components/common/PeriodFilter";
+import { ProspectDashboardSection } from "../components/prospects/ProspectDashboardSection";
 import { shortCurrency } from "../utils/currency";
+import { EMPTY_PERIOD, type Period } from "../utils/periods";
 import styles from "./DashboardPage.module.css";
 
+type SourceFilter = "todos" | "ativo" | "passivo";
+
+const SOURCE_FILTER_LABEL: Record<SourceFilter, string> = {
+  todos: "Todos",
+  ativo: "Ativo (prospecção)",
+  passivo: "Passivo (leads)",
+};
+
+const PASSIVO_BADGE = { label: "Passivo", color: "#4aa3ff", bg: "rgba(74,163,255,.14)" };
+
 export function DashboardPage() {
-  const { data, loading, notImplemented, error } = useDashboard();
+  const { user } = useAuth();
+  const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("todos");
+  const [period, setPeriod] = useState<Period>(EMPTY_PERIOD);
+  const showPassivo = !isSuperAdmin || sourceFilter !== "ativo";
+  const showAtivo = isSuperAdmin && sourceFilter !== "passivo";
 
   return (
     <div>
-      <h1 className={styles.pageTitle}>Dashboard</h1>
+      {isSuperAdmin && (
+        <div className={styles.sourceFilter}>
+          {(["todos", "ativo", "passivo"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={
+                sourceFilter === option
+                  ? `${styles.sourceFilterBtn} ${styles.sourceFilterBtnActive}`
+                  : styles.sourceFilterBtn
+              }
+              onClick={() => setSourceFilter(option)}
+            >
+              {SOURCE_FILTER_LABEL[option]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <PeriodFilter value={period} onChange={setPeriod} />
+
+      {showPassivo && <LeadsDashboardSection taggedPassivo={isSuperAdmin} period={period} />}
+
+      {showPassivo && showAtivo && <div className={styles.sourceDivider} />}
+
+      {showAtivo && <ProspectDashboardSection period={period} />}
+    </div>
+  );
+}
+
+function LeadsDashboardSection({
+  taggedPassivo,
+  period,
+}: {
+  taggedPassivo: boolean;
+  period: Period;
+}) {
+  const { data, loading, notImplemented, error } = useDashboard(period);
+
+  return (
+    <div>
+      <h1 className={styles.pageTitle}>
+        {taggedPassivo && <Badge {...PASSIVO_BADGE} />} Dashboard
+      </h1>
       <p className={styles.pageSubtitle}>Visão geral do funil</p>
 
       {notImplemented && (

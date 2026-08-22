@@ -1,5 +1,6 @@
 import type { DashboardMetrics } from "../types/dashboard";
+import type { Period } from "../utils/periods";
 
 export interface DashboardRepository {
-  getMetrics(): Promise<DashboardMetrics>;
+  getMetrics(period?: Period): Promise<DashboardMetrics>;
 }

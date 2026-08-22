@@ -4,6 +4,44 @@
   font-size: 22px;
   font-weight: 700;
   color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sourceFilter {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin-bottom: 6px;
+}
+
+.sourceFilterBtn {
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.sourceFilterBtn:hover {
+  color: var(--text);
+}
+
+.sourceFilterBtnActive {
+  background: var(--card-bg);
+  color: #fff;
+}
+
+.sourceDivider {
+  border-top: 1px solid var(--border);
+  margin: 26px 0;
 }
 
 .pageSubtitle {

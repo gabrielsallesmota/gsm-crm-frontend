@@ -21,6 +21,7 @@ interface UserResponseDto {
   name: string;
   role: string;
   must_change_password: boolean;
+  is_super_admin: boolean;
 }
 
 function toSession(dto: TokenResponseDto, user: AuthUser): Session {
@@ -38,6 +39,7 @@ function toAuthUser(dto: UserResponseDto): AuthUser {
     name: dto.name,
     role: dto.role,
     mustChangePassword: dto.must_change_password,
+    isSuperAdmin: dto.is_super_admin,
   };
 }
 

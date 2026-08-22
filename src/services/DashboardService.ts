@@ -3,6 +3,7 @@ import { DashboardApiRepository } from "../repositories/api/DashboardApiReposito
 import { DashboardMockRepository } from "../repositories/mock/DashboardMockRepository";
 import { selectRepository } from "./factory";
 import type { DashboardMetrics } from "../types/dashboard";
+import type { Period } from "../utils/periods";
 
 const repo: DashboardRepository = selectRepository(
   () => new DashboardMockRepository(),
@@ -10,8 +11,8 @@ const repo: DashboardRepository = selectRepository(
 );
 
 export class DashboardService {
-  getMetrics(): Promise<DashboardMetrics> {
-    return repo.getMetrics();
+  getMetrics(period?: Period): Promise<DashboardMetrics> {
+    return repo.getMetrics(period);
   }
 }
 

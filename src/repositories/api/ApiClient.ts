@@ -75,6 +75,27 @@ export async function apiRequest<T>(
   return (await resp.json()) as T;
 }
 
+/**
+ * Mesmo fluxo de auth/refresh de `apiRequest`, mas devolve o corpo como
+ * texto cru em vez de fazer `.json()` — usado só pelo export CSV
+ * (`GET /api/v1/prospects/export`), que não responde JSON.
+ */
+export async function apiRequestText(path: string, options: RequestInit = {}): Promise<string> {
+  let resp = await rawRequest(path, options);
+  if (resp.status === 401 && refreshTokenValue) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      resp = await rawRequest(path, options);
+    } else {
+      onSessionExpired?.();
+    }
+  }
+  if (!resp.ok) {
+    throw new ApiError(resp.status, await readErrorDetail(resp));
+  }
+  return resp.text();
+}
+
 export function currentAccessToken(): string | null {
   return accessToken;
 }

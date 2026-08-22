@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Lead, UpdateLeadInput } from "../../types/lead";
+import type { Lead, LeadMessageTemplate, UpdateLeadInput } from "../../types/lead";
 import { Avatar } from "../common/Avatar";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
@@ -8,14 +8,19 @@ import { TEMP } from "../../constants/temperature";
 import { brl } from "../../utils/currency";
 import { useLeadActions } from "../../hooks/useLeadActions";
 import { useToast } from "../../hooks/useToast";
+import { WhatsappButton } from "./WhatsappButton";
 import styles from "./LeadDrawer.module.css";
 
 export function LeadDrawer({
   lead,
+  templates = [],
   onClose,
   onSaved,
 }: {
   lead: Lead;
+  /** Opcional: só quem já carregou os templates (Pipeline) passa isso — a
+   * tela de lista de leads simplesmente não mostra o botão de WhatsApp. */
+  templates?: LeadMessageTemplate[];
   onClose: () => void;
   onSaved?: (lead: Lead) => void;
 }) {
@@ -97,6 +102,7 @@ export function LeadDrawer({
         <div className={styles.badges}>
           <Badge label={stage.label} color={stage.color} bg={stage.bg} />
           <Badge label={temp.label} color={temp.color} bg="rgba(255,255,255,.06)" />
+          <WhatsappButton lead={lead} templates={templates} />
           {!editing && (
             <button className={styles.editToggle} onClick={startEdit}>
               ✎ Editar

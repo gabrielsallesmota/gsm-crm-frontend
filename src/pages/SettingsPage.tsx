@@ -2,9 +2,12 @@ import { useState } from "react";
 import { usePipelines } from "../hooks/usePipelines";
 import { usePipelineActions } from "../hooks/usePipelineActions";
 import { useTags } from "../hooks/useTags";
+import { useAuth } from "../hooks/useAuth";
 import { EmptyState } from "../components/common/EmptyState";
 import { Button } from "../components/common/Button";
 import { Badge } from "../components/common/Badge";
+import { MessageTemplatesSettings } from "../components/prospects/MessageTemplatesSettings";
+import { LeadMessageTemplatesSettings } from "../components/leads/LeadMessageTemplatesSettings";
 import { useToast } from "../hooks/useToast";
 import { ORIGIN } from "../constants/origins";
 import styles from "./SettingsPage.module.css";
@@ -13,6 +16,8 @@ export function SettingsPage() {
   const { data: pipelines, loading, error, reload } = usePipelines();
   const { create, setDefault } = usePipelineActions();
   const { data: tags, notImplemented: tagsNotImplemented } = useTags();
+  const { user } = useAuth();
+  const isSuperAdmin = Boolean(user?.isSuperAdmin);
   const { toast } = useToast();
   const [newName, setNewName] = useState("");
 
@@ -104,6 +109,18 @@ export function SettingsPage() {
           ))}
         </div>
       </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Pipeline — mensagens de WhatsApp</h2>
+        <LeadMessageTemplatesSettings />
+      </section>
+
+      {isSuperAdmin && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Prospecção — mensagens de WhatsApp</h2>
+          <MessageTemplatesSettings />
+        </section>
+      )}
     </div>
   );
 }

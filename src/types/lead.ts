@@ -42,6 +42,14 @@ export interface Lead {
   company: string;
   role: string;
   phone: string;
+  whatsapp: string;
+  /** Telefone normalizado (`whatsapp` tem prioridade sobre `phone`) — usado
+   * pro link `wa.me/...` do botão de WhatsApp. Ver `utils/leadMessageTemplates.ts`. */
+  phoneNormalized: string;
+  /** UUID real do estágio no backend — diferente de `stage` (que colapsa
+   * pra um funil fixo de 5 chaves, ver `repositories/api/stageMapping.ts`).
+   * Templates de mensagem casam pelo estágio real, não pela chave colapsada. */
+  stageId: string;
   email: string;
   city: string;
   state: string;
@@ -76,6 +84,8 @@ export interface LeadListFilter {
   ownerId?: string;
   origin?: string;
   search?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   pageSize?: number;
   sortBy?: string;
@@ -91,3 +101,73 @@ export type CreateLeadInput = Pick<
 export type UpdateLeadInput = Partial<
   Pick<Lead, "name" | "company" | "phone" | "email" | "notes" | "value" | "probability" | "tags">
 >;
+
+export type DedupeStrategy = "skip" | "update" | "duplicate";
+
+export interface ImportRowInput {
+  name: string;
+  company?: string;
+  position?: string;
+  phone?: string;
+  whatsapp?: string;
+  email?: string;
+  city?: string;
+  state?: string;
+  notes?: string;
+  origin?: string;
+}
+
+export interface ImportRowResult {
+  rowIndex: number;
+  outcome: "created" | "updated" | "skipped" | "error";
+  name: string;
+  detail: string | null;
+}
+
+export interface ImportSummary {
+  total: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  rows: ImportRowResult[];
+}
+
+/** Campos do `Lead` que fazem sentido mapear numa importação de CSV — usado
+ * pela tela de import (de/para) para montar os selects. */
+export const IMPORTABLE_LEAD_FIELDS: { key: keyof ImportRowInput; label: string }[] = [
+  { key: "name", label: "Nome" },
+  { key: "company", label: "Empresa" },
+  { key: "position", label: "Cargo" },
+  { key: "phone", label: "Telefone" },
+  { key: "whatsapp", label: "WhatsApp" },
+  { key: "email", label: "E-mail" },
+  { key: "city", label: "Cidade" },
+  { key: "state", label: "Estado (UF)" },
+  { key: "notes", label: "Observações" },
+  { key: "origin", label: "Origem" },
+];
+
+/** Mensagem padrão de WhatsApp por (estágio, origem) — `origin: null` é
+ * coringa (vale pra qualquer origem daquele estágio sem template mais
+ * específico). Placeholders suportados: `{nome}`, `{empresa}`, `{cidade}`,
+ * `{estado}` — ver `utils/leadMessageTemplates.ts`. */
+export interface LeadMessageTemplate {
+  id: string;
+  stageId: string;
+  origin: string | null;
+  message: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLeadMessageTemplateInput {
+  stageId: string;
+  origin?: string;
+  message: string;
+}
+
+export interface UpdateLeadMessageTemplateInput {
+  origin: string | null;
+  message: string;
+}

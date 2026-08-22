@@ -1,9 +1,23 @@
 import type { LeadsRepository } from "../LeadsRepository";
-import type { CreateLeadInput, Lead, LeadListFilter, UpdateLeadInput } from "../../types/lead";
+import type {
+  CreateLeadInput,
+  CreateLeadMessageTemplateInput,
+  DedupeStrategy,
+  ImportRowInput,
+  ImportSummary,
+  Lead,
+  LeadListFilter,
+  LeadMessageTemplate,
+  UpdateLeadInput,
+  UpdateLeadMessageTemplateInput,
+} from "../../types/lead";
 import type { Page } from "../../types/common";
 import type { StageKey } from "../../types/pipeline";
-import { delay } from "../../utils/errors";
+import { delay, NotImplementedError } from "../../utils/errors";
 import { mockState, nextLeadId } from "./state";
+
+const IMPORT_TEMPLATE_REASON =
+  "Import/export de CSV e mensagens padrão de WhatsApp ainda não fazem parte da demonstração pública — disponível com uma conta real.";
 
 export class LeadsMockRepository implements LeadsRepository {
   async list(filter: LeadListFilter): Promise<Page<Lead>> {
@@ -19,6 +33,8 @@ export class LeadsMockRepository implements LeadsRepository {
         (l) => l.name.toLowerCase().includes(q) || l.company.toLowerCase().includes(q) || l.email.toLowerCase().includes(q),
       );
     }
+    if (filter.dateFrom) items = items.filter((l) => l.createdAt.slice(0, 10) >= filter.dateFrom!);
+    if (filter.dateTo) items = items.filter((l) => l.createdAt.slice(0, 10) <= filter.dateTo!);
     if (filter.sortBy === "value") {
       items = [...items].sort((a, b) => (filter.sortDir === "asc" ? a.value - b.value : b.value - a.value));
     }
@@ -46,6 +62,9 @@ export class LeadsMockRepository implements LeadsRepository {
       company: input.company || "—",
       role: "",
       phone: input.phone,
+      whatsapp: "",
+      phoneNormalized: "",
+      stageId: input.stage ?? "novo",
       email: input.email,
       city: "",
       state: "",
@@ -91,6 +110,7 @@ export class LeadsMockRepository implements LeadsRepository {
     const lead = mockState.leads.find((l) => l.id === id);
     if (!lead) throw new Error(`Lead ${id} não encontrado.`);
     lead.stage = stage;
+    lead.stageId = stage;
     lead.lastActivityAt = new Date().toISOString();
     if (stage === "ganho" || stage === "perdido") lead.closedAt = new Date().toISOString();
     return lead;
@@ -99,5 +119,40 @@ export class LeadsMockRepository implements LeadsRepository {
   async delete(id: string): Promise<void> {
     await delay(150);
     mockState.leads = mockState.leads.filter((l) => l.id !== id);
+  }
+
+  async bulkImport(
+    _rows: ImportRowInput[],
+    _pipelineId: string,
+    _defaultStageId: string,
+    _defaultOwnerId: string,
+    _dedupeStrategy: DedupeStrategy,
+  ): Promise<ImportSummary> {
+    throw new NotImplementedError("Import de CSV", IMPORT_TEMPLATE_REASON);
+  }
+
+  async exportCsv(): Promise<string> {
+    throw new NotImplementedError("Export de CSV", IMPORT_TEMPLATE_REASON);
+  }
+
+  async listMessageTemplates(): Promise<LeadMessageTemplate[]> {
+    throw new NotImplementedError("Mensagens de WhatsApp", IMPORT_TEMPLATE_REASON);
+  }
+
+  async createMessageTemplate(
+    _input: CreateLeadMessageTemplateInput,
+  ): Promise<LeadMessageTemplate> {
+    throw new NotImplementedError("Mensagens de WhatsApp", IMPORT_TEMPLATE_REASON);
+  }
+
+  async updateMessageTemplate(
+    _id: string,
+    _input: UpdateLeadMessageTemplateInput,
+  ): Promise<LeadMessageTemplate> {
+    throw new NotImplementedError("Mensagens de WhatsApp", IMPORT_TEMPLATE_REASON);
+  }
+
+  async deleteMessageTemplate(_id: string): Promise<void> {
+    throw new NotImplementedError("Mensagens de WhatsApp", IMPORT_TEMPLATE_REASON);
   }
 }

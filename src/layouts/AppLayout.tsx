@@ -6,10 +6,26 @@ import { Avatar } from "../components/common/Avatar";
 import { NavIcon } from "../components/common/NavIcon";
 import { ToastHost } from "../components/common/ToastHost";
 import { isDemoMode } from "../services/factory";
+import type { AuthUser } from "../types/auth";
 import styles from "./AppLayout.module.css";
 
-const NAV_ITEMS: { to: string; icon: Parameters<typeof NavIcon>[0]["name"]; label: string; adminOnly?: boolean }[] = [
+function roleLabel(user: AuthUser | null): string | undefined {
+  if (!user) return undefined;
+  if (user.isSuperAdmin) return "Superadmin";
+  if (user.role === "gsm_admin") return "admin gsm";
+  return user.role;
+}
+
+const NAV_ITEMS: {
+  to: string;
+  icon: Parameters<typeof NavIcon>[0]["name"];
+  label: string;
+  adminOnly?: boolean;
+}[] = [
   { to: ROUTES.dashboard, icon: "dashboard", label: "Dashboard" },
+  // Prospecção GSM não tem item de menu próprio — para quem é super admin,
+  // ela aparece embutida dentro de Pipeline/Dashboard (filtro Ativo/
+  // Passivo/Todos), não como uma tela separada. Ver `PipelinePage.tsx`.
   { to: ROUTES.pipeline, icon: "pipeline", label: "Pipeline" },
   { to: ROUTES.leads, icon: "leads", label: "Leads" },
   { to: ROUTES.tarefas, icon: "tasks", label: "Tarefas" },
@@ -66,7 +82,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             {user && <Avatar name={user.name} bg="rgba(46,230,110,.14)" color="#2ee66e" />}
             <div className={styles.userInfo}>
               <div className={styles.userName}>{user?.name}</div>
-              <div className={styles.userRole}>{user?.role === "gsm_admin" ? "admin gsm" : user?.role}</div>
+              <div className={styles.userRole}>{roleLabel(user)}</div>
             </div>
             <button className={styles.logoutBtn} onClick={handleLogout} title="Sair" aria-label="Sair">
               ⏻
