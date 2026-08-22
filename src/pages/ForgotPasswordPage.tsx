@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { AuthLayout } from "../layouts/AuthLayout";
-import { authService } from "../services/AuthService";
+import { useAuth } from "../hooks/useAuth";
 import { ROUTES } from "../constants/routes";
 import { Button } from "../components/common/Button";
 import styles from "./LoginPage.module.css";
 
 export function ForgotPasswordPage() {
+  const { requestPasswordReset } = useAuth();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +18,7 @@ export function ForgotPasswordPage() {
     setLoading(true);
     setError(null);
     try {
-      await authService.requestPasswordReset({ email });
+      await requestPasswordReset({ email });
       // O backend sempre responde com sucesso genérico (nunca revela se o
       // e-mail existe) — o front só precisa mostrar essa mensagem.
       setSubmitted(true);

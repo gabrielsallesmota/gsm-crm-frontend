@@ -1,5 +1,5 @@
 import { useTasks } from "../hooks/useTasks";
-import { tasksService } from "../services/TasksService";
+import { useTaskActions } from "../hooks/useTaskActions";
 import { EmptyState } from "../components/common/EmptyState";
 import { shortDateLabel } from "../utils/dates";
 import styles from "./TasksPage.module.css";
@@ -8,9 +8,10 @@ const PRIORITY_COLOR: Record<string, string> = { alta: "#ff6b6b", media: "#f5b13
 
 export function TasksPage() {
   const { data, loading, error, notImplemented, reload } = useTasks();
+  const { toggle } = useTaskActions();
 
   async function handleToggle(taskId: string) {
-    await tasksService.toggle(taskId);
+    await toggle(taskId);
     reload();
   }
 

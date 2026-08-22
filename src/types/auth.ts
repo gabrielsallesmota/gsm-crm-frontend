@@ -5,6 +5,10 @@ export interface AuthUser {
   name: string;
   role: string;
   mustChangePassword: boolean;
+  /** Flag de plataforma, ortogonal a `role` — libera o painel "Prospecção
+   * GSM" (funil comercial interno da GSM, não do tenant). Ver
+   * `app.core.deps.require_super_admin` no backend. */
+  isSuperAdmin: boolean;
 }
 
 export interface LoginInput {

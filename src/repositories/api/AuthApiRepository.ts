@@ -7,7 +7,6 @@ import type {
   ResetPasswordInput,
   Session,
 } from "../../types/auth";
-import type { CreateUserInput, User } from "../../types/user";
 import { apiRequest } from "./ApiClient";
 
 interface TokenResponseDto {
@@ -22,6 +21,7 @@ interface UserResponseDto {
   name: string;
   role: string;
   must_change_password: boolean;
+  is_super_admin: boolean;
 }
 
 function toSession(dto: TokenResponseDto, user: AuthUser): Session {
@@ -39,24 +39,7 @@ function toAuthUser(dto: UserResponseDto): AuthUser {
     name: dto.name,
     role: dto.role,
     mustChangePassword: dto.must_change_password,
-  };
-}
-
-function toRole(role: string): User["role"] {
-  return role === "admin" || role === "gestor" || role === "vendedor" ? role : "vendedor";
-}
-
-function toUser(dto: UserResponseDto): User {
-  const role = toRole(dto.role);
-  return {
-    id: dto.id,
-    tenantId: dto.tenant_id,
-    name: dto.name,
-    email: dto.email,
-    team: "—",
-    role,
-    bg: "rgba(74,163,255,.14)",
-    color: "#4aa3ff",
+    isSuperAdmin: dto.is_super_admin,
   };
 }
 
@@ -89,24 +72,6 @@ export class AuthApiRepository implements AuthRepository {
   async me(accessToken: string): Promise<AuthUser> {
     const dto = await apiRequest<UserResponseDto>("/api/v1/auth/me", {}, accessToken);
     return toAuthUser(dto);
-  }
-
-  async listUsers(): Promise<User[]> {
-    const dtos = await apiRequest<UserResponseDto[]>("/api/v1/users");
-    return dtos.map(toUser);
-  }
-
-  async createUser(input: CreateUserInput): Promise<User> {
-    const dto = await apiRequest<UserResponseDto>("/api/v1/users", {
-      method: "POST",
-      body: JSON.stringify({
-        name: input.name,
-        email: input.email,
-        role: input.role,
-        password: input.password,
-      }),
-    });
-    return toUser(dto);
   }
 
   async requestPasswordReset(input: RequestPasswordResetInput): Promise<void> {

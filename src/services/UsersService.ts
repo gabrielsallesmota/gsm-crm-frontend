@@ -1,18 +1,21 @@
-import type { AuthRepository } from "../repositories/AuthRepository";
-import { AuthApiRepository } from "../repositories/api/AuthApiRepository";
-import { AuthMockRepository } from "../repositories/mock/AuthMockRepository";
-import { CRM_MODE } from "./factory";
+import type { UsersRepository } from "../repositories/UsersRepository";
+import { UsersApiRepository } from "../repositories/api/UsersApiRepository";
+import { UsersMockRepository } from "../repositories/mock/UsersMockRepository";
+import { selectRepository } from "./factory";
 import type { CreateUserInput, User } from "../types/user";
 
-const repo: AuthRepository = CRM_MODE === "demo" ? new AuthMockRepository() : new AuthApiRepository();
+const repo: UsersRepository = selectRepository(
+  () => new UsersMockRepository(),
+  () => new UsersApiRepository(),
+);
 
 export class UsersService {
   list(): Promise<User[]> {
-    return repo.listUsers();
+    return repo.list();
   }
 
   create(input: CreateUserInput): Promise<User> {
-    return repo.createUser(input);
+    return repo.create(input);
   }
 }
 

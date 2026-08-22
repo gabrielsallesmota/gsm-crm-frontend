@@ -1,7 +1,8 @@
 export class NotImplementedError extends Error {
-  constructor(domain: string) {
+  constructor(domain: string, reason?: string) {
     super(
-      `${domain} ainda não tem endpoint no backend (gsm-crm-backend só implementa auth/leads/pipelines).`,
+      reason ??
+        `${domain} ainda não tem endpoint no backend (gsm-crm-backend só implementa auth/leads/pipelines/dashboard).`,
     );
     this.name = "NotImplementedError";
   }

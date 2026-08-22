@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useLeads } from "../hooks/useLeads";
-import { leadsService } from "../services/LeadsService";
+import { useLeadActions } from "../hooks/useLeadActions";
 import { LeadRow } from "../components/leads/LeadRow";
 import { LeadDrawer } from "../components/leads/LeadDrawer";
 import { EmptyState } from "../components/common/EmptyState";
@@ -13,6 +13,7 @@ import styles from "./LeadsPage.module.css";
 export function LeadsPage() {
   const [search, setSearch] = useState("");
   const { data, loading, error, reload } = useLeads({ search, page: 1, pageSize: 100 });
+  const { create } = useLeadActions();
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -22,7 +23,7 @@ export function LeadsPage() {
   const selected = leads.find((l) => l.id === id) ?? null;
 
   async function handleCreate(form: { name: string; company: string; phone: string; email: string; value: number }) {
-    await leadsService.create({
+    await create({
       name: form.name,
       company: form.company,
       phone: form.phone,

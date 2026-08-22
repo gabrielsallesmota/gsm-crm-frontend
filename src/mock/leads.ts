@@ -12,7 +12,12 @@ function timeline(entries: { icon: string; color: string; title: string; desc: s
   }));
 }
 
-export const mockLeads: Lead[] = [
+/**
+ * Seed cru sem `whatsapp`/`phoneNormalized`/`stageId` — mock não tem UUID de
+ * estágio real nem número de WhatsApp separado, então esses três campos são
+ * preenchidos em bloco logo abaixo em vez de repetidos em cada registro.
+ */
+const rawMockLeads: Omit<Lead, "whatsapp" | "phoneNormalized" | "stageId">[] = [
   {
     id: "l1", tenantId: "c1", name: "Marina Alves", company: "—", role: "Cliente final",
     phone: "(11) 98812-3344", email: "marina@email.com", city: "São Paulo", state: "SP",
@@ -242,3 +247,10 @@ export const mockLeads: Lead[] = [
     files: [{ id: "f5", name: "Orcamento.pdf", size: "150 KB", kind: "pdf", at: daysAgo(2) }],
   },
 ];
+
+export const mockLeads: Lead[] = rawMockLeads.map((lead) => ({
+  ...lead,
+  whatsapp: "",
+  phoneNormalized: "",
+  stageId: lead.stage,
+}));

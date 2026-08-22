@@ -1,0 +1,71 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.presetGroup {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+}
+
+.presetBtn {
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.presetBtn:hover {
+  color: var(--text);
+}
+
+.presetBtnActive {
+  background: var(--card-bg);
+  color: #fff;
+}
+
+.customRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dateInput {
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.dateSeparator {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.clearBtn {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.clearBtn:hover {
+  color: var(--text);
+}

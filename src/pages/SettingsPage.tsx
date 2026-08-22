@@ -1,29 +1,36 @@
 import { useState } from "react";
 import { usePipelines } from "../hooks/usePipelines";
-import { pipelinesService } from "../services/PipelinesService";
+import { usePipelineActions } from "../hooks/usePipelineActions";
+import { useTags } from "../hooks/useTags";
+import { useAuth } from "../hooks/useAuth";
 import { EmptyState } from "../components/common/EmptyState";
 import { Button } from "../components/common/Button";
 import { Badge } from "../components/common/Badge";
+import { MessageTemplatesSettings } from "../components/prospects/MessageTemplatesSettings";
+import { LeadMessageTemplatesSettings } from "../components/leads/LeadMessageTemplatesSettings";
 import { useToast } from "../hooks/useToast";
-import { mockTags } from "../mock/tags";
 import { ORIGIN } from "../constants/origins";
 import styles from "./SettingsPage.module.css";
 
 export function SettingsPage() {
   const { data: pipelines, loading, error, reload } = usePipelines();
+  const { create, setDefault } = usePipelineActions();
+  const { data: tags, notImplemented: tagsNotImplemented } = useTags();
+  const { user } = useAuth();
+  const isSuperAdmin = Boolean(user?.isSuperAdmin);
   const { toast } = useToast();
   const [newName, setNewName] = useState("");
 
   async function handleCreatePipeline() {
     if (!newName.trim()) return;
-    await pipelinesService.create({ name: newName.trim(), color: "#4aa3ff" });
+    await create({ name: newName.trim(), color: "#4aa3ff" });
     setNewName("");
     toast("Pipeline criado");
     reload();
   }
 
   async function handleSetDefault(id: string) {
-    await pipelinesService.setDefault(id);
+    await setDefault(id);
     toast("Pipeline padrão atualizado");
     reload();
   }
@@ -80,11 +87,16 @@ export function SettingsPage() {
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Tags</h2>
-        <div className={styles.chipRow}>
-          {mockTags.map((tag) => (
-            <Badge key={tag.id} label={tag.label} color={tag.color} bg={tag.bg} />
-          ))}
-        </div>
+        {tagsNotImplemented ? (
+          <EmptyState
+            title="Tags disponíveis apenas no modo Demo por enquanto"
+            message="O backend ainda não tem um módulo de tags. A tela é a mesma; falta só a origem dos dados em produção."
+          />
+        ) : (
+          <div className={styles.chipRow}>
+            {tags?.map((tag) => <Badge key={tag.id} label={tag.label} color={tag.color} bg={tag.bg} />)}
+          </div>
+        )}
       </section>
 
       <section className={styles.section}>
@@ -97,6 +109,18 @@ export function SettingsPage() {
           ))}
         </div>
       </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Pipeline — mensagens de WhatsApp</h2>
+        <LeadMessageTemplatesSettings />
+      </section>
+
+      {isSuperAdmin && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Prospecção — mensagens de WhatsApp</h2>
+          <MessageTemplatesSettings />
+        </section>
+      )}
     </div>
   );
 }

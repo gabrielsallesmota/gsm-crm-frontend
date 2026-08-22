@@ -1,5 +1,6 @@
 import type { DashboardRepository } from "../DashboardRepository";
 import type { DashboardMetrics } from "../../types/dashboard";
+import type { Period } from "../../utils/periods";
 import { apiRequest } from "./ApiClient";
 import { originOf } from "../../constants/origins";
 import { isToday, weekdayShortLabel } from "../../utils/dates";
@@ -119,8 +120,13 @@ function toDashboardMetrics(dto: DashboardMetricsDto): DashboardMetrics {
 }
 
 export class DashboardApiRepository implements DashboardRepository {
-  async getMetrics(): Promise<DashboardMetrics> {
-    const dto = await apiRequest<DashboardMetricsDto>("/api/v1/dashboard");
+  async getMetrics(period?: Period): Promise<DashboardMetrics> {
+    const params = new URLSearchParams();
+    if (period?.dateFrom) params.set("date_from", period.dateFrom);
+    if (period?.dateTo) params.set("date_to", period.dateTo);
+    const query = params.toString();
+    const path = query ? `/api/v1/dashboard?${query}` : "/api/v1/dashboard";
+    const dto = await apiRequest<DashboardMetricsDto>(path);
     return toDashboardMetrics(dto);
   }
 }

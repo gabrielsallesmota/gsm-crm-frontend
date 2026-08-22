@@ -1,8 +1,19 @@
 import type { LeadsRepository } from "../LeadsRepository";
-import type { CreateLeadInput, Lead, LeadListFilter, UpdateLeadInput } from "../../types/lead";
+import type {
+  CreateLeadInput,
+  CreateLeadMessageTemplateInput,
+  DedupeStrategy,
+  ImportRowInput,
+  ImportSummary,
+  Lead,
+  LeadListFilter,
+  LeadMessageTemplate,
+  UpdateLeadInput,
+  UpdateLeadMessageTemplateInput,
+} from "../../types/lead";
 import type { Page } from "../../types/common";
 import type { StageKey } from "../../types/pipeline";
-import { apiRequest } from "./ApiClient";
+import { apiRequest, apiRequestText } from "./ApiClient";
 import { stageIdToKey, stageKeyToId } from "./stageMapping";
 
 interface LeadDto {
@@ -12,6 +23,8 @@ interface LeadDto {
   company: string | null;
   position: string | null;
   phone: string | null;
+  whatsapp: string | null;
+  phone_normalized: string | null;
   email: string | null;
   city: string | null;
   state: string | null;
@@ -24,6 +37,41 @@ interface LeadDto {
   origin: string;
   created_at: string;
   last_interaction_at: string | null;
+}
+
+interface MessageTemplateDto {
+  id: string;
+  stage_id: string;
+  origin: string | null;
+  message: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function toMessageTemplate(dto: MessageTemplateDto): LeadMessageTemplate {
+  return {
+    id: dto.id,
+    stageId: dto.stage_id,
+    origin: dto.origin,
+    message: dto.message,
+    createdAt: dto.created_at,
+    updatedAt: dto.updated_at,
+  };
+}
+
+function importRowBody(row: ImportRowInput) {
+  return {
+    name: row.name,
+    company: row.company,
+    position: row.position,
+    phone: row.phone,
+    whatsapp: row.whatsapp,
+    email: row.email,
+    city: row.city,
+    state: row.state,
+    notes: row.notes,
+    origin: row.origin,
+  };
 }
 
 function temperatureFromProbability(p: number): Lead["temperature"] {
@@ -48,6 +96,9 @@ function toLead(dto: LeadDto): Lead {
     company: dto.company ?? "—",
     role: dto.position ?? "",
     phone: dto.phone ?? "",
+    whatsapp: dto.whatsapp ?? "",
+    phoneNormalized: dto.phone_normalized ?? "",
+    stageId: dto.stage_id,
     email: dto.email ?? "",
     city: dto.city ?? "",
     state: dto.state ?? "",
@@ -86,6 +137,8 @@ export class LeadsApiRepository implements LeadsRepository {
     if (filter.ownerId) params.set("owner_id", filter.ownerId);
     if (filter.origin) params.set("origin", filter.origin);
     if (filter.search) params.set("search", filter.search);
+    if (filter.dateFrom) params.set("date_from", filter.dateFrom);
+    if (filter.dateTo) params.set("date_to", filter.dateTo);
     params.set("page", String(filter.page ?? 1));
     params.set("page_size", String(filter.pageSize ?? 50));
     if (filter.sortBy) params.set("sort_by", filter.sortBy);
@@ -159,5 +212,87 @@ export class LeadsApiRepository implements LeadsRepository {
 
   async delete(id: string): Promise<void> {
     await apiRequest<void>(`/api/v1/leads/${id}`, { method: "DELETE" });
+  }
+
+  async bulkImport(
+    rows: ImportRowInput[],
+    pipelineId: string,
+    defaultStageId: string,
+    defaultOwnerId: string,
+    dedupeStrategy: DedupeStrategy,
+  ): Promise<ImportSummary> {
+    const dto = await apiRequest<{
+      total: number;
+      created: number;
+      updated: number;
+      skipped: number;
+      errors: number;
+      rows: {
+        row_index: number;
+        outcome: ImportSummary["rows"][number]["outcome"];
+        name: string;
+        detail: string | null;
+      }[];
+    }>("/api/v1/leads/bulk-import", {
+      method: "POST",
+      body: JSON.stringify({
+        pipeline_id: pipelineId,
+        default_stage_id: defaultStageId,
+        default_owner_id: defaultOwnerId,
+        dedupe_strategy: dedupeStrategy,
+        rows: rows.map(importRowBody),
+      }),
+    });
+    return {
+      total: dto.total,
+      created: dto.created,
+      updated: dto.updated,
+      skipped: dto.skipped,
+      errors: dto.errors,
+      rows: dto.rows.map((r) => ({
+        rowIndex: r.row_index,
+        outcome: r.outcome,
+        name: r.name,
+        detail: r.detail,
+      })),
+    };
+  }
+
+  async exportCsv(): Promise<string> {
+    return apiRequestText("/api/v1/leads/export");
+  }
+
+  async listMessageTemplates(): Promise<LeadMessageTemplate[]> {
+    const dto = await apiRequest<MessageTemplateDto[]>("/api/v1/lead-message-templates");
+    return dto.map(toMessageTemplate);
+  }
+
+  async createMessageTemplate(input: CreateLeadMessageTemplateInput): Promise<LeadMessageTemplate> {
+    return toMessageTemplate(
+      await apiRequest<MessageTemplateDto>("/api/v1/lead-message-templates", {
+        method: "POST",
+        body: JSON.stringify({
+          stage_id: input.stageId,
+          origin: input.origin,
+          message: input.message,
+        }),
+      }),
+    );
+  }
+
+  async updateMessageTemplate(
+    id: string,
+    input: UpdateLeadMessageTemplateInput,
+  ): Promise<LeadMessageTemplate> {
+    return toMessageTemplate(
+      await apiRequest<MessageTemplateDto>(`/api/v1/lead-message-templates/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ origin: input.origin, message: input.message }),
+      }),
+    );
+  }
+
+  async deleteMessageTemplate(id: string): Promise<void> {
+    await apiRequest<void>(`/api/v1/lead-message-templates/${id}`, { method: "DELETE" });
   }
 }

@@ -1,39 +1,130 @@
 import { useState } from "react";
 import { usePipelines } from "../hooks/usePipelines";
 import { useLeads } from "../hooks/useLeads";
-import { leadsService } from "../services/LeadsService";
+import { useLeadActions } from "../hooks/useLeadActions";
+import { useLeadMessageTemplates } from "../hooks/useLeadMessageTemplates";
+import { useAuth } from "../hooks/useAuth";
+import { useToast } from "../hooks/useToast";
 import { EmptyState } from "../components/common/EmptyState";
 import { Badge } from "../components/common/Badge";
+import { Button } from "../components/common/Button";
+import { PeriodFilter } from "../components/common/PeriodFilter";
 import { LeadDrawer } from "../components/leads/LeadDrawer";
+import { LeadImportModal } from "../components/leads/LeadImportModal";
+import { WhatsappButton } from "../components/leads/WhatsappButton";
+import { ProspectionBoard } from "../components/prospects/ProspectionBoard";
 import { originOf } from "../constants/origins";
 import { brl } from "../utils/currency";
+import { EMPTY_PERIOD, type Period } from "../utils/periods";
 import type { StageKey } from "../types/pipeline";
-import type { Lead } from "../types/lead";
+import type { Lead, LeadMessageTemplate } from "../types/lead";
 import styles from "./PipelinePage.module.css";
 
+type SourceFilter = "todos" | "ativo" | "passivo";
+
+const PASSIVO_BADGE = { label: "Passivo", color: "#4aa3ff", bg: "rgba(74,163,255,.14)" };
+
+const SOURCE_FILTER_LABEL: Record<SourceFilter, string> = {
+  todos: "Todos",
+  ativo: "Ativo (prospecção)",
+  passivo: "Passivo (leads)",
+};
+
 export function PipelinePage() {
+  const { user } = useAuth();
+  const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("todos");
+  const [period, setPeriod] = useState<Period>(EMPTY_PERIOD);
+  const showPassivo = !isSuperAdmin || sourceFilter !== "ativo";
+  const showAtivo = isSuperAdmin && sourceFilter !== "passivo";
+
+  return (
+    <div>
+      {isSuperAdmin && (
+        <div className={styles.sourceFilter}>
+          {(["todos", "ativo", "passivo"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={
+                sourceFilter === option
+                  ? `${styles.sourceFilterBtn} ${styles.sourceFilterBtnActive}`
+                  : styles.sourceFilterBtn
+              }
+              onClick={() => setSourceFilter(option)}
+            >
+              {SOURCE_FILTER_LABEL[option]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <PeriodFilter value={period} onChange={setPeriod} />
+
+      {showPassivo && <LeadsPipelineBoard taggedPassivo={isSuperAdmin} period={period} />}
+
+      {showPassivo && showAtivo && <div className={styles.sourceDivider} />}
+
+      {showAtivo && <ProspectionBoard period={period} />}
+    </div>
+  );
+}
+
+function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean; period: Period }) {
   const { data: pipelines, loading: loadingPipelines, error: pipelineError } = usePipelines();
+  const { move, exportCsv } = useLeadActions();
+  const { data: templates } = useLeadMessageTemplates();
+  const { toast } = useToast();
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const pipeline = pipelines?.find((p) => p.id === selectedPipelineId) ?? pipelines?.[0];
 
   const { data, loading, error, reload } = useLeads({
     ...(pipeline ? { pipelineId: pipeline.id } : {}),
+    ...period,
     page: 1,
     pageSize: 200,
   });
   const [dragId, setDragId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   async function handleDrop(stage: StageKey) {
     if (!dragId) return;
     const leadId = dragId;
     setDragId(null);
-    await leadsService.move(leadId, stage);
+    await move(leadId, stage);
     reload();
   }
 
-  if (pipelineError) return <EmptyState title="Não foi possível carregar os pipelines" message={pipelineError.message} />;
-  if (loadingPipelines || !pipeline) return <div className={styles.loading}>Carregando…</div>;
+  function handleExport() {
+    void (async () => {
+      try {
+        const csv = await exportCsv();
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "leads.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Não foi possível exportar.");
+      }
+    })();
+  }
+
+  if (pipelineError) {
+    return <EmptyState title="Não foi possível carregar os pipelines" message={pipelineError.message} />;
+  }
+  if (loadingPipelines) return <div className={styles.loading}>Carregando…</div>;
+  if (!pipeline) {
+    return (
+      <EmptyState
+        title="Nenhum pipeline cadastrado ainda"
+        message="Crie o primeiro pipeline em Configurações para começar a usar o quadro."
+      />
+    );
+  }
 
   const leads = data?.items ?? [];
   const selectedLead = leads.find((l) => l.id === selectedLeadId) ?? null;
@@ -42,22 +133,28 @@ export function PipelinePage() {
     <div>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.pageTitle}>Pipeline</h1>
+          <h1 className={styles.pageTitle}>
+            {taggedPassivo && <Badge {...PASSIVO_BADGE} />} Pipeline
+          </h1>
           <p className={styles.pageSubtitle}>Arraste os cards entre as etapas</p>
         </div>
-        {pipelines && pipelines.length > 1 && (
-          <select
-            className={styles.pipelineSelect}
-            value={pipeline.id}
-            onChange={(e) => setSelectedPipelineId(e.target.value)}
-          >
-            {pipelines.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <div className={styles.toolbar}>
+          {pipelines && pipelines.length > 1 && (
+            <select
+              className={styles.pipelineSelect}
+              value={pipeline.id}
+              onChange={(e) => setSelectedPipelineId(e.target.value)}
+            >
+              {pipelines.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <Button onClick={() => setImporting(true)}>Importar CSV</Button>
+          <Button onClick={handleExport}>Exportar CSV</Button>
+        </div>
       </div>
 
       {error && <EmptyState title="Não foi possível carregar os leads" message={error.message} />}
@@ -83,6 +180,7 @@ export function PipelinePage() {
                     <KanbanCard
                       key={lead.id}
                       lead={lead}
+                      templates={templates ?? []}
                       onDragStart={() => setDragId(lead.id)}
                       onClick={() => setSelectedLeadId(lead.id)}
                     />
@@ -96,7 +194,22 @@ export function PipelinePage() {
       )}
 
       {selectedLead && (
-        <LeadDrawer lead={selectedLead} onClose={() => setSelectedLeadId(null)} onSaved={() => reload()} />
+        <LeadDrawer
+          lead={selectedLead}
+          templates={templates ?? []}
+          onClose={() => setSelectedLeadId(null)}
+          onSaved={() => reload()}
+        />
+      )}
+
+      {importing && pipeline && (
+        <LeadImportModal
+          pipelineId={pipeline.id}
+          stages={pipeline.stages}
+          defaultStageId={pipeline.stages[0]?.id ?? "novo"}
+          onClose={() => setImporting(false)}
+          onImported={() => reload()}
+        />
       )}
     </div>
   );
@@ -104,10 +217,12 @@ export function PipelinePage() {
 
 function KanbanCard({
   lead,
+  templates,
   onDragStart,
   onClick,
 }: {
   lead: Lead;
+  templates: LeadMessageTemplate[];
   onDragStart: () => void;
   onClick: () => void;
 }) {
@@ -120,6 +235,7 @@ function KanbanCard({
         <span className={styles.cardValue}>R$ {brl(lead.value)}</span>
         <Badge label={origin.label} color={origin.color} bg={origin.bg} />
       </div>
+      <WhatsappButton lead={lead} templates={templates} size="small" />
     </div>
   );
 }
