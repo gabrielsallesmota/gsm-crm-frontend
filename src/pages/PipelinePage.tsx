@@ -3,7 +3,6 @@ import { usePipelines } from "../hooks/usePipelines";
 import { useLeads } from "../hooks/useLeads";
 import { useLeadActions } from "../hooks/useLeadActions";
 import { useLeadMessageTemplates } from "../hooks/useLeadMessageTemplates";
-import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { EmptyState } from "../components/common/EmptyState";
 import { Badge } from "../components/common/Badge";
@@ -31,8 +30,10 @@ const SOURCE_FILTER_LABEL: Record<SourceFilter, string> = {
 };
 
 export function PipelinePage() {
-  const { user } = useAuth();
-  const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  // Ver DashboardPage.tsx — `is_super_admin` não existe mais no backend
+  // (Fase 2/3); sem sinal confiável de platform staff até a Fase 10, a
+  // seção de Prospecção fica desligada para todo mundo.
+  const isSuperAdmin = false;
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("todos");
   const [period, setPeriod] = useState<Period>(EMPTY_PERIOD);
   const showPassivo = !isSuperAdmin || sourceFilter !== "ativo";

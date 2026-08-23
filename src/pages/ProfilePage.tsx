@@ -5,7 +5,7 @@ import { ChangePasswordForm } from "../components/auth/ChangePasswordForm";
 import styles from "./ProfilePage.module.css";
 
 export function ProfilePage() {
-  const { user, currentTenant, changePassword } = useAuth();
+  const { user, currentTenantName, changePassword } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -40,7 +40,7 @@ export function ProfilePage() {
           <div className={styles.name}>{user.name}</div>
           <div className={styles.email}>{user.email}</div>
           <div className={styles.meta}>
-            {user.role} · {currentTenant?.name}
+            {user.role} · {currentTenantName}
           </div>
         </div>
       </div>

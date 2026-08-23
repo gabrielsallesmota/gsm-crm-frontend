@@ -2,7 +2,6 @@ import { useState } from "react";
 import { usePipelines } from "../hooks/usePipelines";
 import { usePipelineActions } from "../hooks/usePipelineActions";
 import { useTags } from "../hooks/useTags";
-import { useAuth } from "../hooks/useAuth";
 import { EmptyState } from "../components/common/EmptyState";
 import { Button } from "../components/common/Button";
 import { Badge } from "../components/common/Badge";
@@ -16,8 +15,10 @@ export function SettingsPage() {
   const { data: pipelines, loading, error, reload } = usePipelines();
   const { create, setDefault } = usePipelineActions();
   const { data: tags, notImplemented: tagsNotImplemented } = useTags();
-  const { user } = useAuth();
-  const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  // Ver DashboardPage.tsx — `is_super_admin` não existe mais no backend
+  // (Fase 2/3); sem sinal confiável de platform staff até a Fase 10, a
+  // seção de mensagens de Prospecção fica desligada para todo mundo.
+  const isSuperAdmin = false;
   const { toast } = useToast();
   const [newName, setNewName] = useState("");
 

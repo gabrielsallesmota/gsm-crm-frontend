@@ -5,15 +5,13 @@ import { useAuth } from "../hooks/useAuth";
 import { Avatar } from "../components/common/Avatar";
 import { NavIcon } from "../components/common/NavIcon";
 import { ToastHost } from "../components/common/ToastHost";
+import { useToast } from "../hooks/useToast";
 import { isDemoMode } from "../services/factory";
 import type { AuthUser } from "../types/auth";
 import styles from "./AppLayout.module.css";
 
 function roleLabel(user: AuthUser | null): string | undefined {
-  if (!user) return undefined;
-  if (user.isSuperAdmin) return "Superadmin";
-  if (user.role === "gsm_admin") return "admin gsm";
-  return user.role;
+  return user?.role;
 }
 
 const NAV_ITEMS: {
@@ -36,10 +34,29 @@ const NAV_ITEMS: {
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const { user, tenants, currentTenant, canSwitchTenant, switchTenant, logout } = useAuth();
+  const {
+    user,
+    tenants,
+    currentTenant,
+    canSwitchTenant,
+    switchTenant,
+    currentTenantName,
+    availableTenants,
+    selectTenant,
+    logout,
+  } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const isAdmin = user?.role === "admin" || user?.role === "gestor" || user?.role === "gsm_admin";
+  // "gsm_admin" nunca existiu como role real do backend — era um papel só
+  // do mock de demonstração (auditoria Fase 1-3: confirmado que o backend
+  // sempre usou só admin/gestor/vendedor). Removido daqui; o modo demo
+  // continua funcionando (a comparação nunca era o que fazia o demo
+  // funcionar — `isDemoMode`/`canSwitchTenant` já cobrem isso).
+  const isAdmin = user?.role === "admin" || user?.role === "gestor";
+  // Troca de tenant real (produção) — independente do mecanismo de demo
+  // (`canSwitchTenant`/`switchTenant`, que continua intocado).
+  const canSwitchRealTenant = !isDemoMode && availableTenants.length > 1;
 
   async function handleLogout() {
     await logout();
@@ -94,7 +111,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <header className={styles.topbar}>
             <input className={styles.search} placeholder="Buscar leads, empresas…" />
             <div className={styles.topbarRight}>
-              {canSwitchTenant ? (
+              {isDemoMode && canSwitchTenant ? (
                 <select
                   className={styles.tenantSwitch}
                   value={currentTenant?.id}
@@ -106,11 +123,33 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     </option>
                   ))}
                 </select>
+              ) : canSwitchRealTenant ? (
+                <select
+                  className={styles.tenantSwitch}
+                  value={user?.tenantId}
+                  onChange={(e) => {
+                    const tenantId = e.target.value;
+                    selectTenant(tenantId).catch((err: unknown) => {
+                      toast(err instanceof Error ? err.message : "Não foi possível trocar de tenant.");
+                    });
+                  }}
+                >
+                  {availableTenants.map((t) => (
+                    <option key={t.tenantId} value={t.tenantId}>
+                      {t.tenantName}
+                    </option>
+                  ))}
+                </select>
               ) : (
-                currentTenant && (
+                currentTenantName && (
                   <span className={styles.tenantChip}>
-                    <Avatar name={currentTenant.name} bg={currentTenant.avatarBg} color={currentTenant.avatarColor} size={22} />
-                    {currentTenant.name}
+                    <Avatar
+                      name={currentTenantName}
+                      bg={currentTenant?.avatarBg ?? "rgba(46,230,110,.14)"}
+                      color={currentTenant?.avatarColor ?? "#2ee66e"}
+                      size={22}
+                    />
+                    {currentTenantName}
                   </span>
                 )
               )}

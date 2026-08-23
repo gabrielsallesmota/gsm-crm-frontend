@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useDashboard } from "../hooks/useDashboard";
-import { useAuth } from "../hooks/useAuth";
 import { KpiCard } from "../components/kpi/KpiCard";
 import { WeekBarChart } from "../components/charts/WeekBarChart";
 import { OriginDonut } from "../components/charts/OriginDonut";
@@ -24,8 +23,12 @@ const SOURCE_FILTER_LABEL: Record<SourceFilter, string> = {
 const PASSIVO_BADGE = { label: "Passivo", color: "#4aa3ff", bg: "rgba(74,163,255,.14)" };
 
 export function DashboardPage() {
-  const { user } = useAuth();
-  const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  // O backend não expõe mais acesso de plataforma neste objeto (Fase 2/3 —
+  // `is_super_admin` foi removido de `/auth/me` e do JWT; o mecanismo real
+  // agora é `platform_staff`, sem sinal no frontend até a Fase 10). Até lá,
+  // a seção "Prospecção" fica desligada para todo mundo — mais seguro que
+  // assumir acesso sem ter como verificar.
+  const isSuperAdmin = false;
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("todos");
   const [period, setPeriod] = useState<Period>(EMPTY_PERIOD);
   const showPassivo = !isSuperAdmin || sourceFilter !== "ativo";
