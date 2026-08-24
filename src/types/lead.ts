@@ -55,7 +55,11 @@ export interface Lead {
   state: string;
   notes: string;
   stage: StageKey;
-  ownerId: string;
+  /** `null` = lead de intake público (API Key, backend Fase 6) ainda não
+   * atribuído a ninguém — nenhuma tela hoje lê este campo para exibir nome
+   * de responsável, mas o tipo precisa refletir o contrato real da API
+   * (`GET /api/v1/leads`) desde que esse endpoint público existe. */
+  ownerId: string | null;
   value: number;
   probability: number;
   origin: string;
@@ -94,9 +98,12 @@ export interface LeadListFilter {
 
 export type CreateLeadInput = Pick<
   Lead,
-  "name" | "company" | "phone" | "email" | "origin" | "value" | "ownerId"
+  "name" | "company" | "phone" | "email" | "origin" | "value"
 > &
-  Partial<Pick<Lead, "stage" | "notes">> & { pipelineId?: string };
+  // Criação manual sempre exige um dono real — `ownerId: string | null` do
+  // `Lead` é só para leads já existentes (intake público, ver comentário
+  // acima); aqui sobrescreve de volta para obrigatório.
+  { ownerId: string } & Partial<Pick<Lead, "stage" | "notes">> & { pipelineId?: string };
 
 export type UpdateLeadInput = Partial<
   Pick<Lead, "name" | "company" | "phone" | "email" | "notes" | "value" | "probability" | "tags">

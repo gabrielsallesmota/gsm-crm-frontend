@@ -31,7 +31,8 @@ interface LeadDto {
   notes: string | null;
   pipeline_id: string;
   stage_id: string;
-  owner_id: string;
+  // null = lead de intake público (backend Fase 6) ainda sem responsável.
+  owner_id: string | null;
   expected_value: number | null;
   probability: number | null;
   origin: string;
