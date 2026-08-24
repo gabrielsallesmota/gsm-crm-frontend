@@ -3,20 +3,17 @@ import { EmptyState } from "../components/common/EmptyState";
 import styles from "./ReportsPage.module.css";
 
 export function ReportsPage() {
-  const { data, loading, error, notImplemented } = useReports();
+  // Sem branch de `notImplemented` de propósito — mesma razão de
+  // `DashboardPage.tsx`: `ReportsApiRepository` já chama `GET /api/v1/reports`
+  // de verdade e nunca lança `NotImplementedError`.
+  const { data, loading, error } = useReports();
 
   return (
     <div>
       <h1 className={styles.pageTitle}>Relatórios</h1>
       <p className={styles.pageSubtitle}>Desempenho do funil e da equipe</p>
 
-      {notImplemented && (
-        <EmptyState
-          title="Relatórios disponíveis apenas no modo Demo por enquanto"
-          message="O backend ainda não tem um módulo de relatórios agregados — só autenticação, leads e pipelines. A tela é a mesma; falta só a origem dos dados em produção."
-        />
-      )}
-      {error && !notImplemented && <EmptyState title="Não foi possível carregar os relatórios" message={error.message} />}
+      {error && <EmptyState title="Não foi possível carregar os relatórios" message={error.message} />}
       {loading && !data && <div className={styles.loading}>Carregando…</div>}
 
       {data && (

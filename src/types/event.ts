@@ -9,3 +9,10 @@ export interface CalEvent {
   at: string;
   time: string;
 }
+
+export interface CreateCalEventInput {
+  leadId: string;
+  title: string;
+  type: CalEventType;
+  at: string;
+}

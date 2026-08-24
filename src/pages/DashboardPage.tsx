@@ -73,7 +73,11 @@ function LeadsDashboardSection({
   taggedPassivo: boolean;
   period: Period;
 }) {
-  const { data, loading, notImplemented, error } = useDashboard(period);
+  // Sem branch de `notImplemented` aqui de propósito: `DashboardApiRepository`
+  // já chama `GET /api/v1/dashboard` de verdade (existe desde a Fase 3) e
+  // nunca lança `NotImplementedError` — o branch antigo nunca disparava em
+  // produção, só documentava uma lacuna que já foi fechada.
+  const { data, loading, error } = useDashboard(period);
 
   return (
     <div>
@@ -82,14 +86,7 @@ function LeadsDashboardSection({
       </h1>
       <p className={styles.pageSubtitle}>Visão geral do funil</p>
 
-      {notImplemented && (
-        <EmptyState
-          title="Dashboard disponível apenas no modo Demo por enquanto"
-          message="O backend ainda não expõe métricas agregadas de dashboard — só autenticação, leads e pipelines. Assim que esse endpoint existir, esta tela passa a funcionar em produção sem nenhuma mudança de interface."
-        />
-      )}
-
-      {error && !notImplemented && <EmptyState title="Não foi possível carregar o dashboard" message={error.message} />}
+      {error && <EmptyState title="Não foi possível carregar o dashboard" message={error.message} />}
 
       {loading && !data && <div className={styles.loading}>Carregando…</div>}
 

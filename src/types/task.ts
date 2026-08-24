@@ -9,3 +9,10 @@ export interface Task {
   done: boolean;
   dueAt: string;
 }
+
+export interface CreateTaskInput {
+  leadId: string;
+  title: string;
+  priority: TaskPriority;
+  dueAt: string;
+}

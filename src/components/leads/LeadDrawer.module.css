@@ -141,6 +141,26 @@
   margin-bottom: 22px;
 }
 
+.tagOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tagOption {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+}
+
+.tagOptionActive {
+  border-color: transparent;
+}
+
 .sectionTitle {
   font-size: 12px;
   font-weight: 700;

@@ -7,6 +7,7 @@ import { STAGES } from "../../constants/stages";
 import { TEMP } from "../../constants/temperature";
 import { brl } from "../../utils/currency";
 import { useLeadActions } from "../../hooks/useLeadActions";
+import { useTags } from "../../hooks/useTags";
 import { useToast } from "../../hooks/useToast";
 import { WhatsappButton } from "./WhatsappButton";
 import styles from "./LeadDrawer.module.css";
@@ -26,12 +27,20 @@ export function LeadDrawer({
 }) {
   const { toast } = useToast();
   const { update } = useLeadActions();
+  const { data: availableTags } = useTags();
   const stage = STAGES[lead.stage];
   const temp = TEMP[lead.temperature];
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(() => fromLead(lead));
+
+  function toggleTag(tagId: string) {
+    setForm((f) => ({
+      ...f,
+      tags: f.tags.includes(tagId) ? f.tags.filter((id) => id !== tagId) : [...f.tags, tagId],
+    }));
+  }
 
   function startEdit() {
     setForm(fromLead(lead));
@@ -53,6 +62,7 @@ export function LeadDrawer({
         value: Number(form.value) || 0,
         probability: Math.min(100, Math.max(0, Number(form.probability) || 0)),
         notes: form.notes,
+        tags: form.tags,
       };
       const updated = await update(lead.id, input);
       toast("Lead atualizado com sucesso");
@@ -165,6 +175,37 @@ export function LeadDrawer({
           </div>
         </div>
 
+        {(editing ? availableTags && availableTags.length > 0 : lead.tags.length > 0) && (
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>Tags</div>
+            {editing ? (
+              <div className={styles.tagOptions}>
+                {availableTags?.map((tag) => {
+                  const active = form.tags.includes(tag.id);
+                  return (
+                    <button
+                      type="button"
+                      key={tag.id}
+                      className={active ? `${styles.tagOption} ${styles.tagOptionActive}` : styles.tagOption}
+                      style={active ? { color: tag.color, background: tag.bg } : undefined}
+                      onClick={() => toggleTag(tag.id)}
+                    >
+                      {tag.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className={styles.tagOptions}>
+                {lead.tags.map((tagId) => {
+                  const tag = availableTags?.find((t) => t.id === tagId);
+                  return tag ? <Badge key={tag.id} label={tag.label} color={tag.color} bg={tag.bg} /> : null;
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {editing ? (
           <div className={styles.section}>
             <div className={styles.sectionTitle}>Notas</div>
@@ -249,5 +290,6 @@ function fromLead(lead: Lead) {
     value: String(lead.value),
     probability: String(lead.probability),
     notes: lead.notes,
+    tags: lead.tags,
   };
 }

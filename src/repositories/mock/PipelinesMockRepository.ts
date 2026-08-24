@@ -68,7 +68,10 @@ export class PipelinesMockRepository implements PipelinesRepository {
     return pipeline;
   }
 
-  async createStage(pipelineId: string, input: Pick<PipelineStage, "label" | "color">): Promise<PipelineStage> {
+  async createStage(
+    pipelineId: string,
+    input: Pick<PipelineStage, "label" | "color"> & { isWon?: boolean; isLost?: boolean },
+  ): Promise<PipelineStage> {
     await delay(150);
     const pipeline = mockState.pipelines.find((p) => p.id === pipelineId);
     if (!pipeline) throw new Error(`Pipeline ${pipelineId} não encontrado.`);

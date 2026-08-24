@@ -38,7 +38,10 @@ export class PipelinesService {
     return repo.setDefault(id);
   }
 
-  createStage(pipelineId: string, input: Pick<PipelineStage, "label" | "color">): Promise<PipelineStage> {
+  createStage(
+    pipelineId: string,
+    input: Pick<PipelineStage, "label" | "color"> & { isWon?: boolean; isLost?: boolean },
+  ): Promise<PipelineStage> {
     return repo.createStage(pipelineId, input);
   }
 

@@ -38,6 +38,7 @@ interface LeadDto {
   origin: string;
   created_at: string;
   last_interaction_at: string | null;
+  tags: string[];
 }
 
 interface MessageTemplateDto {
@@ -83,8 +84,10 @@ function temperatureFromProbability(p: number): Lead["temperature"] {
 
 /**
  * O backend ainda não guarda os campos "ricos" do CRM (timeline de
- * atividades, tarefas/eventos vinculados, insights de IA, sentimento,
- * objeções, campos customizados) — só o cadastro básico do lead. Essas
+ * atividades, insights de IA, sentimento, objeções, campos customizados) —
+ * `tags` já é real (módulo `tags`); `tasks`/`events` também já existem no
+ * backend, mas como telas GLOBAIS próprias (`/tasks`, `/calendar`), não
+ * embutidas na resposta do lead — por isso continuam `[]` aqui. Essas
  * seções aparecem vazias em produção até o backend ganhar esse
  * histórico; a tela é a mesma, só o conteúdo disponível é menor.
  */
@@ -109,7 +112,7 @@ function toLead(dto: LeadDto): Lead {
     value: dto.expected_value ?? 0,
     probability,
     origin: dto.origin,
-    tags: [],
+    tags: dto.tags,
     createdAt: dto.created_at,
     firstContactHours: 0,
     lastActivityAt: dto.last_interaction_at ?? dto.created_at,
@@ -193,6 +196,9 @@ export class LeadsApiRepository implements LeadsRepository {
         notes: input.notes,
         expected_value: input.value,
         probability: input.probability,
+        // `undefined` (campo omitido) faz o backend não mexer nas tags —
+        // só envia `tag_ids` quando `input.tags` de fato veio preenchido.
+        tag_ids: input.tags,
       }),
     });
     return toLead(dto);

@@ -4,3 +4,5 @@ export interface Tag {
   color: string;
   bg: string;
 }
+
+export type CreateTagInput = Pick<Tag, "label" | "color" | "bg">;

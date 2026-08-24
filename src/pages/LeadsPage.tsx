@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useLeads } from "../hooks/useLeads";
 import { useLeadActions } from "../hooks/useLeadActions";
+import { usePipelines } from "../hooks/usePipelines";
+import { useAuth } from "../hooks/useAuth";
 import { LeadRow } from "../components/leads/LeadRow";
 import { LeadDrawer } from "../components/leads/LeadDrawer";
 import { EmptyState } from "../components/common/EmptyState";
@@ -14,6 +16,8 @@ export function LeadsPage() {
   const [search, setSearch] = useState("");
   const { data, loading, error, reload } = useLeads({ search, page: 1, pageSize: 100 });
   const { create } = useLeadActions();
+  const { data: pipelines } = usePipelines();
+  const { user } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -21,8 +25,13 @@ export function LeadsPage() {
 
   const leads = data?.items ?? [];
   const selected = leads.find((l) => l.id === id) ?? null;
+  // Tenant sem nenhum pipeline ainda (só acontece antes do primeiro
+  // pipeline ser criado em Configurações) — sem isso, `handleCreate` não
+  // tem pra onde mandar o lead (backend exige `pipeline_id`).
+  const defaultPipeline = pipelines?.find((p) => p.isDefault) ?? pipelines?.[0];
 
   async function handleCreate(form: { name: string; company: string; phone: string; email: string; value: number }) {
+    if (!defaultPipeline || !user) return;
     await create({
       name: form.name,
       company: form.company,
@@ -30,7 +39,11 @@ export function LeadsPage() {
       email: form.email,
       value: form.value,
       origin: "manual",
-      ownerId: "u1",
+      // Quem cria o lead vira o dono por padrão — o "novo lead" é um form
+      // rápido, sem seletor de responsável; reatribuir depois é feito no
+      // drawer de edição do lead.
+      ownerId: user.id,
+      pipelineId: defaultPipeline.id,
     });
     toast("Lead criado com sucesso");
     setCreating(false);
@@ -44,7 +57,12 @@ export function LeadsPage() {
           <h1 className={styles.pageTitle}>Leads</h1>
           <p className={styles.pageSubtitle}>{data ? `${data.total} leads` : "Carregando…"}</p>
         </div>
-        <Button variant="primary" onClick={() => setCreating(true)}>
+        <Button
+          variant="primary"
+          onClick={() => setCreating(true)}
+          disabled={!defaultPipeline}
+          title={defaultPipeline ? undefined : "Crie um pipeline em Configurações antes de cadastrar um lead"}
+        >
           + Novo lead
         </Button>
       </div>

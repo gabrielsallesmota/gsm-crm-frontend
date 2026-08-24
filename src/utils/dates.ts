@@ -40,3 +40,7 @@ export function relativeDayLabel(iso: string): string {
 export function shortDateLabel(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
+
+export function shortTimeLabel(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}

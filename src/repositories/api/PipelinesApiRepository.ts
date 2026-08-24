@@ -90,10 +90,18 @@ export class PipelinesApiRepository implements PipelinesRepository {
     return toPipeline(dto);
   }
 
-  async createStage(pipelineId: string, input: Pick<PipelineStage, "label" | "color">): Promise<PipelineStage> {
+  async createStage(
+    pipelineId: string,
+    input: Pick<PipelineStage, "label" | "color"> & { isWon?: boolean; isLost?: boolean },
+  ): Promise<PipelineStage> {
     const dto = await apiRequest<StageDto>(`/api/v1/pipelines/${pipelineId}/stages`, {
       method: "POST",
-      body: JSON.stringify({ name: input.label, color: input.color }),
+      body: JSON.stringify({
+        name: input.label,
+        color: input.color,
+        is_won: input.isWon ?? false,
+        is_lost: input.isLost ?? false,
+      }),
     });
     return { id: "novo", label: dto.name, color: dto.color };
   }

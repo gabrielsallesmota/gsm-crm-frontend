@@ -8,6 +8,9 @@ export interface PipelinesRepository {
   delete(id: string): Promise<void>;
   reorder(orderedIds: string[]): Promise<void>;
   setDefault(id: string): Promise<Pipeline>;
-  createStage(pipelineId: string, input: Pick<PipelineStage, "label" | "color">): Promise<PipelineStage>;
+  createStage(
+    pipelineId: string,
+    input: Pick<PipelineStage, "label" | "color"> & { isWon?: boolean; isLost?: boolean },
+  ): Promise<PipelineStage>;
   reorderStages(pipelineId: string, orderedIds: string[]): Promise<void>;
 }

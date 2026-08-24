@@ -1,7 +1,12 @@
+import { useState } from "react";
 import { useCalendar } from "../hooks/useCalendar";
+import { useCalendarActions } from "../hooks/useCalendarActions";
+import { useLeads } from "../hooks/useLeads";
+import { useToast } from "../hooks/useToast";
 import { EmptyState } from "../components/common/EmptyState";
+import { Button } from "../components/common/Button";
 import { relativeDayLabel, shortDateLabel } from "../utils/dates";
-import type { CalEvent } from "../types/event";
+import type { CalEvent, CalEventType } from "../types/event";
 import styles from "./AgendaPage.module.css";
 
 const TYPE_LABEL: Record<string, { label: string; color: string }> = {
@@ -11,7 +16,33 @@ const TYPE_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 export function AgendaPage() {
-  const { data, loading, error, notImplemented } = useCalendar();
+  // Sem branch de `notImplemented` de propósito — mesma razão de
+  // `DashboardPage.tsx`: `CalendarApiRepository` já chama `GET
+  // /api/v1/calendar/events` de verdade e nunca lança `NotImplementedError`.
+  const { data, loading, error, reload } = useCalendar();
+  const { data: leadsPage } = useLeads({ pageSize: 200 });
+  const { create, delete: deleteEvent } = useCalendarActions();
+  const { toast } = useToast();
+
+  const [leadId, setLeadId] = useState("");
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState<CalEventType>("reuniao");
+  const [at, setAt] = useState("");
+
+  async function handleCreate() {
+    if (!leadId || !title.trim() || !at) return;
+    await create({ leadId, title: title.trim(), type, at: new Date(at).toISOString() });
+    setTitle("");
+    setAt("");
+    toast("Compromisso criado");
+    reload();
+  }
+
+  async function handleDelete(eventId: string) {
+    await deleteEvent(eventId);
+    toast("Compromisso removido");
+    reload();
+  }
 
   const groups = new Map<string, { label: string; date: string; events: CalEvent[] }>();
   for (const event of data ?? []) {
@@ -28,16 +59,41 @@ export function AgendaPage() {
       <h1 className={styles.pageTitle}>Agenda</h1>
       <p className={styles.pageSubtitle}>Próximos compromissos</p>
 
-      {notImplemented && (
-        <EmptyState
-          title="Agenda disponível apenas no modo Demo por enquanto"
-          message="O backend ainda não tem um módulo de agenda — só autenticação, leads e pipelines. A tela é a mesma; falta só a origem dos dados em produção."
+      <div className={styles.inlineForm}>
+        <select className={styles.select} value={leadId} onChange={(e) => setLeadId(e.target.value)}>
+          <option value="">Lead…</option>
+          {leadsPage?.items.map((lead) => (
+            <option key={lead.id} value={lead.id}>
+              {lead.name}
+            </option>
+          ))}
+        </select>
+        <input
+          className={styles.input}
+          placeholder="Título do compromisso…"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
         />
-      )}
-      {error && !notImplemented && <EmptyState title="Não foi possível carregar a agenda" message={error.message} />}
+        <select className={styles.select} value={type} onChange={(e) => setType(e.target.value as CalEventType)}>
+          <option value="reuniao">Reunião</option>
+          <option value="retorno">Retorno</option>
+          <option value="visita">Visita</option>
+        </select>
+        <input
+          className={styles.input}
+          type="datetime-local"
+          value={at}
+          onChange={(e) => setAt(e.target.value)}
+        />
+        <Button variant="primary" onClick={() => void handleCreate()} disabled={!leadId || !title.trim() || !at}>
+          Adicionar
+        </Button>
+      </div>
+
+      {error && <EmptyState title="Não foi possível carregar a agenda" message={error.message} />}
       {loading && !data && <div className={styles.loading}>Carregando…</div>}
 
-      {data && days.length === 0 && !notImplemented && <div className={styles.empty}>Nenhum compromisso agendado.</div>}
+      {data && days.length === 0 && <div className={styles.empty}>Nenhum compromisso agendado.</div>}
 
       {days.map(([key, group]) => (
         <div key={key} className={styles.dayBlock}>
@@ -57,6 +113,14 @@ export function AgendaPage() {
                 <span className={styles.eventType} style={{ color: type?.color }}>
                   {type?.label}
                 </span>
+                <button
+                  type="button"
+                  className={styles.deleteBtn}
+                  onClick={() => void handleDelete(event.id)}
+                  aria-label="Remover compromisso"
+                >
+                  ✕
+                </button>
               </div>
             );
           })}
