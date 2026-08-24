@@ -8,6 +8,7 @@ import { LeadRow } from "../components/leads/LeadRow";
 import { LeadDrawer } from "../components/leads/LeadDrawer";
 import { EmptyState } from "../components/common/EmptyState";
 import { Button } from "../components/common/Button";
+import { CurrencyInput } from "../components/common/CurrencyInput";
 import { useToast } from "../hooks/useToast";
 import { ROUTES } from "../constants/routes";
 import styles from "./LeadsPage.module.css";
@@ -120,13 +121,13 @@ function QuickCreateModal({
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
     if (!name.trim()) return;
     setSubmitting(true);
-    await onSubmit({ name, company, phone, email, value: Number(value) || 0 });
+    await onSubmit({ name, company, phone, email, value });
     setSubmitting(false);
   }
 
@@ -138,7 +139,7 @@ function QuickCreateModal({
         <input className={styles.input} placeholder="Empresa" value={company} onChange={(e) => setCompany(e.target.value)} />
         <input className={styles.input} placeholder="Telefone" value={phone} onChange={(e) => setPhone(e.target.value)} />
         <input className={styles.input} placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input className={styles.input} placeholder="Valor (R$)" value={value} onChange={(e) => setValue(e.target.value)} />
+        <CurrencyInput className={styles.input} value={value} onChange={setValue} />
         <div className={styles.modalActions}>
           <Button onClick={onClose}>Cancelar</Button>
           <Button variant="primary" onClick={() => void handleSubmit()} disabled={submitting || !name.trim()}>

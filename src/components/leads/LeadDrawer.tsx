@@ -3,6 +3,7 @@ import type { Lead, LeadMessageTemplate, UpdateLeadInput } from "../../types/lea
 import { Avatar } from "../common/Avatar";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
+import { CurrencyInput } from "../common/CurrencyInput";
 import { STAGES } from "../../constants/stages";
 import { TEMP } from "../../constants/temperature";
 import { brl } from "../../utils/currency";
@@ -59,7 +60,7 @@ export function LeadDrawer({
         company: form.company.trim(),
         phone: form.phone.trim(),
         email: form.email.trim(),
-        value: Number(form.value) || 0,
+        value: form.value,
         probability: Math.min(100, Math.max(0, Number(form.probability) || 0)),
         notes: form.notes,
         tags: form.tags,
@@ -124,11 +125,10 @@ export function LeadDrawer({
           <div className={styles.field}>
             <div className={styles.fieldLabel}>Valor</div>
             {editing ? (
-              <input
+              <CurrencyInput
                 className={styles.editInputSmall}
-                type="number"
                 value={form.value}
-                onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
+                onChange={(v) => setForm((f) => ({ ...f, value: v }))}
               />
             ) : (
               <div className={styles.fieldValue}>R$ {brl(lead.value)}</div>
@@ -287,7 +287,7 @@ function fromLead(lead: Lead) {
     company: lead.company === "—" ? "" : lead.company,
     phone: lead.phone,
     email: lead.email,
-    value: String(lead.value),
+    value: lead.value,
     probability: String(lead.probability),
     notes: lead.notes,
     tags: lead.tags,
