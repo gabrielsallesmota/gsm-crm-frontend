@@ -23,7 +23,7 @@ export interface ProspectsRepository {
   get(id: string): Promise<Prospect>;
   create(input: CreateProspectInput): Promise<Prospect>;
   update(id: string, input: UpdateProspectInput): Promise<Prospect>;
-  move(id: string, stageId: string): Promise<Prospect>;
+  move(id: string, stageId: string, targetDate?: string | null): Promise<Prospect>;
   delete(id: string): Promise<void>;
   checkDuplicate(phone: string): Promise<ProspectDuplicateCheck>;
   bulkImport(

@@ -44,8 +44,8 @@ export class ProspectsService {
     return repo.update(id, input);
   }
 
-  move(id: string, stageId: string): Promise<Prospect> {
-    return repo.move(id, stageId);
+  move(id: string, stageId: string, targetDate?: string | null): Promise<Prospect> {
+    return repo.move(id, stageId, targetDate);
   }
 
   delete(id: string): Promise<void> {

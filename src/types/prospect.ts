@@ -31,6 +31,9 @@ export interface ProspectStage {
   order: number;
   isWon: boolean;
   isLost: boolean;
+  // Mover um prospect pra este estágio deve pedir uma data alvo de
+  // follow-up? Ver `Prospect.targetDate` e `ProspectionBoard.tsx`.
+  asksTargetDate: boolean;
 }
 
 /** Anotação datada de alguém sobre o prospect — histórico append-only,
@@ -75,6 +78,10 @@ export interface Prospect {
   pageObjective: PageObjective | null;
   priority: ProspectPriority;
   origin: ProspectOrigin;
+  // Próxima data de follow-up ("YYYY-MM-DD") — normalmente definida ao
+  // mover pra um estágio com `ProspectStage.asksTargetDate`, mas editável a
+  // qualquer momento (ver `ProspectDrawer`). `null` = sem data marcada.
+  targetDate: string | null;
   createdAt: string;
   updatedAt: string;
   lastComment?: LastProspectCommentPreview | null;
@@ -121,16 +128,17 @@ export interface CreateProspectInput {
   pageObjective?: PageObjective;
   priority?: ProspectPriority;
   origin?: ProspectOrigin;
+  targetDate?: string;
   force?: boolean;
 }
 
 export type UpdateProspectInput = Partial<CreateProspectInput>;
 
 export type CreateProspectStageInput = Pick<ProspectStage, "name" | "color"> &
-  Partial<Pick<ProspectStage, "isWon" | "isLost">>;
+  Partial<Pick<ProspectStage, "isWon" | "isLost" | "asksTargetDate">>;
 
 export type UpdateProspectStageInput = Partial<
-  Pick<ProspectStage, "name" | "color" | "isWon" | "isLost">
+  Pick<ProspectStage, "name" | "color" | "isWon" | "isLost" | "asksTargetDate">
 >;
 
 export interface ProspectDuplicateCheck {

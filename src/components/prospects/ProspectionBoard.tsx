@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useProspectStages } from "../../hooks/useProspectStages";
+import { useProspectStageActions } from "../../hooks/useProspectStageActions";
 import { useProspects } from "../../hooks/useProspects";
 import { useProspectActions } from "../../hooks/useProspectActions";
 import { useMessageTemplates } from "../../hooks/useMessageTemplates";
@@ -25,6 +26,25 @@ import styles from "./ProspectionBoard.module.css";
 
 const ATIVO_BADGE = { label: "Ativo", color: "#a78bfa", bg: "rgba(167,139,250,.16)" };
 
+function isoInDays(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** "2026-08-27" → "27/08" — cabe no canto do card mesmo minimizado; o ano
+ * some de propósito (follow-up é sempre "próximos dias", não faz falta). */
+function formatShortDate(iso: string): string {
+  const [, month, day] = iso.split("-");
+  return `${day}/${month}`;
+}
+
+/** Comparação lexicográfica pura já funciona pra "YYYY-MM-DD" — sem
+ * `Date` de propósito, evita timezone mexer com "hoje" perto da meia-noite. */
+function isOverdue(targetDateIso: string): boolean {
+  return targetDateIso < new Date().toISOString().slice(0, 10);
+}
+
 /**
  * Seção "Ativo (prospecção)" dentro do Pipeline unificado — visão só de
  * super admin. Kanban próprio (estágios/dados de `prospects`, isolados do
@@ -39,22 +59,71 @@ export function ProspectionBoard({ period }: { period: Period }) {
     reload: reloadStages,
   } = useProspectStages();
   const { move } = useProspectActions();
+  const { reorder: reorderStages } = useProspectStageActions();
   const { toast } = useToast();
   const { data: templates } = useMessageTemplates();
 
   const { data, loading, error, reload } = useProspects({ ...period, page: 1, pageSize: 200 });
   const [dragId, setDragId] = useState<string | null>(null);
+  // Arrastar uma COLUNA (reordenar estágios) é uma operação diferente de
+  // arrastar um CARD (mover prospect de estágio) — estado separado pra não
+  // confundir os dois num mesmo drop (ver `handleDrop`).
+  const [dragColumnId, setDragColumnId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [managingStages, setManagingStages] = useState(false);
+  // Move pendente aguardando a data alvo (só quando o estágio de destino
+  // pede — ver `stage.asksTargetDate`); some assim que confirma ou pula.
+  const [pendingMove, setPendingMove] = useState<{
+    prospectId: string;
+    stageId: string;
+    stageName: string;
+  } | null>(null);
 
-  async function handleDrop(stageId: string) {
+  async function handleDrop(targetStageId: string) {
+    if (dragColumnId) {
+      const draggedStageId = dragColumnId;
+      setDragColumnId(null);
+      if (draggedStageId === targetStageId || !stages) return;
+      const ids = stages.map((s) => s.id);
+      const fromIndex = ids.indexOf(draggedStageId);
+      const toIndex = ids.indexOf(targetStageId);
+      if (fromIndex === -1 || toIndex === -1) return;
+      ids.splice(fromIndex, 1);
+      ids.splice(toIndex, 0, draggedStageId);
+      try {
+        await reorderStages(ids);
+        reloadStages();
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Não foi possível reordenar os estágios");
+      }
+      return;
+    }
     if (!dragId) return;
     const prospectId = dragId;
     setDragId(null);
-    await move(prospectId, stageId);
+    const current = prospects.find((p) => p.id === prospectId);
+    if (!current || current.stageId === targetStageId) return; // solto na própria coluna — nada a fazer
+    const targetStage = stages?.find((s) => s.id === targetStageId);
+    if (targetStage?.asksTargetDate) {
+      setPendingMove({ prospectId, stageId: targetStageId, stageName: targetStage.name });
+      return;
+    }
+    await move(prospectId, targetStageId);
     reload();
+  }
+
+  async function handleConfirmPendingMove(targetDate: string | null) {
+    if (!pendingMove) return;
+    const { prospectId, stageId } = pendingMove;
+    setPendingMove(null);
+    try {
+      await move(prospectId, stageId, targetDate);
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível mover o prospect");
+    }
   }
 
   function handleExport() {
@@ -144,7 +213,12 @@ export function ProspectionBoard({ period }: { period: Period }) {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => void handleDrop(stage.id)}
               >
-                <div className={styles.columnHeader}>
+                <div
+                  className={styles.columnHeader}
+                  draggable
+                  onDragStart={() => setDragColumnId(stage.id)}
+                  title="Arraste pra reordenar os estágios"
+                >
                   <span className={styles.columnDot} style={{ background: stage.color }} />
                   <span className={styles.columnLabel}>{stage.name}</span>
                   <span className={styles.columnCount}>{stageProspects.length}</span>
@@ -214,6 +288,71 @@ export function ProspectionBoard({ period }: { period: Period }) {
           }}
         />
       )}
+
+      {pendingMove && (
+        <TargetDatePrompt
+          stageName={pendingMove.stageName}
+          onConfirm={(date) => void handleConfirmPendingMove(date)}
+          onSkip={() => void handleConfirmPendingMove(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Só aparece quando o estágio de destino do move tem `asksTargetDate`
+ * ligado (ver `SettingsPage.tsx` → Prospecção — Estágios). Atalhos de dias
+ * cobrem o caso comum (retomar em N dias); o campo de data é pra quando o
+ * follow-up é numa data específica em vez de "daqui a X dias". */
+function TargetDatePrompt({
+  stageName,
+  onConfirm,
+  onSkip,
+}: {
+  stageName: string;
+  onConfirm: (date: string) => void;
+  onSkip: () => void;
+}) {
+  const [date, setDate] = useState("");
+
+  function pickShortcut(days: number) {
+    onConfirm(isoInDays(days));
+  }
+
+  return (
+    <div className={styles.overlay} onClick={onSkip}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <h2 className={styles.modalTitle}>Quando retomar contato?</h2>
+        <p className={styles.modalSubtitle}>
+          Movendo pra <strong>{stageName}</strong> — defina uma data alvo de follow-up (opcional).
+        </p>
+        <div className={styles.dateShortcuts}>
+          <button type="button" className={styles.dateShortcutBtn} onClick={() => pickShortcut(1)}>
+            +1 dia
+          </button>
+          <button type="button" className={styles.dateShortcutBtn} onClick={() => pickShortcut(2)}>
+            +2 dias
+          </button>
+          <button type="button" className={styles.dateShortcutBtn} onClick={() => pickShortcut(3)}>
+            +3 dias
+          </button>
+          <button type="button" className={styles.dateShortcutBtn} onClick={() => pickShortcut(7)}>
+            +7 dias
+          </button>
+        </div>
+        <input
+          className={styles.input}
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+        />
+        <div className={styles.modalActions}>
+          <Button onClick={onSkip}>Pular</Button>
+          <Button variant="primary" onClick={() => date && onConfirm(date)} disabled={!date}>
+            Confirmar
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -235,7 +374,24 @@ function ProspectCard({
     <div className={styles.card} draggable onDragStart={onDragStart} onClick={onClick}>
       <div className={styles.cardTop}>
         <div className={styles.cardName}>{prospect.companyName}</div>
-        <Badge label={priority.label} color={priority.color} bg={priority.bg} />
+        {/* Canto superior direito do card — prioridade sempre, data alvo
+            embaixo dela só quando marcada (mesmo com o card minimizado,
+            sem precisar abrir o drawer pra saber quando retomar contato). */}
+        <div className={styles.cardTopRight}>
+          <Badge label={priority.label} color={priority.color} bg={priority.bg} />
+          {prospect.targetDate && (
+            <span
+              className={
+                isOverdue(prospect.targetDate)
+                  ? `${styles.targetDate} ${styles.targetDateOverdue}`
+                  : styles.targetDate
+              }
+              title={`Follow-up marcado pra ${formatShortDate(prospect.targetDate)}`}
+            >
+              📅 {formatShortDate(prospect.targetDate)}
+            </span>
+          )}
+        </div>
       </div>
       <div className={styles.cardMeta}>
         {[prospect.city, prospect.niche].filter(Boolean).join(" · ") || "—"}

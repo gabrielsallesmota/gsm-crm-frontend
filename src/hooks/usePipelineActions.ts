@@ -14,6 +14,7 @@ export interface PipelineActions {
     stageKey: StageKey,
     input: Partial<Pick<PipelineStage, "label" | "color" | "isWon" | "isLost">>,
   ): Promise<PipelineStage>;
+  reorderStages(pipelineId: string, orderedIds: string[]): Promise<void>;
 }
 
 export function usePipelineActions(): PipelineActions {
@@ -24,5 +25,6 @@ export function usePipelineActions(): PipelineActions {
     createStage: (pipelineId, input) => pipelinesService.createStage(pipelineId, input),
     updateStage: (pipelineId, stageKey, input) =>
       pipelinesService.updateStage(pipelineId, stageKey, input),
+    reorderStages: (pipelineId, orderedIds) => pipelinesService.reorderStages(pipelineId, orderedIds),
   };
 }

@@ -63,6 +63,7 @@ export function SettingsPage() {
     color: "#4aa3ff",
     isWon: false,
     isLost: false,
+    asksTargetDate: false,
   });
   const [editingProspectStage, setEditingProspectStage] = useState<string | null>(null);
   const [prospectStageForm, setProspectStageForm] = useState({
@@ -70,6 +71,7 @@ export function SettingsPage() {
     color: "#4aa3ff",
     isWon: false,
     isLost: false,
+    asksTargetDate: false,
   });
 
   async function handleCreatePipeline() {
@@ -115,7 +117,13 @@ export function SettingsPage() {
     if (!newProspectStage.name.trim()) return;
     try {
       await createProspectStage(newProspectStage);
-      setNewProspectStage({ name: "", color: "#4aa3ff", isWon: false, isLost: false });
+      setNewProspectStage({
+        name: "",
+        color: "#4aa3ff",
+        isWon: false,
+        isLost: false,
+        asksTargetDate: false,
+      });
       toast("Estágio de prospecção criado");
       reloadProspectStages();
     } catch (err) {
@@ -130,6 +138,7 @@ export function SettingsPage() {
       color: stage.color,
       isWon: stage.isWon,
       isLost: stage.isLost,
+      asksTargetDate: stage.asksTargetDate,
     });
   }
 
@@ -447,6 +456,16 @@ export function SettingsPage() {
                 />
                 Perdido
               </label>
+              <label className={styles.stageFlagLabel} title="Ao mover um prospect pra este estágio, pergunta quando retomar contato">
+                <input
+                  type="checkbox"
+                  checked={newProspectStage.asksTargetDate}
+                  onChange={(e) =>
+                    setNewProspectStage((f) => ({ ...f, asksTargetDate: e.target.checked }))
+                  }
+                />
+                Pede data alvo ao mover
+              </label>
               <Button
                 variant="primary"
                 onClick={() => void handleCreateProspectStage()}
@@ -502,6 +521,16 @@ export function SettingsPage() {
                         }
                       />
                       Perdido
+                    </label>
+                    <label className={styles.stageFlagLabel} title="Ao mover um prospect pra este estágio, pergunta quando retomar contato">
+                      <input
+                        type="checkbox"
+                        checked={prospectStageForm.asksTargetDate}
+                        onChange={(e) =>
+                          setProspectStageForm((f) => ({ ...f, asksTargetDate: e.target.checked }))
+                        }
+                      />
+                      Pede data alvo ao mover
                     </label>
                     <Button
                       variant="primary"

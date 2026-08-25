@@ -49,7 +49,7 @@ export class ProspectsMockRepository implements ProspectsRepository {
     throw new NotImplementedError("Prospecção GSM", REASON);
   }
 
-  async move(_id: string, _stageId: string): Promise<Prospect> {
+  async move(_id: string, _stageId: string, _targetDate?: string | null): Promise<Prospect> {
     throw new NotImplementedError("Prospecção GSM", REASON);
   }
 

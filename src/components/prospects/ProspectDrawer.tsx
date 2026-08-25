@@ -101,6 +101,7 @@ export function ProspectDrawer({
         priority: form.priority,
         origin: form.origin,
         force,
+        ...(form.targetDate ? { targetDate: form.targetDate } : {}),
         ...(form.googleRating ? { googleRating: Number(form.googleRating) } : {}),
         ...(form.googleReviewsCount ? { googleReviewsCount: Number(form.googleReviewsCount) } : {}),
         ...(form.pageObjective
@@ -370,6 +371,14 @@ export function ProspectDrawer({
               options={Object.entries(PRIORITY).map(([k, v]) => ({ value: k, label: v.label }))}
               onChange={(v) => setForm((f) => ({ ...f, priority: v as FormState["priority"] }))}
             />
+            <Field
+              label="Data alvo (follow-up)"
+              editing={editing}
+              value={form.targetDate}
+              display={formatTargetDate(prospect.targetDate)}
+              onChange={(v) => setForm((f) => ({ ...f, targetDate: v }))}
+              type="date"
+            />
           </div>
         </div>
 
@@ -551,6 +560,14 @@ function SelectField({
   );
 }
 
+/** "2026-08-27" → "27/08/2026" — só pro modo leitura; em edição o campo é
+ * um `<input type="date">` nativo, que já cuida do próprio formato. */
+function formatTargetDate(iso: string | null): string {
+  if (!iso) return "—";
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 function fromProspect(prospect: Prospect) {
   return {
     companyName: prospect.companyName,
@@ -572,5 +589,6 @@ function fromProspect(prospect: Prospect) {
     pageObjective: prospect.pageObjective ?? "",
     priority: prospect.priority,
     origin: prospect.origin,
+    targetDate: prospect.targetDate ?? "",
   };
 }

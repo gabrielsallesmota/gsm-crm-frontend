@@ -12,7 +12,7 @@ import type {
 export interface ProspectActions {
   create(input: CreateProspectInput): Promise<Prospect>;
   update(id: string, input: UpdateProspectInput): Promise<Prospect>;
-  move(id: string, stageId: string): Promise<Prospect>;
+  move(id: string, stageId: string, targetDate?: string | null): Promise<Prospect>;
   delete(id: string): Promise<void>;
   checkDuplicate(phone: string): Promise<ProspectDuplicateCheck>;
   bulkImport(
@@ -29,7 +29,7 @@ export function useProspectActions(): ProspectActions {
   return {
     create: (input) => prospectsService.create(input),
     update: (id, input) => prospectsService.update(id, input),
-    move: (id, stageId) => prospectsService.move(id, stageId),
+    move: (id, stageId, targetDate) => prospectsService.move(id, stageId, targetDate),
     delete: (id) => prospectsService.delete(id),
     checkDuplicate: (phone) => prospectsService.checkDuplicate(phone),
     bulkImport: (rows, defaultStageId, dedupeStrategy) =>

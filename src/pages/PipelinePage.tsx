@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { usePipelines } from "../hooks/usePipelines";
+import { usePipelineActions } from "../hooks/usePipelineActions";
 import { useLeads } from "../hooks/useLeads";
 import { useLeadActions } from "../hooks/useLeadActions";
 import { useLeadMessageTemplates } from "../hooks/useLeadMessageTemplates";
@@ -72,7 +73,13 @@ export function PipelinePage() {
 }
 
 function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean; period: Period }) {
-  const { data: pipelines, loading: loadingPipelines, error: pipelineError } = usePipelines();
+  const {
+    data: pipelines,
+    loading: loadingPipelines,
+    error: pipelineError,
+    reload: reloadPipelines,
+  } = usePipelines();
+  const { reorderStages } = usePipelineActions();
   const { move, exportCsv } = useLeadActions();
   const { data: templates } = useLeadMessageTemplates();
   const { toast } = useToast();
@@ -86,14 +93,36 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
     pageSize: 200,
   });
   const [dragId, setDragId] = useState<string | null>(null);
+  // Arrastar uma COLUNA (reordenar estágios) é diferente de arrastar um
+  // CARD (mover lead de estágio) — estado separado, mesmo padrão de
+  // `ProspectionBoard.tsx`.
+  const [dragColumnId, setDragColumnId] = useState<StageKey | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
 
-  async function handleDrop(stage: StageKey) {
+  async function handleDrop(targetStage: StageKey) {
+    if (dragColumnId) {
+      const draggedStageId = dragColumnId;
+      setDragColumnId(null);
+      if (!pipeline || draggedStageId === targetStage) return;
+      const ids = pipeline.stages.map((s) => s.id);
+      const fromIndex = ids.indexOf(draggedStageId);
+      const toIndex = ids.indexOf(targetStage);
+      if (fromIndex === -1 || toIndex === -1) return;
+      ids.splice(fromIndex, 1);
+      ids.splice(toIndex, 0, draggedStageId);
+      try {
+        await reorderStages(pipeline.id, ids);
+        reloadPipelines();
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Não foi possível reordenar os estágios");
+      }
+      return;
+    }
     if (!dragId) return;
     const leadId = dragId;
     setDragId(null);
-    await move(leadId, stage);
+    await move(leadId, targetStage);
     reload();
   }
 
@@ -171,7 +200,12 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => void handleDrop(stage.id)}
               >
-                <div className={styles.columnHeader}>
+                <div
+                  className={styles.columnHeader}
+                  draggable
+                  onDragStart={() => setDragColumnId(stage.id)}
+                  title="Arraste pra reordenar os estágios"
+                >
                   <span className={styles.columnDot} style={{ background: stage.color }} />
                   <span className={styles.columnLabel}>{stage.label}</span>
                   <span className={styles.columnCount}>{stageLeads.length}</span>

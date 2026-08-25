@@ -57,6 +57,7 @@
   align-items: center;
   gap: 8px;
   padding: 4px 4px 12px;
+  cursor: grab;
 }
 
 .columnDot {
@@ -105,6 +106,28 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+}
+
+.cardTopRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.targetDate {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Data alvo já vencida — mesmo esquema de cor de erro usado no resto do
+   app (ver `.duplicateNote`/`.duplicateWarning`), pra chamar atenção de
+   que esse prospect está com follow-up atrasado. */
+.targetDateOverdue {
+  color: #ff6b6b;
 }
 
 .cardMeta {
@@ -190,6 +213,29 @@
   font-size: 12px;
   color: #ff6b6b;
   margin: -4px 0 11px;
+}
+
+.dateShortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dateShortcutBtn {
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.dateShortcutBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .modalActions {

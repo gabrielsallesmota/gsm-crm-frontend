@@ -50,6 +50,7 @@ interface ProspectDto {
   page_objective: PageObjective | null;
   priority: ProspectPriority;
   origin: ProspectOrigin;
+  target_date: string | null;
   created_at: string;
   updated_at: string;
   last_comment: { text: string; created_at: string } | null;
@@ -62,6 +63,7 @@ interface ProspectStageDto {
   order: number;
   is_won: boolean;
   is_lost: boolean;
+  asks_target_date: boolean;
 }
 
 function toProspect(dto: ProspectDto): Prospect {
@@ -89,6 +91,7 @@ function toProspect(dto: ProspectDto): Prospect {
     pageObjective: dto.page_objective,
     priority: dto.priority,
     origin: dto.origin,
+    targetDate: dto.target_date,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
     lastComment: dto.last_comment
@@ -105,6 +108,7 @@ function toProspectStage(dto: ProspectStageDto): ProspectStage {
     order: dto.order,
     isWon: dto.is_won,
     isLost: dto.is_lost,
+    asksTargetDate: dto.asks_target_date,
   };
 }
 
@@ -130,6 +134,7 @@ function createBody(input: CreateProspectInput | UpdateProspectInput) {
     page_objective: input.pageObjective,
     priority: input.priority,
     origin: input.origin,
+    target_date: input.targetDate,
     force: input.force ?? false,
   };
 }
@@ -207,11 +212,11 @@ export class ProspectsApiRepository implements ProspectsRepository {
     );
   }
 
-  async move(id: string, stageId: string): Promise<Prospect> {
+  async move(id: string, stageId: string, targetDate?: string | null): Promise<Prospect> {
     return toProspect(
       await apiRequest<ProspectDto>(`/api/v1/prospects/${id}/move`, {
         method: "PATCH",
-        body: JSON.stringify({ stage_id: stageId }),
+        body: JSON.stringify({ stage_id: stageId, target_date: targetDate ?? null }),
       }),
     );
   }
@@ -280,6 +285,7 @@ export class ProspectsApiRepository implements ProspectsRepository {
           color: input.color,
           is_won: input.isWon ?? false,
           is_lost: input.isLost ?? false,
+          asks_target_date: input.asksTargetDate ?? false,
         }),
       }),
     );
@@ -294,6 +300,7 @@ export class ProspectsApiRepository implements ProspectsRepository {
           color: input.color,
           is_won: input.isWon,
           is_lost: input.isLost,
+          asks_target_date: input.asksTargetDate,
         }),
       }),
     );
