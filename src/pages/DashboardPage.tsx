@@ -10,6 +10,7 @@ import { PeriodFilter } from "../components/common/PeriodFilter";
 import { ProspectDashboardSection } from "../components/prospects/ProspectDashboardSection";
 import { shortCurrency } from "../utils/currency";
 import { EMPTY_PERIOD, type Period } from "../utils/periods";
+import { useAuth } from "../hooks/useAuth";
 import styles from "./DashboardPage.module.css";
 
 type SourceFilter = "todos" | "ativo" | "passivo";
@@ -23,12 +24,10 @@ const SOURCE_FILTER_LABEL: Record<SourceFilter, string> = {
 const PASSIVO_BADGE = { label: "Passivo", color: "#4aa3ff", bg: "rgba(74,163,255,.14)" };
 
 export function DashboardPage() {
-  // O backend não expõe mais acesso de plataforma neste objeto (Fase 2/3 —
-  // `is_super_admin` foi removido de `/auth/me` e do JWT; o mecanismo real
-  // agora é `platform_staff`, sem sinal no frontend até a Fase 10). Até lá,
-  // a seção "Prospecção" fica desligada para todo mundo — mais seguro que
-  // assumir acesso sem ter como verificar.
-  const isSuperAdmin = false;
+  // Prospecção (funil comercial próprio da GSM) é restrita a platform staff
+  // no backend — `isPlatformStaff` vem de `GET /auth/me` (ver `types/auth.ts`).
+  const { user } = useAuth();
+  const isSuperAdmin = user?.isPlatformStaff ?? false;
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("todos");
   const [period, setPeriod] = useState<Period>(EMPTY_PERIOD);
   const showPassivo = !isSuperAdmin || sourceFilter !== "ativo";

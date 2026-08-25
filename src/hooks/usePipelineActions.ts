@@ -1,5 +1,5 @@
 import { pipelinesService } from "../services/PipelinesService";
-import type { Pipeline, PipelineStage } from "../types/pipeline";
+import type { Pipeline, PipelineStage, StageKey } from "../types/pipeline";
 
 export interface PipelineActions {
   create(input: Pick<Pipeline, "name" | "color">): Promise<Pipeline>;
@@ -8,6 +8,11 @@ export interface PipelineActions {
     pipelineId: string,
     input: Pick<PipelineStage, "label" | "color"> & { isWon?: boolean; isLost?: boolean },
   ): Promise<PipelineStage>;
+  updateStage(
+    pipelineId: string,
+    stageKey: StageKey,
+    input: Partial<Pick<PipelineStage, "label" | "color" | "isWon" | "isLost">>,
+  ): Promise<PipelineStage>;
 }
 
 export function usePipelineActions(): PipelineActions {
@@ -15,5 +20,7 @@ export function usePipelineActions(): PipelineActions {
     create: (input) => pipelinesService.create(input),
     setDefault: (id) => pipelinesService.setDefault(id),
     createStage: (pipelineId, input) => pipelinesService.createStage(pipelineId, input),
+    updateStage: (pipelineId, stageKey, input) =>
+      pipelinesService.updateStage(pipelineId, stageKey, input),
   };
 }

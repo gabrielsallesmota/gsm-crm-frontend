@@ -1,5 +1,5 @@
 import type { PipelinesRepository } from "../PipelinesRepository";
-import type { Pipeline, PipelineStage } from "../../types/pipeline";
+import type { Pipeline, PipelineStage, StageKey } from "../../types/pipeline";
 import { STAGE_ORDER } from "../../constants/stages";
 import { apiRequest } from "./ApiClient";
 import { buildStageMap, stageKeyToId, type RemoteStage } from "./stageMapping";
@@ -34,7 +34,13 @@ async function toPipeline(dto: PipelineDto): Promise<Pipeline> {
   const stages: PipelineStage[] = STAGE_ORDER.map((key) => {
     const remoteId = stageKeyToId(dto.id, key);
     const match = remoteId ? byId.get(remoteId) : undefined;
-    return { id: key, label: match?.name ?? key, color: match?.color ?? "#9aa6b2" };
+    return {
+      id: key,
+      label: match?.name ?? key,
+      color: match?.color ?? "#9aa6b2",
+      isWon: match?.is_won ?? false,
+      isLost: match?.is_lost ?? false,
+    };
   });
   return {
     id: dto.id,
@@ -103,7 +109,32 @@ export class PipelinesApiRepository implements PipelinesRepository {
         is_lost: input.isLost ?? false,
       }),
     });
-    return { id: "novo", label: dto.name, color: dto.color };
+    return { id: "novo", label: dto.name, color: dto.color, isWon: dto.is_won, isLost: dto.is_lost };
+  }
+
+  async updateStage(
+    pipelineId: string,
+    stageKey: StageKey,
+    input: Partial<Pick<PipelineStage, "label" | "color" | "isWon" | "isLost">>,
+  ): Promise<PipelineStage> {
+    // O frontend só conhece as 5 chaves fixas (`StageKey`) — o UUID real do
+    // estágio fica escondido atrás de `stageKeyToId` (cache montado por
+    // `toPipeline`/`buildStageMap` no último `list()`/`get()`). Repositório
+    // é a camada certa pra resolver isso, não a página (ver `stageMapping.ts`).
+    const stageId = stageKeyToId(pipelineId, stageKey);
+    if (!stageId) {
+      throw new Error("Estágio ainda não carregado — recarregue a página de Configurações.");
+    }
+    const dto = await apiRequest<StageDto>(`/api/v1/stages/${stageId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: input.label,
+        color: input.color,
+        is_won: input.isWon,
+        is_lost: input.isLost,
+      }),
+    });
+    return { id: stageKey, label: dto.name, color: dto.color, isWon: dto.is_won, isLost: dto.is_lost };
   }
 
   async reorderStages(_pipelineId: string, orderedIds: string[]): Promise<void> {

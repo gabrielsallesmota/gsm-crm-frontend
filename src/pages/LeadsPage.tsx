@@ -33,22 +33,29 @@ export function LeadsPage() {
 
   async function handleCreate(form: { name: string; company: string; phone: string; email: string; value: number }) {
     if (!defaultPipeline || !user) return;
-    await create({
-      name: form.name,
-      company: form.company,
-      phone: form.phone,
-      email: form.email,
-      value: form.value,
-      origin: "manual",
-      // Quem cria o lead vira o dono por padrão — o "novo lead" é um form
-      // rápido, sem seletor de responsável; reatribuir depois é feito no
-      // drawer de edição do lead.
-      ownerId: user.id,
-      pipelineId: defaultPipeline.id,
-    });
-    toast("Lead criado com sucesso");
-    setCreating(false);
-    reload();
+    try {
+      await create({
+        name: form.name,
+        company: form.company,
+        phone: form.phone,
+        email: form.email,
+        value: form.value,
+        origin: "manual",
+        // Quem cria o lead vira o dono por padrão — o "novo lead" é um form
+        // rápido, sem seletor de responsável; reatribuir depois é feito no
+        // drawer de edição do lead.
+        ownerId: user.id,
+        pipelineId: defaultPipeline.id,
+      });
+      toast("Lead criado com sucesso");
+      setCreating(false);
+      reload();
+    } catch (err) {
+      // Sem isso, um erro aqui (ex.: pipeline sem estágio) só aparecia como
+      // "Uncaught (in promise)" no console — a pessoa via o modal travado em
+      // "Salvando…" pra sempre, sem entender por quê.
+      toast(err instanceof Error ? err.message : "Não foi possível criar o lead");
+    }
   }
 
   return (
@@ -127,8 +134,14 @@ function QuickCreateModal({
   async function handleSubmit() {
     if (!name.trim()) return;
     setSubmitting(true);
-    await onSubmit({ name, company, phone, email, value });
-    setSubmitting(false);
+    try {
+      await onSubmit({ name, company, phone, email, value });
+    } finally {
+      // `finally` (não só o caminho feliz): se `onSubmit` lançar (ver
+      // `handleCreate`, que já mostra o toast do erro), o botão ainda
+      // assim volta a ficar clicável em vez de travado em "Salvando…".
+      setSubmitting(false);
+    }
   }
 
   return (

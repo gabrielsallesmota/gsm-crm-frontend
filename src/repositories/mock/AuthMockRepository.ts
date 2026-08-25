@@ -41,6 +41,7 @@ export class AuthMockRepository implements AuthRepository {
         name: "Admin GSM",
         role: "gsm_admin",
         mustChangePassword: false,
+        isPlatformStaff: true,
       };
       return { requiresTenantSelection: false, session: { user, tokens: DEMO_TOKENS } };
     }
@@ -54,6 +55,7 @@ export class AuthMockRepository implements AuthRepository {
       name: seed.name,
       role: seed.role,
       mustChangePassword: false,
+      isPlatformStaff: false,
     };
     return { requiresTenantSelection: false, session: { user, tokens: DEMO_TOKENS } };
   }
@@ -97,6 +99,7 @@ export class AuthMockRepository implements AuthRepository {
       name: seed.name,
       role: seed.role,
       mustChangePassword: false,
+      isPlatformStaff: false,
     };
   }
 

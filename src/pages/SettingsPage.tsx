@@ -9,8 +9,10 @@ import { Badge } from "../components/common/Badge";
 import { MessageTemplatesSettings } from "../components/prospects/MessageTemplatesSettings";
 import { LeadMessageTemplatesSettings } from "../components/leads/LeadMessageTemplatesSettings";
 import { useToast } from "../hooks/useToast";
+import { useAuth } from "../hooks/useAuth";
 import { ORIGIN } from "../constants/origins";
 import { hexToRgba } from "../utils/colors";
+import type { PipelineStage, StageKey } from "../types/pipeline";
 import styles from "./SettingsPage.module.css";
 
 // Mesmo funil padrão semeado automaticamente pelo backend em todo pipeline
@@ -27,17 +29,20 @@ const DEFAULT_STAGES: { label: string; color: string; isWon?: boolean; isLost?: 
 
 export function SettingsPage() {
   const { data: pipelines, loading, error, reload } = usePipelines();
-  const { create, setDefault, createStage } = usePipelineActions();
+  const { create, setDefault, createStage, updateStage } = usePipelineActions();
   const { data: tags, error: tagsError, reload: reloadTags } = useTags();
   const { create: createTag, delete: deleteTag } = useTagActions();
-  // Ver DashboardPage.tsx — `is_super_admin` não existe mais no backend
-  // (Fase 2/3); sem sinal confiável de platform staff até a Fase 10, a
-  // seção de mensagens de Prospecção fica desligada para todo mundo.
-  const isSuperAdmin = false;
+  // Ver DashboardPage.tsx — `isPlatformStaff` vem de `GET /auth/me`.
+  const { user } = useAuth();
+  const isSuperAdmin = user?.isPlatformStaff ?? false;
   const { toast } = useToast();
   const [newName, setNewName] = useState("");
   const [newTagLabel, setNewTagLabel] = useState("");
   const [newTagColor, setNewTagColor] = useState("#4aa3ff");
+  const [editingStage, setEditingStage] = useState<{ pipelineId: string; stageKey: StageKey } | null>(
+    null,
+  );
+  const [stageForm, setStageForm] = useState({ label: "", color: "#4aa3ff", isWon: false, isLost: false });
 
   async function handleCreatePipeline() {
     if (!newName.trim()) return;
@@ -61,6 +66,19 @@ export function SettingsPage() {
       await createStage(pipelineId, stage);
     }
     toast("Estágios padrão criados");
+    reload();
+  }
+
+  function startEditStage(pipelineId: string, stage: PipelineStage) {
+    setEditingStage({ pipelineId, stageKey: stage.id });
+    setStageForm({ label: stage.label, color: stage.color, isWon: stage.isWon, isLost: stage.isLost });
+  }
+
+  async function handleSaveStage() {
+    if (!editingStage) return;
+    await updateStage(editingStage.pipelineId, editingStage.stageKey, stageForm);
+    setEditingStage(null);
+    toast("Estágio atualizado");
     reload();
   }
 
@@ -117,11 +135,59 @@ export function SettingsPage() {
                 )}
               </div>
               <div className={styles.stages}>
-                {pipeline.stages.map((stage) => (
-                  <span key={stage.id} className={styles.stageChip} style={{ color: stage.color }}>
-                    {stage.label}
-                  </span>
-                ))}
+                {pipeline.stages.map((stage) =>
+                  editingStage?.pipelineId === pipeline.id && editingStage.stageKey === stage.id ? (
+                    <div key={stage.id} className={styles.stageEditForm}>
+                      <input
+                        className={styles.input}
+                        value={stageForm.label}
+                        onChange={(e) => setStageForm((f) => ({ ...f, label: e.target.value }))}
+                      />
+                      <input
+                        className={styles.colorInput}
+                        type="color"
+                        value={stageForm.color}
+                        onChange={(e) => setStageForm((f) => ({ ...f, color: e.target.value }))}
+                        aria-label="Cor do estágio"
+                      />
+                      <label className={styles.stageFlagLabel}>
+                        <input
+                          type="checkbox"
+                          checked={stageForm.isWon}
+                          onChange={(e) => setStageForm((f) => ({ ...f, isWon: e.target.checked }))}
+                        />
+                        Ganho
+                      </label>
+                      <label className={styles.stageFlagLabel}>
+                        <input
+                          type="checkbox"
+                          checked={stageForm.isLost}
+                          onChange={(e) => setStageForm((f) => ({ ...f, isLost: e.target.checked }))}
+                        />
+                        Perdido
+                      </label>
+                      <Button
+                        variant="primary"
+                        onClick={() => void handleSaveStage()}
+                        disabled={!stageForm.label.trim()}
+                      >
+                        Salvar
+                      </Button>
+                      <Button onClick={() => setEditingStage(null)}>Cancelar</Button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      key={stage.id}
+                      className={styles.stageChip}
+                      style={{ color: stage.color }}
+                      onClick={() => startEditStage(pipeline.id, stage)}
+                      title="Clique para editar"
+                    >
+                      {stage.label}
+                    </button>
+                  ),
+                )}
               </div>
               {pipeline.stages.length === 0 && (
                 <div className={styles.noStages}>

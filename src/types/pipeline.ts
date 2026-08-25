@@ -4,6 +4,8 @@ export interface PipelineStage {
   id: StageKey;
   label: string;
   color: string;
+  isWon: boolean;
+  isLost: boolean;
 }
 
 export interface Pipeline {

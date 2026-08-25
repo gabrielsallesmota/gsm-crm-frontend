@@ -2,7 +2,7 @@ import type { PipelinesRepository } from "../repositories/PipelinesRepository";
 import { PipelinesApiRepository } from "../repositories/api/PipelinesApiRepository";
 import { PipelinesMockRepository } from "../repositories/mock/PipelinesMockRepository";
 import { selectRepository } from "./factory";
-import type { Pipeline, PipelineStage } from "../types/pipeline";
+import type { Pipeline, PipelineStage, StageKey } from "../types/pipeline";
 
 const repo: PipelinesRepository = selectRepository(
   () => new PipelinesMockRepository(),
@@ -43,6 +43,14 @@ export class PipelinesService {
     input: Pick<PipelineStage, "label" | "color"> & { isWon?: boolean; isLost?: boolean },
   ): Promise<PipelineStage> {
     return repo.createStage(pipelineId, input);
+  }
+
+  updateStage(
+    pipelineId: string,
+    stageKey: StageKey,
+    input: Partial<Pick<PipelineStage, "label" | "color" | "isWon" | "isLost">>,
+  ): Promise<PipelineStage> {
+    return repo.updateStage(pipelineId, stageKey, input);
   }
 
   reorderStages(pipelineId: string, orderedIds: string[]): Promise<void> {

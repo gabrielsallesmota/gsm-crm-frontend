@@ -1,4 +1,4 @@
-import type { Pipeline, PipelineStage } from "../types/pipeline";
+import type { Pipeline, PipelineStage, StageKey } from "../types/pipeline";
 
 export interface PipelinesRepository {
   list(): Promise<Pipeline[]>;
@@ -11,6 +11,11 @@ export interface PipelinesRepository {
   createStage(
     pipelineId: string,
     input: Pick<PipelineStage, "label" | "color"> & { isWon?: boolean; isLost?: boolean },
+  ): Promise<PipelineStage>;
+  updateStage(
+    pipelineId: string,
+    stageKey: StageKey,
+    input: Partial<Pick<PipelineStage, "label" | "color" | "isWon" | "isLost">>,
   ): Promise<PipelineStage>;
   reorderStages(pipelineId: string, orderedIds: string[]): Promise<void>;
 }

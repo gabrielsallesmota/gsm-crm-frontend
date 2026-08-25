@@ -1,5 +1,5 @@
 import type { PipelinesRepository } from "../PipelinesRepository";
-import type { Pipeline, PipelineStage } from "../../types/pipeline";
+import type { Pipeline, PipelineStage, StageKey } from "../../types/pipeline";
 import { delay } from "../../utils/errors";
 import { mockState } from "./state";
 
@@ -26,11 +26,11 @@ export class PipelinesMockRepository implements PipelinesRepository {
       isDefault: false,
       active: true,
       stages: [
-        { id: "novo", label: "Novo", color: "#4aa3ff" },
-        { id: "contato", label: "Em contato", color: "#f5b13d" },
-        { id: "proposta", label: "Proposta", color: "#a78bfa" },
-        { id: "ganho", label: "Ganho", color: "#2ee66e" },
-        { id: "perdido", label: "Perdido", color: "#9aa6b2" },
+        { id: "novo", label: "Novo", color: "#4aa3ff", isWon: false, isLost: false },
+        { id: "contato", label: "Em contato", color: "#f5b13d", isWon: false, isLost: false },
+        { id: "proposta", label: "Proposta", color: "#a78bfa", isWon: false, isLost: false },
+        { id: "ganho", label: "Ganho", color: "#2ee66e", isWon: true, isLost: false },
+        { id: "perdido", label: "Perdido", color: "#9aa6b2", isWon: false, isLost: true },
       ],
     };
     mockState.pipelines.push(pipeline);
@@ -75,8 +75,28 @@ export class PipelinesMockRepository implements PipelinesRepository {
     await delay(150);
     const pipeline = mockState.pipelines.find((p) => p.id === pipelineId);
     if (!pipeline) throw new Error(`Pipeline ${pipelineId} não encontrado.`);
-    const stage: PipelineStage = { id: "novo", label: input.label, color: input.color };
+    const stage: PipelineStage = {
+      id: "novo",
+      label: input.label,
+      color: input.color,
+      isWon: input.isWon ?? false,
+      isLost: input.isLost ?? false,
+    };
     pipeline.stages.push(stage);
+    return stage;
+  }
+
+  async updateStage(
+    pipelineId: string,
+    stageKey: StageKey,
+    input: Partial<Pick<PipelineStage, "label" | "color" | "isWon" | "isLost">>,
+  ): Promise<PipelineStage> {
+    await delay(150);
+    const pipeline = mockState.pipelines.find((p) => p.id === pipelineId);
+    if (!pipeline) throw new Error(`Pipeline ${pipelineId} não encontrado.`);
+    const stage = pipeline.stages.find((s) => s.id === stageKey);
+    if (!stage) throw new Error(`Estágio ${stageKey} não encontrado.`);
+    Object.assign(stage, input);
     return stage;
   }
 

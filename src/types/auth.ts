@@ -16,9 +16,10 @@ export interface AuthUser {
    * gera um novo token via `POST /auth/select-tenant`, nunca é só estado
    * local (ver ADR "JWT Tenant Selection"). */
   tenantId: string;
-  // Nota: `isSuperAdmin` não existe mais — o backend nunca mais expõe acesso
-  // de plataforma neste objeto (nem no JWT, nem em /auth/me). O mecanismo
-  // real é `platform_staff`, sem superfície HTTP ainda (Fase 10).
+  /** Acesso de PLATAFORMA (Fase 10, `platform_staff`) — independente de
+   * `role` (que é por-tenant). `GET /auth/me` agora expõe isto de verdade
+   * (antes a UI sempre tratava a pessoa como não-staff, mesmo já sendo). */
+  isPlatformStaff: boolean;
 }
 
 /** Um tenant que a pessoa pode acessar — devolvido no login (quando há mais

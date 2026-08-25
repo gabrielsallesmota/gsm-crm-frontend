@@ -40,10 +40,7 @@ interface UserResponseDto {
   account_id: string;
   tenant_id: string;
   role: string;
-  // is_super_admin não existe mais na resposta (Fase 2/3) — o mecanismo
-  // real de acesso de plataforma é `platform_staff`, sem endpoint HTTP
-  // ainda (Fase 10). Nunca reintroduzir esse campo aqui sem o backend
-  // voltar a expor algo equivalente.
+  is_platform_staff: boolean;
 }
 
 function toTenantOption(dto: TenantOptionDto): TenantOption {
@@ -66,6 +63,7 @@ function toAuthUser(dto: UserResponseDto): AuthUser {
     mustChangePassword: dto.must_change_password,
     accountId: dto.account_id,
     tenantId: dto.tenant_id,
+    isPlatformStaff: dto.is_platform_staff,
   };
 }
 
