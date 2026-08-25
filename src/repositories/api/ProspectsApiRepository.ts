@@ -52,6 +52,7 @@ interface ProspectDto {
   origin: ProspectOrigin;
   created_at: string;
   updated_at: string;
+  last_comment: { text: string; created_at: string } | null;
 }
 
 interface ProspectStageDto {
@@ -90,6 +91,9 @@ function toProspect(dto: ProspectDto): Prospect {
     origin: dto.origin,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
+    lastComment: dto.last_comment
+      ? { text: dto.last_comment.text, createdAt: dto.last_comment.created_at }
+      : null,
   };
 }
 

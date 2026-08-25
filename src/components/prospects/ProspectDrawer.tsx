@@ -4,6 +4,9 @@ import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { WhatsappButton } from "./WhatsappButton";
 import { useProspectActions } from "../../hooks/useProspectActions";
+import { useProspectComments } from "../../hooks/useProspectComments";
+import { useProspectCommentActions } from "../../hooks/useProspectCommentActions";
+import { EmptyState } from "../common/EmptyState";
 import { useToast } from "../../hooks/useToast";
 import { ApiError } from "../../types/common";
 import {
@@ -35,6 +38,25 @@ export function ProspectDrawer({
 }) {
   const { toast } = useToast();
   const { update, move, delete: deleteProspect } = useProspectActions();
+  const { data: comments, notImplemented: commentsNotImplemented, reload: reloadComments } =
+    useProspectComments(prospect.id);
+  const { create: createComment } = useProspectCommentActions();
+  const [newComment, setNewComment] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
+
+  async function handlePostComment() {
+    if (!newComment.trim()) return;
+    setPostingComment(true);
+    try {
+      await createComment(prospect.id, newComment.trim());
+      setNewComment("");
+      reloadComments();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível adicionar o comentário");
+    } finally {
+      setPostingComment(false);
+    }
+  }
   const stage = stages.find((s) => s.id === prospect.stageId);
   const priority = PRIORITY[prospect.priority];
   const origin = PROSPECT_ORIGIN[prospect.origin];
@@ -378,6 +400,47 @@ export function ProspectDrawer({
             />
           ) : (
             <p className={styles.notes}>{prospect.opportunity || "—"}</p>
+          )}
+        </div>
+
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Comentários</div>
+          {commentsNotImplemented ? (
+            <EmptyState
+              title="Não disponível no modo Demonstração"
+              message="Prospecção GSM é uma área interna, sem dados fictícios para mostrar aqui."
+            />
+          ) : (
+            <>
+            <div className={styles.commentForm}>
+              <textarea
+                className={styles.textarea}
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                rows={2}
+                placeholder="Deixe um comentário sobre este prospect…"
+              />
+              <Button
+                variant="primary"
+                onClick={() => void handlePostComment()}
+                disabled={postingComment || !newComment.trim()}
+              >
+                {postingComment ? "Enviando…" : "Comentar"}
+              </Button>
+            </div>
+            {comments?.length === 0 && <div className={styles.notes}>Nenhum comentário ainda.</div>}
+            {comments?.map((c) => (
+              <div key={c.id} className={styles.commentRow}>
+                <div className={styles.commentMeta}>
+                  <span className={styles.commentAuthor}>{c.authorName}</span>
+                  <span className={styles.commentDate}>
+                    {new Date(c.createdAt).toLocaleString("pt-BR")}
+                  </span>
+                </div>
+                <p className={styles.notes}>{c.text}</p>
+              </div>
+            ))}
+            </>
           )}
         </div>
 

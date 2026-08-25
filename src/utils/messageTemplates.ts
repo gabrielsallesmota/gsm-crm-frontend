@@ -42,6 +42,10 @@ const PLACEHOLDERS: { token: string; get: (p: Prospect) => string }[] = [
   { token: "{servico_principal}", get: (p) => p.mainService },
   { token: "{cidade}", get: (p) => p.city },
   { token: "{bairro}", get: (p) => p.neighborhood },
+  // Mesmo formato usado no resto da tela pra exibir a nota (ver
+  // `ProspectDrawer.tsx`, `display={... String(prospect.googleRating) ...}`)
+  // — sem casas decimais fixas nem vírgula, só `String(number)`.
+  { token: "{avaliacao_google}", get: (p) => (p.googleRating != null ? String(p.googleRating) : "") },
 ];
 
 export function renderMessage(template: MessageTemplate, prospect: Prospect): string {

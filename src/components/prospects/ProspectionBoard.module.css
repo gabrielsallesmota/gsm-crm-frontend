@@ -113,6 +113,16 @@
   margin: 4px 0 10px;
 }
 
+.cardComment {
+  font-size: 11px;
+  color: var(--muted-2);
+  margin-bottom: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
 .cardFooter {
   display: flex;
   align-items: center;

@@ -59,7 +59,8 @@ export function MessageTemplatesSettings() {
         Mensagem padrão de WhatsApp por estágio + área do prospect. Deixe "área" em branco para
         criar o template coringa desse estágio (usado quando não existe um específico pra área do
         prospect). Placeholders disponíveis: <code>{"{empresa}"}</code> <code>{"{nicho}"}</code>{" "}
-        <code>{"{servico_principal}"}</code> <code>{"{cidade}"}</code> <code>{"{bairro}"}</code>
+        <code>{"{servico_principal}"}</code> <code>{"{cidade}"}</code> <code>{"{bairro}"}</code>{" "}
+        <code>{"{avaliacao_google}"}</code>
       </p>
 
       {stageList.length === 0 ? (

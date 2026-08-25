@@ -33,6 +33,24 @@ export interface ProspectStage {
   isLost: boolean;
 }
 
+/** Anotação datada de alguém sobre o prospect — histórico append-only,
+ * diferente de `positiveNote`/`opportunity` (campos livres únicos). */
+export interface ProspectComment {
+  id: string;
+  prospectId: string;
+  authorUserId: string;
+  authorName: string;
+  text: string;
+  createdAt: string;
+}
+
+/** Só o preview do comentário mais recente — mesma ideia de
+ * `types/lead.ts::LastCommentPreview`. */
+export interface LastProspectCommentPreview {
+  text: string;
+  createdAt: string;
+}
+
 export interface Prospect {
   id: string;
   sequenceNumber: number;
@@ -59,6 +77,7 @@ export interface Prospect {
   origin: ProspectOrigin;
   createdAt: string;
   updatedAt: string;
+  lastComment?: LastProspectCommentPreview | null;
 }
 
 export interface ProspectListFilter {
@@ -217,7 +236,8 @@ export interface ProspectDashboardMetrics {
 /** Mensagem padrão de WhatsApp por (estágio, área) — `niche: null` é
  * coringa (vale pra qualquer área daquele estágio sem template mais
  * específico). Placeholders suportados na mensagem: `{empresa}`, `{nicho}`,
- * `{servico_principal}`, `{cidade}`, `{bairro}` — ver `utils/messageTemplates.ts`. */
+ * `{servico_principal}`, `{cidade}`, `{bairro}`, `{avaliacao_google}` — ver
+ * `utils/messageTemplates.ts`. */
 export interface MessageTemplate {
   id: string;
   stageId: string;

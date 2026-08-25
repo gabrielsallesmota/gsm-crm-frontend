@@ -3,6 +3,8 @@ import { usePipelines } from "../hooks/usePipelines";
 import { usePipelineActions } from "../hooks/usePipelineActions";
 import { useTags } from "../hooks/useTags";
 import { useTagActions } from "../hooks/useTagActions";
+import { useProspectStages } from "../hooks/useProspectStages";
+import { useProspectStageActions } from "../hooks/useProspectStageActions";
 import { EmptyState } from "../components/common/EmptyState";
 import { Button } from "../components/common/Button";
 import { Badge } from "../components/common/Badge";
@@ -13,6 +15,7 @@ import { useAuth } from "../hooks/useAuth";
 import { ORIGIN } from "../constants/origins";
 import { hexToRgba } from "../utils/colors";
 import type { Pipeline, PipelineStage, StageKey } from "../types/pipeline";
+import type { ProspectStage } from "../types/prospect";
 import styles from "./SettingsPage.module.css";
 
 // Mesmo funil padrão semeado automaticamente pelo backend em todo pipeline
@@ -32,6 +35,16 @@ export function SettingsPage() {
   const { create, update, setDefault, createStage, updateStage } = usePipelineActions();
   const { data: tags, error: tagsError, reload: reloadTags } = useTags();
   const { create: createTag, delete: deleteTag } = useTagActions();
+  const {
+    data: prospectStages,
+    notImplemented: prospectStagesNotImplemented,
+    reload: reloadProspectStages,
+  } = useProspectStages();
+  const {
+    create: createProspectStage,
+    update: updateProspectStage,
+    delete: deleteProspectStage,
+  } = useProspectStageActions();
   // Ver DashboardPage.tsx — `isPlatformStaff` vem de `GET /auth/me`.
   const { user } = useAuth();
   const isSuperAdmin = user?.isPlatformStaff ?? false;
@@ -45,6 +58,19 @@ export function SettingsPage() {
   const [stageForm, setStageForm] = useState({ label: "", color: "#4aa3ff", isWon: false, isLost: false });
   const [editingPipeline, setEditingPipeline] = useState<string | null>(null);
   const [pipelineForm, setPipelineForm] = useState({ name: "", color: "#4aa3ff" });
+  const [newProspectStage, setNewProspectStage] = useState({
+    name: "",
+    color: "#4aa3ff",
+    isWon: false,
+    isLost: false,
+  });
+  const [editingProspectStage, setEditingProspectStage] = useState<string | null>(null);
+  const [prospectStageForm, setProspectStageForm] = useState({
+    name: "",
+    color: "#4aa3ff",
+    isWon: false,
+    isLost: false,
+  });
 
   async function handleCreatePipeline() {
     if (!newName.trim()) return;
@@ -71,6 +97,38 @@ export function SettingsPage() {
     setEditingPipeline(null);
     toast("Pipeline atualizado");
     reload();
+  }
+
+  async function handleCreateProspectStage() {
+    if (!newProspectStage.name.trim()) return;
+    await createProspectStage(newProspectStage);
+    setNewProspectStage({ name: "", color: "#4aa3ff", isWon: false, isLost: false });
+    toast("Estágio de prospecção criado");
+    reloadProspectStages();
+  }
+
+  function startEditProspectStage(stage: ProspectStage) {
+    setEditingProspectStage(stage.id);
+    setProspectStageForm({
+      name: stage.name,
+      color: stage.color,
+      isWon: stage.isWon,
+      isLost: stage.isLost,
+    });
+  }
+
+  async function handleSaveProspectStage() {
+    if (!editingProspectStage) return;
+    await updateProspectStage(editingProspectStage, prospectStageForm);
+    setEditingProspectStage(null);
+    toast("Estágio de prospecção atualizado");
+    reloadProspectStages();
+  }
+
+  async function handleDeleteProspectStage(id: string) {
+    await deleteProspectStage(id);
+    toast("Estágio de prospecção removido");
+    reloadProspectStages();
   }
 
   async function handleCreateDefaultStages(pipelineId: string) {
@@ -314,6 +372,129 @@ export function SettingsPage() {
         <h2 className={styles.sectionTitle}>Pipeline — mensagens de WhatsApp</h2>
         <LeadMessageTemplatesSettings />
       </section>
+
+      {isSuperAdmin && (
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Prospecção — Estágios</h2>
+            <div className={styles.inlineForm}>
+              <input
+                className={styles.input}
+                placeholder="Nome do novo estágio…"
+                value={newProspectStage.name}
+                onChange={(e) => setNewProspectStage((f) => ({ ...f, name: e.target.value }))}
+              />
+              <input
+                className={styles.colorInput}
+                type="color"
+                value={newProspectStage.color}
+                onChange={(e) => setNewProspectStage((f) => ({ ...f, color: e.target.value }))}
+                aria-label="Cor do estágio"
+              />
+              <label className={styles.stageFlagLabel}>
+                <input
+                  type="checkbox"
+                  checked={newProspectStage.isWon}
+                  onChange={(e) => setNewProspectStage((f) => ({ ...f, isWon: e.target.checked }))}
+                />
+                Ganho
+              </label>
+              <label className={styles.stageFlagLabel}>
+                <input
+                  type="checkbox"
+                  checked={newProspectStage.isLost}
+                  onChange={(e) => setNewProspectStage((f) => ({ ...f, isLost: e.target.checked }))}
+                />
+                Perdido
+              </label>
+              <Button
+                variant="primary"
+                onClick={() => void handleCreateProspectStage()}
+                disabled={!newProspectStage.name.trim()}
+              >
+                Adicionar
+              </Button>
+            </div>
+          </div>
+
+          {prospectStagesNotImplemented ? (
+            <EmptyState
+              title="Não disponível no modo Demonstração"
+              message="Prospecção GSM é uma área interna, sem dados fictícios para mostrar aqui."
+            />
+          ) : (
+            <div className={styles.stages}>
+              {prospectStages?.map((stage) =>
+                editingProspectStage === stage.id ? (
+                  <div key={stage.id} className={styles.stageEditForm}>
+                    <input
+                      className={styles.input}
+                      value={prospectStageForm.name}
+                      onChange={(e) =>
+                        setProspectStageForm((f) => ({ ...f, name: e.target.value }))
+                      }
+                    />
+                    <input
+                      className={styles.colorInput}
+                      type="color"
+                      value={prospectStageForm.color}
+                      onChange={(e) =>
+                        setProspectStageForm((f) => ({ ...f, color: e.target.value }))
+                      }
+                      aria-label="Cor do estágio"
+                    />
+                    <label className={styles.stageFlagLabel}>
+                      <input
+                        type="checkbox"
+                        checked={prospectStageForm.isWon}
+                        onChange={(e) =>
+                          setProspectStageForm((f) => ({ ...f, isWon: e.target.checked }))
+                        }
+                      />
+                      Ganho
+                    </label>
+                    <label className={styles.stageFlagLabel}>
+                      <input
+                        type="checkbox"
+                        checked={prospectStageForm.isLost}
+                        onChange={(e) =>
+                          setProspectStageForm((f) => ({ ...f, isLost: e.target.checked }))
+                        }
+                      />
+                      Perdido
+                    </label>
+                    <Button
+                      variant="primary"
+                      onClick={() => void handleSaveProspectStage()}
+                      disabled={!prospectStageForm.name.trim()}
+                    >
+                      Salvar
+                    </Button>
+                    <Button onClick={() => setEditingProspectStage(null)}>Cancelar</Button>
+                    <Button
+                      variant="danger"
+                      onClick={() => void handleDeleteProspectStage(stage.id)}
+                    >
+                      Excluir
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    key={stage.id}
+                    className={styles.stageChip}
+                    style={{ color: stage.color }}
+                    onClick={() => startEditProspectStage(stage)}
+                    title="Clique para editar"
+                  >
+                    {stage.name}
+                  </button>
+                ),
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {isSuperAdmin && (
         <section className={styles.section}>
