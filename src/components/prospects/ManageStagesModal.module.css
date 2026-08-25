@@ -95,6 +95,7 @@
 
 .colorSwatches {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -113,6 +114,7 @@
 
 .input {
   flex: 1;
+  min-width: 0;
   background: var(--card-bg);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-input);
@@ -125,4 +127,14 @@
   display: flex;
   justify-content: flex-end;
   margin-top: 18px;
+}
+
+@media (max-width: 480px) {
+  .overlay {
+    padding: 10px;
+  }
+
+  .modal {
+    padding: 18px;
+  }
 }

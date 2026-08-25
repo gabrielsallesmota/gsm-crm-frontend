@@ -18,6 +18,12 @@
   animation: gsmFade 0.2s ease-out;
 }
 
+@media (max-width: 480px) {
+  .drawer {
+    padding: 22px 16px 48px;
+  }
+}
+
 .close {
   position: absolute;
   top: 20px;
@@ -107,6 +113,12 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .field {

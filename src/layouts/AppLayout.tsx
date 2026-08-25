@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ROUTES } from "../constants/routes";
 import { useAuth } from "../hooks/useAuth";
 import { Avatar } from "../components/common/Avatar";
@@ -46,7 +46,50 @@ export function AppLayout({ children }: { children: ReactNode }) {
     logout,
   } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  // Sidebar em telas estreitas vira drawer off-canvas (ver media query em
+  // `AppLayout.module.css`) — controlado só aqui porque em desktop o botão
+  // que abre/fecha nem é renderizado (`.menuToggle` some via CSS).
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Sidebar fixa (desktop/tablet) recolhida pra uma barra só de ícones —
+  // independente do drawer mobile acima, que já resolve o espaço à sua
+  // própria maneira (some por completo em vez de encolher). Lido de forma
+  // preguiçosa (função no useState) pra não piscar expandida no primeiro
+  // paint de quem já deixou recolhida da última vez.
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("gsm_sidebar_collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("gsm_sidebar_collapsed", collapsed ? "1" : "0");
+    } catch {
+      // Storage indisponível (modo privado, quota etc.) — a preferência
+      // só não persiste entre sessões, sem quebrar o toggle em si.
+    }
+  }, [collapsed]);
+
+  // Fecha o drawer sempre que a rota muda (clique num item do menu) —
+  // cobre também navegação disparada por outro lugar (ex.: `+ Lead`).
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  // Esc fecha o drawer, igual a qualquer overlay da aplicação.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobileNavOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileNavOpen]);
 
   // "gsm_admin" nunca existiu como role real do backend — era um papel só
   // do mock de demonstração (auditoria Fase 1-3: confirmado que o backend
@@ -74,12 +117,41 @@ export function AppLayout({ children }: { children: ReactNode }) {
       )}
 
       <div className={styles.body}>
-        <aside className={styles.sidebar}>
+        {mobileNavOpen && (
+          <div
+            className={styles.navOverlay}
+            onClick={() => setMobileNavOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        <aside
+          id="app-sidebar"
+          className={[styles.sidebar, mobileNavOpen && styles.sidebarOpen, collapsed && styles.sidebarCollapsed]
+            .filter(Boolean)
+            .join(" ")}
+        >
           <div className={styles.logo}>
-            <span className={styles.logoMark}>
-              &lt;GSM <span className={styles.logoAccent}>/&gt;</span>
-            </span>
-            <span className={styles.logoSub}>CRM</span>
+            {collapsed ? (
+              <span className={styles.logoMark}>
+                &lt;<span className={styles.logoAccent}>/</span>&gt;
+              </span>
+            ) : (
+              <>
+                <span className={styles.logoMark}>
+                  &lt;GSM <span className={styles.logoAccent}>/&gt;</span>
+                </span>
+                <span className={styles.logoSub}>CRM</span>
+              </>
+            )}
+            <button
+              type="button"
+              className={styles.sidebarClose}
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="Fechar menu"
+            >
+              <NavIcon name="close" size={16} />
+            </button>
           </div>
 
           <nav className={styles.nav}>
@@ -87,6 +159,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <NavLink
                 key={item.to}
                 to={item.to}
+                title={item.label}
                 className={({ isActive }) => (isActive ? `${styles.navItem} ${styles.navItemActive}` : styles.navItem)}
               >
                 <NavIcon name={item.icon} />
@@ -94,6 +167,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
           </nav>
+
+          <button
+            type="button"
+            className={styles.collapseToggle}
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            <NavIcon name="collapse" size={14} />
+            {!collapsed && <span>Recolher menu</span>}
+          </button>
 
           <div className={styles.userBox}>
             {user && <Avatar name={user.name} bg="rgba(46,230,110,.14)" color="#2ee66e" />}
@@ -109,6 +193,16 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
         <div className={styles.main}>
           <header className={styles.topbar}>
+            <button
+              type="button"
+              className={styles.menuToggle}
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Abrir menu"
+              aria-controls="app-sidebar"
+              aria-expanded={mobileNavOpen}
+            >
+              <NavIcon name="menu" size={19} />
+            </button>
             <input className={styles.search} placeholder="Buscar leads, empresas…" />
             <div className={styles.topbarRight}>
               {isDemoMode && canSwitchTenant ? (

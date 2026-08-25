@@ -18,6 +18,12 @@
   animation: gsmFade 0.2s ease-out;
 }
 
+@media (max-width: 480px) {
+  .drawer {
+    padding: 22px 16px 48px;
+  }
+}
+
 .close {
   position: absolute;
   top: 20px;
@@ -116,6 +122,15 @@
   grid-template-columns: 1fr 1fr;
   gap: 14px;
   margin-bottom: 20px;
+}
+
+/* Drawer inteiro vira full-width abaixo de 480px (`width: min(460px,
+   100%)` acima) — 2 colunas nesse ponto deixam valores como e-mail/telefone
+   ilegíveis, então empilha. */
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .field {

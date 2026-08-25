@@ -8,6 +8,14 @@ const PATHS = {
   settings: "M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5A7 7 0 0 0 5 12a7 7 0 0 0 .3 1.2l-2 1.5 2 3.4 2.3-.9c.6.5 1.3.9 2 1.2L10 21h4l.4-2.6c.7-.3 1.4-.7 2-1.2l2.3.9 2-3.4-2-1.5c.2-.4.3-.8.3-1.2z",
   users: "M9 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 10a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM2 21c0-3.3 3.1-6 7-6s7 2.7 7 6M14.5 15.2c2.9.5 5.5 2.4 5.5 5.8",
   prospects: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v3M12 19v3M2 12h3M19 12h3",
+  // Usados só pelos toggles da sidebar (ver `AppLayout.tsx`) — não são
+  // itens de navegação, por isso ficam fora de `NAV_ITEMS`.
+  menu: "M4 7h16M4 12h16M4 17h16",
+  close: "M6 6l12 12M18 6L6 18",
+  // Chevron duplo — recolher/expandir a sidebar fixa (desktop/tablet).
+  // `AppLayout.module.css` gira 180° via CSS quando recolhida, então um
+  // path só cobre os dois estados.
+  collapse: "M11 17l-5-5 5-5M18 17l-5-5 5-5",
 };
 
 export function NavIcon({ name, size = 17 }: { name: keyof typeof PATHS; size?: number }) {

@@ -20,6 +20,27 @@
   animation: gsmPop 0.2s ease-out;
 }
 
+@media (max-width: 480px) {
+  .overlay {
+    padding: 10px;
+  }
+
+  .modal {
+    padding: 18px;
+  }
+
+  /* De/para da importação e o par cidade/pipeline (ver `.row > div`) —
+     2 colunas nesse ponto deixam o select de destino ilegível. */
+  .mappingRow {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .row {
+    flex-direction: column;
+  }
+}
+
 .modalTitle {
   margin: 0 0 6px;
   font-family: var(--font-heading);

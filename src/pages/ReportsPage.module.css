@@ -19,7 +19,11 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  /* `min(320px, 100%)`: em vez de um piso cru de 320px, que estoura a
+     viewport em telas de exatamente 320px (a própria largura mínima que a
+     auditoria pede pra suportar — ver mesmo ajuste em
+     `AuthLayout.module.css`). */
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 16px;
 }
 

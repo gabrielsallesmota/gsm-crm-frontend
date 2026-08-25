@@ -36,6 +36,39 @@
   position: sticky;
   top: 0;
   height: 100vh;
+  transition: width 0.2s ease;
+}
+
+/* Barra só de ícones (desktop/tablet — neutralizado no mobile, ver media
+   query no fim do arquivo, onde a sidebar é um drawer full-width). */
+.sidebarCollapsed {
+  width: 76px;
+}
+
+.sidebarCollapsed .logoSub,
+.sidebarCollapsed .navItem span,
+.sidebarCollapsed .userInfo,
+.sidebarCollapsed .collapseToggle span {
+  display: none;
+}
+
+.sidebarCollapsed .logo {
+  justify-content: center;
+  padding: 20px 8px 16px;
+}
+
+.sidebarCollapsed .navItem {
+  justify-content: center;
+  padding: 10px;
+}
+
+.sidebarCollapsed .collapseToggle {
+  justify-content: center;
+}
+
+.sidebarCollapsed .userBox {
+  justify-content: center;
+  padding: 16px 10px;
 }
 
 .logo {
@@ -44,6 +77,43 @@
   align-items: center;
   gap: 9px;
   border-bottom: 1px solid var(--border);
+}
+
+/* Só existe pra fechar o drawer mobile (ver media query no fim do
+   arquivo) — em desktop a sidebar é sempre visível, então some. */
+.sidebarClose {
+  display: none;
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 4px;
+}
+
+.sidebarClose:hover {
+  color: var(--text);
+}
+
+/* Abre o drawer mobile — escondido em desktop, onde a sidebar já fica
+   visível o tempo todo (ver `.sidebar` fora da media query). */
+.menuToggle {
+  display: none;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  padding: 9px;
+  align-items: center;
+  justify-content: center;
+}
+
+.menuToggle:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.navOverlay {
+  display: none;
 }
 
 .logoMark {
@@ -93,6 +163,38 @@
 .navItemActive {
   background: var(--accent-bg);
   color: var(--accent);
+}
+
+/* Recolhe/expande a sidebar fixa (desktop/tablet) — some no mobile via
+   media query no fim do arquivo, onde a sidebar já é um drawer que some
+   por completo em vez de encolher (não faz sentido recolher os dois). */
+.collapseToggle {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 12px 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collapseToggle:hover {
+  color: var(--text);
+}
+
+.collapseToggle svg {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.sidebarCollapsed .collapseToggle svg {
+  transform: rotate(180deg);
 }
 
 .userBox {
@@ -156,6 +258,7 @@
 
 .search {
   flex: 1;
+  min-width: 0;
   max-width: 380px;
   background: var(--card-bg-alt);
   border: 1px solid var(--border);
@@ -207,4 +310,98 @@
   flex: 1;
   padding: clamp(18px, 2.4vw, 30px) 24px 60px;
   animation: gsmFade 0.25s ease-out;
+}
+
+/* Sidebar de 230px fixos + conteúdo não cabem num viewport de celular —
+   abaixo de 900px (mesmo corte já usado em `DashboardPage.module.css` pro
+   grid de gráficos) a sidebar vira um drawer off-canvas: some da faixa
+   fixa do layout e passa a flutuar por cima do conteúdo, controlada pelo
+   botão ☰ no topbar (ver `AppLayout.tsx`). O conteúdo principal passa a
+   ocupar 100% da largura disponível. */
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    /* Acima do `.demoBanner` (z-index: 999) — sem isso, os primeiros ~36px
+       do drawer ficavam por baixo da faixa "● DEMONSTRAÇÃO" no modo demo. */
+    z-index: 1010;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 20px 0 40px rgba(0, 0, 0, 0.35);
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+
+  .sidebarClose {
+    display: inline-flex;
+  }
+
+  /* O drawer mobile é sempre full-width com labels, mesmo que a pessoa
+     tenha recolhido a sidebar fixa no desktop — são dois controles
+     independentes (ver comentário do `useState(collapsed)` em
+     `AppLayout.tsx`), e recolher um drawer que já some por completo
+     quando fechado não faria sentido. */
+  .sidebarCollapsed {
+    width: 230px;
+  }
+
+  .sidebarCollapsed .logoSub,
+  .sidebarCollapsed .navItem span,
+  .sidebarCollapsed .userInfo {
+    display: initial;
+  }
+
+  .sidebarCollapsed .logo {
+    justify-content: flex-start;
+    padding: 20px 20px 16px;
+  }
+
+  .sidebarCollapsed .navItem {
+    justify-content: flex-start;
+    padding: 10px 12px;
+  }
+
+  .sidebarCollapsed .userBox {
+    justify-content: flex-start;
+    padding: 16px 18px;
+  }
+
+  .collapseToggle {
+    display: none;
+  }
+
+  .navOverlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    animation: gsmFade 0.15s ease-out;
+  }
+
+  .menuToggle {
+    display: inline-flex;
+  }
+
+  .topbar {
+    padding: 12px 16px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .search {
+    flex: 1 1 160px;
+  }
+
+  .topbarRight {
+    flex-shrink: 0;
+    gap: 8px;
+  }
+
+  .content {
+    padding: 16px 16px 40px;
+  }
 }

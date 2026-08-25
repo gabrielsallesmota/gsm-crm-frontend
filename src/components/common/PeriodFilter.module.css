@@ -13,6 +13,14 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   padding: 4px;
+  /* "Hoje / 7 dias / Este mês / Mês passado" não quebra linha (é um
+     pill/segmented control) — em telas estreitas os 4 botões juntos são
+     mais largos que a viewport. Em vez de deixar isso empurrar a página
+     inteira pro lado (o bug real por trás do overflow horizontal no
+     mobile), o pill rola só ele mesmo. */
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .presetBtn {

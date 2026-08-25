@@ -156,6 +156,12 @@
   animation: gsmPop 0.2s ease-out;
 }
 
+@media (max-width: 480px) {
+  .modal {
+    padding: 18px;
+  }
+}
+
 .modalTitle {
   margin: 0 0 16px;
   font-family: var(--font-heading);

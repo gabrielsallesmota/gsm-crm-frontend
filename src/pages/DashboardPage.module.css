@@ -17,6 +17,11 @@
   border-radius: var(--radius-pill);
   padding: 4px;
   margin-bottom: 6px;
+  /* Mesmo raciocínio do `.presetGroup` em `PeriodFilter.module.css`: pill
+     que não quebra linha, contido com scroll próprio em vez de estourar
+     a página em telas bem estreitas (320-360px). */
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .sourceFilterBtn {
