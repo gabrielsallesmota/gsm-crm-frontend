@@ -74,16 +74,24 @@ export function SettingsPage() {
 
   async function handleCreatePipeline() {
     if (!newName.trim()) return;
-    await create({ name: newName.trim(), color: "#4aa3ff" });
-    setNewName("");
-    toast("Pipeline criado");
-    reload();
+    try {
+      await create({ name: newName.trim(), color: "#4aa3ff" });
+      setNewName("");
+      toast("Pipeline criado");
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível criar o pipeline");
+    }
   }
 
   async function handleSetDefault(id: string) {
-    await setDefault(id);
-    toast("Pipeline padrão atualizado");
-    reload();
+    try {
+      await setDefault(id);
+      toast("Pipeline padrão atualizado");
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível definir o pipeline padrão");
+    }
   }
 
   function startEditPipeline(pipeline: Pipeline) {
@@ -93,18 +101,26 @@ export function SettingsPage() {
 
   async function handleSavePipeline() {
     if (!editingPipeline) return;
-    await update(editingPipeline, pipelineForm);
-    setEditingPipeline(null);
-    toast("Pipeline atualizado");
-    reload();
+    try {
+      await update(editingPipeline, pipelineForm);
+      setEditingPipeline(null);
+      toast("Pipeline atualizado");
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível atualizar o pipeline");
+    }
   }
 
   async function handleCreateProspectStage() {
     if (!newProspectStage.name.trim()) return;
-    await createProspectStage(newProspectStage);
-    setNewProspectStage({ name: "", color: "#4aa3ff", isWon: false, isLost: false });
-    toast("Estágio de prospecção criado");
-    reloadProspectStages();
+    try {
+      await createProspectStage(newProspectStage);
+      setNewProspectStage({ name: "", color: "#4aa3ff", isWon: false, isLost: false });
+      toast("Estágio de prospecção criado");
+      reloadProspectStages();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível criar o estágio de prospecção");
+    }
   }
 
   function startEditProspectStage(stage: ProspectStage) {
@@ -119,27 +135,39 @@ export function SettingsPage() {
 
   async function handleSaveProspectStage() {
     if (!editingProspectStage) return;
-    await updateProspectStage(editingProspectStage, prospectStageForm);
-    setEditingProspectStage(null);
-    toast("Estágio de prospecção atualizado");
-    reloadProspectStages();
+    try {
+      await updateProspectStage(editingProspectStage, prospectStageForm);
+      setEditingProspectStage(null);
+      toast("Estágio de prospecção atualizado");
+      reloadProspectStages();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível atualizar o estágio de prospecção");
+    }
   }
 
   async function handleDeleteProspectStage(id: string) {
-    await deleteProspectStage(id);
-    toast("Estágio de prospecção removido");
-    reloadProspectStages();
+    try {
+      await deleteProspectStage(id);
+      toast("Estágio de prospecção removido");
+      reloadProspectStages();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível remover o estágio de prospecção");
+    }
   }
 
   async function handleCreateDefaultStages(pipelineId: string) {
-    for (const stage of DEFAULT_STAGES) {
-      // Sequencial (não Promise.all) de propósito: `order` no backend é
-      // `len(estágios já existentes)` no momento da criação — em paralelo,
-      // duas criações poderiam ler a mesma contagem e colidir na mesma ordem.
-      await createStage(pipelineId, stage);
+    try {
+      for (const stage of DEFAULT_STAGES) {
+        // Sequencial (não Promise.all) de propósito: `order` no backend é
+        // `len(estágios já existentes)` no momento da criação — em paralelo,
+        // duas criações poderiam ler a mesma contagem e colidir na mesma ordem.
+        await createStage(pipelineId, stage);
+      }
+      toast("Estágios padrão criados");
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível criar os estágios padrão");
     }
-    toast("Estágios padrão criados");
-    reload();
   }
 
   function startEditStage(pipelineId: string, stage: PipelineStage) {
@@ -149,24 +177,36 @@ export function SettingsPage() {
 
   async function handleSaveStage() {
     if (!editingStage) return;
-    await updateStage(editingStage.pipelineId, editingStage.stageKey, stageForm);
-    setEditingStage(null);
-    toast("Estágio atualizado");
-    reload();
+    try {
+      await updateStage(editingStage.pipelineId, editingStage.stageKey, stageForm);
+      setEditingStage(null);
+      toast("Estágio atualizado");
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível atualizar o estágio");
+    }
   }
 
   async function handleCreateTag() {
     if (!newTagLabel.trim()) return;
-    await createTag({ label: newTagLabel.trim(), color: newTagColor, bg: hexToRgba(newTagColor, 0.14) });
-    setNewTagLabel("");
-    toast("Tag criada");
-    reloadTags();
+    try {
+      await createTag({ label: newTagLabel.trim(), color: newTagColor, bg: hexToRgba(newTagColor, 0.14) });
+      setNewTagLabel("");
+      toast("Tag criada");
+      reloadTags();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível criar a tag");
+    }
   }
 
   async function handleDeleteTag(id: string) {
-    await deleteTag(id);
-    toast("Tag removida");
-    reloadTags();
+    try {
+      await deleteTag(id);
+      toast("Tag removida");
+      reloadTags();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível remover a tag");
+    }
   }
 
   return (

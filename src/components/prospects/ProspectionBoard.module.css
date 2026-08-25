@@ -113,10 +113,15 @@
   margin: 4px 0 10px;
 }
 
+/* Fica por último no card, embaixo do botão de WhatsApp — uma linha só
+   (trunca com "…" em vez de quebrar), sempre visível como rodapé do card
+   em vez de competir por espaço lá em cima com nome/badges. */
 .cardComment {
   font-size: 11px;
   color: var(--muted-2);
-  margin-bottom: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;

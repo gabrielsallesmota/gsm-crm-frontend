@@ -240,16 +240,16 @@ function ProspectCard({
       <div className={styles.cardMeta}>
         {[prospect.city, prospect.niche].filter(Boolean).join(" · ") || "—"}
       </div>
-      {prospect.lastComment && (
-        <div className={styles.cardComment} title={prospect.lastComment.text}>
-          💬 {prospect.lastComment.text}
-        </div>
-      )}
       <div className={styles.cardFooter}>
         <span className={styles.cardMeta}>{prospect.phoneRaw || "sem telefone"}</span>
         <Badge label={whatsapp.label} color={whatsapp.color} bg={whatsapp.bg} />
       </div>
       <WhatsappButton prospect={prospect} templates={templates} size="small" />
+      {prospect.lastComment && (
+        <div className={styles.cardComment} title={prospect.lastComment.text}>
+          💬 {prospect.lastComment.text}
+        </div>
+      )}
     </div>
   );
 }
