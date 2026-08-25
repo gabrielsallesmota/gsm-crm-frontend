@@ -232,6 +232,13 @@ function KanbanCard({
     <div className={styles.card} draggable onDragStart={onDragStart} onClick={onClick}>
       <div className={styles.cardName}>{lead.name}</div>
       <div className={styles.cardCompany}>{lead.company}</div>
+      {lead.lastComment && (
+        // `title` = tooltip nativo com o texto inteiro no hover; o texto
+        // visível já vem truncado por CSS (`.cardComment`, ellipsis).
+        <div className={styles.cardComment} title={lead.lastComment.text}>
+          💬 {lead.lastComment.text}
+        </div>
+      )}
       <div className={styles.cardFooter}>
         <span className={styles.cardValue}>R$ {brl(lead.value)}</span>
         <Badge label={origin.label} color={origin.color} bg={origin.bg} />

@@ -99,6 +99,26 @@
   padding: 4px 10px;
 }
 
+.editIconBtn {
+  background: transparent;
+  border: none;
+  color: var(--muted-2);
+  font-size: 13px;
+  padding: 2px 4px;
+}
+
+.editIconBtn:hover {
+  color: var(--text);
+}
+
+.pipelineEditForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .stages {
   display: flex;
   flex-wrap: wrap;

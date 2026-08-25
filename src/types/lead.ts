@@ -35,6 +35,26 @@ export interface LeadEventRef {
   time: string;
 }
 
+/** Anotação datada de alguém sobre o lead — histórico append-only,
+ * diferente de `Lead.notes` (campo livre único, sobrescrito a cada
+ * edição). */
+export interface LeadComment {
+  id: string;
+  leadId: string;
+  authorUserId: string;
+  authorName: string;
+  text: string;
+  createdAt: string;
+}
+
+/** Só o preview do comentário mais recente — o que aparece no card do
+ * Kanban sem abrir o lead (hover/inline). A view completa é `LeadComment[]`,
+ * carregada à parte (`GET /leads/{id}/comments`) só quando o lead é aberto. */
+export interface LastCommentPreview {
+  text: string;
+  createdAt: string;
+}
+
 export interface Lead {
   id: string;
   tenantId: string;
@@ -64,6 +84,9 @@ export interface Lead {
   probability: number;
   origin: string;
   tags: string[];
+  /** `undefined` no modo Demo pra leads sem comentário (fixtures não
+   * precisam declarar); `null` explícito na API real. */
+  lastComment?: LastCommentPreview | null;
   createdAt: string;
   firstContactHours: number;
   lastActivityAt: string;

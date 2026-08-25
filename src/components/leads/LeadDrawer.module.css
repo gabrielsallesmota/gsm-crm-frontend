@@ -217,6 +217,54 @@
   color: var(--muted-2);
 }
 
+.commentForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.commentForm .editTextarea {
+  min-height: 50px;
+}
+
+.commentForm button {
+  align-self: flex-end;
+}
+
+.commentRow {
+  border-top: 1px solid var(--border);
+  padding: 10px 0;
+}
+
+.commentRow:first-of-type {
+  border-top: none;
+}
+
+.commentMeta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.commentAuthor {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.commentDate {
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.commentText {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .timelineRow {
   display: flex;
   gap: 10px;

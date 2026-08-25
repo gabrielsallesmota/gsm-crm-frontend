@@ -8,6 +8,7 @@ import type { Pipeline } from "../../types/pipeline";
 import type { User } from "../../types/user";
 import type { Tenant } from "../../types/tenant";
 import type { Tag } from "../../types/tag";
+import type { LeadComment } from "../../types/lead";
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -19,6 +20,10 @@ export const mockState: {
   users: User[];
   tenants: Tenant[];
   tags: Tag[];
+  // Comentários de lead vivem à parte de `leads` de propósito (mesma
+  // divisão do backend: `LeadComment` não é embutido em `Lead`) — indexado
+  // por `leadId`, mais recente primeiro.
+  leadComments: Record<string, LeadComment[]>;
   currentTenantId: string;
 } = {
   leads: clone(mockLeads),
@@ -26,6 +31,7 @@ export const mockState: {
   users: clone(mockUsers),
   tenants: clone(mockTenants),
   tags: clone(mockTags),
+  leadComments: {},
   currentTenantId: mockTenants[0]?.id ?? "c1",
 };
 
@@ -52,4 +58,9 @@ export function nextTaskId(): string {
 let eventSeq = 1000;
 export function nextEventId(): string {
   return `event${eventSeq++}`;
+}
+
+let commentSeq = 1000;
+export function nextCommentId(): string {
+  return `comment${commentSeq++}`;
 }

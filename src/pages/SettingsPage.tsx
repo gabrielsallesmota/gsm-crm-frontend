@@ -12,7 +12,7 @@ import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { ORIGIN } from "../constants/origins";
 import { hexToRgba } from "../utils/colors";
-import type { PipelineStage, StageKey } from "../types/pipeline";
+import type { Pipeline, PipelineStage, StageKey } from "../types/pipeline";
 import styles from "./SettingsPage.module.css";
 
 // Mesmo funil padrão semeado automaticamente pelo backend em todo pipeline
@@ -29,7 +29,7 @@ const DEFAULT_STAGES: { label: string; color: string; isWon?: boolean; isLost?: 
 
 export function SettingsPage() {
   const { data: pipelines, loading, error, reload } = usePipelines();
-  const { create, setDefault, createStage, updateStage } = usePipelineActions();
+  const { create, update, setDefault, createStage, updateStage } = usePipelineActions();
   const { data: tags, error: tagsError, reload: reloadTags } = useTags();
   const { create: createTag, delete: deleteTag } = useTagActions();
   // Ver DashboardPage.tsx — `isPlatformStaff` vem de `GET /auth/me`.
@@ -43,6 +43,8 @@ export function SettingsPage() {
     null,
   );
   const [stageForm, setStageForm] = useState({ label: "", color: "#4aa3ff", isWon: false, isLost: false });
+  const [editingPipeline, setEditingPipeline] = useState<string | null>(null);
+  const [pipelineForm, setPipelineForm] = useState({ name: "", color: "#4aa3ff" });
 
   async function handleCreatePipeline() {
     if (!newName.trim()) return;
@@ -55,6 +57,19 @@ export function SettingsPage() {
   async function handleSetDefault(id: string) {
     await setDefault(id);
     toast("Pipeline padrão atualizado");
+    reload();
+  }
+
+  function startEditPipeline(pipeline: Pipeline) {
+    setEditingPipeline(pipeline.id);
+    setPipelineForm({ name: pipeline.name, color: pipeline.color });
+  }
+
+  async function handleSavePipeline() {
+    if (!editingPipeline) return;
+    await update(editingPipeline, pipelineForm);
+    setEditingPipeline(null);
+    toast("Pipeline atualizado");
     reload();
   }
 
@@ -123,17 +138,55 @@ export function SettingsPage() {
         <div className={styles.pipelineGrid}>
           {pipelines?.map((pipeline) => (
             <div key={pipeline.id} className={styles.pipelineCard}>
-              <div className={styles.pipelineHeader}>
-                <span className={styles.pipelineDot} style={{ background: pipeline.color }} />
-                <span className={styles.pipelineName}>{pipeline.name}</span>
-                {pipeline.isDefault ? (
-                  <Badge label="Padrão" color="#2ee66e" bg="rgba(46,230,110,.14)" />
-                ) : (
-                  <button className={styles.setDefaultBtn} onClick={() => void handleSetDefault(pipeline.id)}>
-                    Tornar padrão
+              {editingPipeline === pipeline.id ? (
+                <div className={styles.pipelineEditForm}>
+                  <input
+                    className={styles.colorInput}
+                    type="color"
+                    value={pipelineForm.color}
+                    onChange={(e) => setPipelineForm((f) => ({ ...f, color: e.target.value }))}
+                    aria-label="Cor do pipeline"
+                  />
+                  <input
+                    className={styles.input}
+                    value={pipelineForm.name}
+                    onChange={(e) => setPipelineForm((f) => ({ ...f, name: e.target.value }))}
+                  />
+                  <Button
+                    variant="primary"
+                    onClick={() => void handleSavePipeline()}
+                    disabled={!pipelineForm.name.trim()}
+                  >
+                    Salvar
+                  </Button>
+                  <Button onClick={() => setEditingPipeline(null)}>Cancelar</Button>
+                </div>
+              ) : (
+                <div className={styles.pipelineHeader}>
+                  <span className={styles.pipelineDot} style={{ background: pipeline.color }} />
+                  <span className={styles.pipelineName}>{pipeline.name}</span>
+                  <button
+                    type="button"
+                    className={styles.editIconBtn}
+                    onClick={() => startEditPipeline(pipeline)}
+                    aria-label={`Editar pipeline ${pipeline.name}`}
+                    title="Editar nome/cor"
+                  >
+                    ✎
                   </button>
-                )}
-              </div>
+                  {pipeline.isDefault ? (
+                    <Badge label="Padrão" color="#2ee66e" bg="rgba(46,230,110,.14)" />
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.setDefaultBtn}
+                      onClick={() => void handleSetDefault(pipeline.id)}
+                    >
+                      Tornar padrão
+                    </button>
+                  )}
+                </div>
+              )}
               <div className={styles.stages}>
                 {pipeline.stages.map((stage) =>
                   editingStage?.pipelineId === pipeline.id && editingStage.stageKey === stage.id ? (

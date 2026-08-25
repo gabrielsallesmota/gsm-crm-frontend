@@ -39,6 +39,7 @@ interface LeadDto {
   created_at: string;
   last_interaction_at: string | null;
   tags: string[];
+  last_comment: { text: string; created_at: string } | null;
 }
 
 interface MessageTemplateDto {
@@ -113,6 +114,9 @@ function toLead(dto: LeadDto): Lead {
     probability,
     origin: dto.origin,
     tags: dto.tags,
+    lastComment: dto.last_comment
+      ? { text: dto.last_comment.text, createdAt: dto.last_comment.created_at }
+      : null,
     createdAt: dto.created_at,
     firstContactHours: 0,
     lastActivityAt: dto.last_interaction_at ?? dto.created_at,

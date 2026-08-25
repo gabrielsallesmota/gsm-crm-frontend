@@ -9,6 +9,8 @@ import { TEMP } from "../../constants/temperature";
 import { brl } from "../../utils/currency";
 import { useLeadActions } from "../../hooks/useLeadActions";
 import { useTags } from "../../hooks/useTags";
+import { useLeadComments } from "../../hooks/useLeadComments";
+import { useLeadCommentActions } from "../../hooks/useLeadCommentActions";
 import { useToast } from "../../hooks/useToast";
 import { WhatsappButton } from "./WhatsappButton";
 import styles from "./LeadDrawer.module.css";
@@ -29,12 +31,30 @@ export function LeadDrawer({
   const { toast } = useToast();
   const { update } = useLeadActions();
   const { data: availableTags } = useTags();
+  const { data: comments, reload: reloadComments } = useLeadComments(lead.id);
+  const { create: createComment } = useLeadCommentActions();
   const stage = STAGES[lead.stage];
   const temp = TEMP[lead.temperature];
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(() => fromLead(lead));
+  const [newComment, setNewComment] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
+
+  async function handlePostComment() {
+    if (!newComment.trim()) return;
+    setPostingComment(true);
+    try {
+      await createComment(lead.id, newComment.trim());
+      setNewComment("");
+      reloadComments();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível adicionar o comentário");
+    } finally {
+      setPostingComment(false);
+    }
+  }
 
   function toggleTag(tagId: string) {
     setForm((f) => ({
@@ -259,6 +279,36 @@ export function LeadDrawer({
             ))}
           </div>
         )}
+
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Comentários</div>
+          <div className={styles.commentForm}>
+            <textarea
+              className={styles.editTextarea}
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              rows={2}
+              placeholder="Deixe um comentário sobre este lead…"
+            />
+            <Button
+              variant="primary"
+              onClick={() => void handlePostComment()}
+              disabled={postingComment || !newComment.trim()}
+            >
+              {postingComment ? "Enviando…" : "Comentar"}
+            </Button>
+          </div>
+          {comments?.length === 0 && <div className={styles.empty}>Nenhum comentário ainda.</div>}
+          {comments?.map((c) => (
+            <div key={c.id} className={styles.commentRow}>
+              <div className={styles.commentMeta}>
+                <span className={styles.commentAuthor}>{c.authorName}</span>
+                <span className={styles.commentDate}>{new Date(c.createdAt).toLocaleString("pt-BR")}</span>
+              </div>
+              <p className={styles.commentText}>{c.text}</p>
+            </div>
+          ))}
+        </div>
 
         <div className={styles.section}>
           <div className={styles.sectionTitle}>Linha do tempo</div>
