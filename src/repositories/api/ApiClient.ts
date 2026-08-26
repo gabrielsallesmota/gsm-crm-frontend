@@ -1,7 +1,7 @@
 import { ApiError } from "../../types/common";
 import type { TokenResponse } from "../../types/auth";
 
-const BASE_URL = import.meta.env.VITE_CRM_API_URL || "http://localhost:8010";
+export const BASE_URL = import.meta.env.VITE_CRM_API_URL || "http://localhost:8010";
 
 let accessToken: string | null = null;
 let refreshTokenValue: string | null = null;

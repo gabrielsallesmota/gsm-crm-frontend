@@ -29,6 +29,7 @@ const NAV_ITEMS: {
   { to: ROUTES.tarefas, icon: "tasks", label: "Tarefas" },
   { to: ROUTES.agenda, icon: "agenda", label: "Agenda" },
   { to: ROUTES.relatorios, icon: "reports", label: "Relatórios" },
+  { to: ROUTES.terapeutaDaVezGestao, icon: "queue", label: "Terapeuta da Vez" },
   { to: ROUTES.configuracoes, icon: "settings", label: "Configurações", adminOnly: true },
   { to: ROUTES.usuarios, icon: "users", label: "Usuários", adminOnly: true },
 ];

@@ -13,4 +13,6 @@ export const ROUTES = {
   configuracoes: "/configuracoes",
   usuarios: "/usuarios",
   perfil: "/perfil",
+  terapeutaDaVez: "/terapeuta-da-vez",
+  terapeutaDaVezGestao: "/terapeuta-da-vez/gestao",
 } as const;

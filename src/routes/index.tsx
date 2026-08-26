@@ -14,12 +14,18 @@ import { ReportsPage } from "../pages/ReportsPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { UsersPage } from "../pages/UsersPage";
 import { ProfilePage } from "../pages/ProfilePage";
+import { TerapeutaDaVezPage } from "../pages/TerapeutaDaVezPage";
+import { TerapeutaDaVezGestaoPage } from "../pages/TerapeutaDaVezGestaoPage";
 
 export const router = createBrowserRouter([
   { path: ROUTES.login, element: <LoginPage /> },
   { path: ROUTES.forgotPassword, element: <ForgotPasswordPage /> },
   { path: ROUTES.resetPassword, element: <ResetPasswordPage /> },
   { path: ROUTES.forcedPasswordChange, element: <ForcedPasswordChangePage /> },
+  // Painel do quiosque — igual ao login, fora de `ProtectedRoute`: tela
+  // cheia, sem sidebar, sem exigir sessão do CRM (pedido explícito do
+  // cliente: "deve ser aberto").
+  { path: ROUTES.terapeutaDaVez, element: <TerapeutaDaVezPage /> },
   {
     element: <ProtectedRoute />,
     children: [
@@ -31,6 +37,7 @@ export const router = createBrowserRouter([
       { path: ROUTES.tarefas, element: <TasksPage /> },
       { path: ROUTES.agenda, element: <AgendaPage /> },
       { path: ROUTES.relatorios, element: <ReportsPage /> },
+      { path: ROUTES.terapeutaDaVezGestao, element: <TerapeutaDaVezGestaoPage /> },
       { path: ROUTES.configuracoes, element: <SettingsPage /> },
       { path: ROUTES.usuarios, element: <UsersPage /> },
       { path: ROUTES.perfil, element: <ProfilePage /> },
