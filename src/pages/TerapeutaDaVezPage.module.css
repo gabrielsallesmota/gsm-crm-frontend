@@ -453,33 +453,57 @@
   gap: 6px;
 }
 
+/* Uma linha só sempre — os cards encolhem juntos (flex 1 1 0 + min-width:0)
+   em vez de quebrar pra segunda linha; `overflow-x: auto` é só uma rede de
+   segurança pra telas absurdamente estreitas, não o comportamento normal. */
 .spacesGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: clamp(4px, 0.8vw, 10px);
+  overflow-x: auto;
 }
 
 .spaceCard {
-  padding: 12px 14px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: clamp(6px, 0.9vw, 12px) clamp(8px, 1vw, 14px);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   border-top: 3px solid #d9d9d9;
+}
+
+.spaceCardTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
 }
 
 .spaceCardName {
   font-weight: 700;
-  font-size: 13px;
+  font-size: clamp(9.5px, 1vw, 13px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .spaceCardStatus {
-  font-size: 9.5px;
-  letter-spacing: 1.1px;
+  font-size: clamp(7.5px, 0.68vw, 9.5px);
+  letter-spacing: 0.8px;
+  white-space: nowrap;
+  flex: none;
 }
 
 .spaceCardLine {
-  font-size: 10.5px;
-  line-height: 1.4;
+  font-size: clamp(7.5px, 0.78vw, 10.5px);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ---- Toast ------------------------------------------------------------------- */

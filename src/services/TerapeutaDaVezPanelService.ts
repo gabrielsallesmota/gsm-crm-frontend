@@ -1,5 +1,5 @@
 import { terapeutaDaVezPublicRepository } from "../repositories/api/TerapeutaDaVezPublicRepository";
-import type { AttendanceAction, PanelState } from "../types/operations";
+import type { AttendanceAction, PanelState, Shift, TherapistAction } from "../types/operations";
 
 /** Painel aberto (sem login) — chamar/recusar/iniciar/finalizar e o estado
  * completo da fila. Ver `TerapeutaDaVezPublicRepository`. */
@@ -20,8 +20,16 @@ export class TerapeutaDaVezPanelService {
     return terapeutaDaVezPublicRepository.start(attendanceId, procedureId, spaceIds);
   }
 
-  finish(attendanceId: string): Promise<AttendanceAction> {
-    return terapeutaDaVezPublicRepository.finish(attendanceId);
+  finish(attendanceId: string, awardPoints: boolean): Promise<AttendanceAction> {
+    return terapeutaDaVezPublicRepository.finish(attendanceId, awardPoints);
+  }
+
+  checkIn(therapistId: string, shift?: Shift): Promise<TherapistAction> {
+    return terapeutaDaVezPublicRepository.checkIn(therapistId, shift);
+  }
+
+  checkOut(therapistId: string): Promise<TherapistAction> {
+    return terapeutaDaVezPublicRepository.checkOut(therapistId);
   }
 }
 

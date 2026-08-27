@@ -1,3 +1,20 @@
+/* Página fora do AppLayout (standalone, sem login do CRM) — precisa do
+   próprio fundo/padding, que normalmente vinha do shell protegido. */
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  padding: clamp(16px, 3vw, 40px);
+  font-family: var(--font-body);
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .pageTitle {
   margin: 0;
   font-family: var(--font-heading);
@@ -10,6 +27,31 @@
   margin: 4px 0 20px;
   font-size: 13.5px;
   color: var(--muted);
+}
+
+.gateWrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 20px;
+}
+
+.gateCard {
+  width: min(92vw, 380px);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gateError {
+  font-size: 12.5px;
+  color: var(--red);
 }
 
 .tabs {

@@ -5,25 +5,25 @@ import { useAttendanceHistory } from "../hooks/useAttendanceHistory";
 import { useOperationsClients } from "../hooks/useOperationsClients";
 import { useProcedureActions } from "../hooks/useProcedureActions";
 import { useProcedures } from "../hooks/useProcedures";
+import { useSpaceActions } from "../hooks/useSpaceActions";
+import { useSpaces } from "../hooks/useSpaces";
 import { useTherapistActions } from "../hooks/useTherapistActions";
 import { useTherapists } from "../hooks/useTherapists";
 import { useToast } from "../hooks/useToast";
+import { operationsApiRepository } from "../repositories/api/OperationsApiRepository";
+import { getOperationsPassword, setOperationsPassword } from "../repositories/api/operationsAuth";
 import type {
   AttendancePhase,
   CreateProcedureInput,
+  CreateSpaceInput,
   CreateTherapistInput,
   Procedure,
-  Shift,
+  SpaceAdmin,
+  SpaceRequirementInput,
   SpaceType,
   Therapist,
 } from "../types/operations";
 import styles from "./TerapeutaDaVezGestaoPage.module.css";
-
-const SHIFT_OPTIONS: { value: Shift; label: string }[] = [
-  { value: "manha", label: "Manhã (10:00–16:00)" },
-  { value: "inter", label: "Interjornada (13:00–19:00)" },
-  { value: "tarde", label: "Tarde (16:00–22:00)" },
-];
 
 const SPACE_TYPE_OPTIONS: { value: SpaceType; label: string }[] = [
   { value: "maca", label: "Maca" },
@@ -38,28 +38,60 @@ const PHASE_LABELS: Record<string, string> = {
   therapy: "Terapia",
 };
 
-type Tab = "terapeutas" | "procedimentos" | "clientes" | "historico";
+type Tab = "terapeutas" | "procedimentos" | "espacos" | "clientes" | "historico";
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+/**
+ * Página standalone (fora do `ProtectedRoute`/login do CRM, pedido
+ * explícito do cliente) — gate por senha simples compartilhada em vez de
+ * conta de usuário. Ver `operationsAuth.ts`/`OperationsApiRepository.ts`.
+ */
 export function TerapeutaDaVezGestaoPage() {
+  const [unlocked, setUnlocked] = useState(() => !!getOperationsPassword());
+
+  if (!unlocked) return <PasswordGate onUnlock={() => setUnlocked(true)} />;
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.pageHeader}>
+        <div>
+          <h1 className={styles.pageTitle}>Terapeuta da Vez</h1>
+          <p className={styles.pageSubtitle}>
+            Cadastro de terapeutas e procedimentos, clientes e histórico de atendimentos do painel de fila.
+          </p>
+        </div>
+        <button
+          type="button"
+          className={styles.tab}
+          onClick={() => {
+            setOperationsPassword(null);
+            setUnlocked(false);
+          }}
+        >
+          Trocar senha
+        </button>
+      </div>
+
+      <GestaoTabs />
+    </div>
+  );
+}
+
+function GestaoTabs() {
   const [tab, setTab] = useState<Tab>("terapeutas");
 
   return (
-    <div>
-      <h1 className={styles.pageTitle}>Terapeuta da Vez</h1>
-      <p className={styles.pageSubtitle}>
-        Cadastro de terapeutas e procedimentos, clientes e histórico de atendimentos do painel de fila.
-      </p>
-
+    <>
       <div className={styles.tabs}>
         {(
           [
             ["terapeutas", "Terapeutas"],
             ["procedimentos", "Procedimentos"],
+            ["espacos", "Espaços"],
             ["clientes", "Clientes"],
             ["historico", "Histórico"],
           ] as [Tab, string][]
@@ -77,8 +109,57 @@ export function TerapeutaDaVezGestaoPage() {
 
       {tab === "terapeutas" && <TherapistsTab />}
       {tab === "procedimentos" && <ProceduresTab />}
+      {tab === "espacos" && <SpacesTab />}
       {tab === "clientes" && <ClientsTab />}
       {tab === "historico" && <HistoryTab />}
+    </>
+  );
+}
+
+function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  async function handleSubmit() {
+    if (!password.trim()) return;
+    setChecking(true);
+    setError(null);
+    setOperationsPassword(password.trim());
+    try {
+      // Qualquer chamada simples serve pra validar a senha contra o backend
+      // (`require_operations_access`) antes de mostrar a tela de verdade.
+      await operationsApiRepository.listTherapists();
+      onUnlock();
+    } catch {
+      setOperationsPassword(null);
+      setError("Senha incorreta.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  return (
+    <div className={styles.gateWrap}>
+      <div className={styles.gateCard}>
+        <h1 className={styles.pageTitle}>Terapeuta da Vez · Gestão</h1>
+        <p className={styles.pageSubtitle}>Digite a senha de acesso da gestão (não é a senha do CRM).</p>
+        <input
+          className={styles.input}
+          type="password"
+          autoFocus
+          placeholder="Senha"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void handleSubmit();
+          }}
+        />
+        {error && <div className={styles.gateError}>{error}</div>}
+        <Button variant="primary" onClick={() => void handleSubmit()} disabled={checking || !password.trim()}>
+          {checking ? "Verificando…" : "Entrar"}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -90,23 +171,17 @@ function TherapistsTab() {
   const actions = useTherapistActions();
   const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<CreateTherapistInput>({
-    code: "",
-    name: "",
-    shift: "manha",
-    points: 0,
-    active: true,
-  });
+  const [form, setForm] = useState<CreateTherapistInput>({ code: "", name: "", active: true });
   const [submitting, setSubmitting] = useState(false);
 
   function startEdit(t: Therapist) {
     setEditingId(t.id);
-    setForm({ code: t.code, name: t.name, shift: t.shift, points: t.points, active: t.active });
+    setForm({ code: t.code, name: t.name, active: t.active });
   }
 
   function resetForm() {
     setEditingId(null);
-    setForm({ code: "", name: "", shift: "manha", points: 0, active: true });
+    setForm({ code: "", name: "", active: true });
   }
 
   async function handleSubmit() {
@@ -142,6 +217,12 @@ function TherapistsTab() {
 
   return (
     <div>
+      <p className={styles.rowMeta} style={{ marginBottom: 10 }}>
+        Turno e pontuação não são cadastrados aqui — cada terapeuta dá Entrada/Saída e escolhe o
+        turno diretamente na tela do painel (<code>/terapeuta-da-vez</code>), porque a escala muda
+        dia a dia (folgas etc.). Para consultar o saldo de pontos de um dia específico, use a aba
+        Histórico.
+      </p>
       <div className={styles.form}>
         <input
           className={styles.inputSmall}
@@ -154,24 +235,6 @@ function TherapistsTab() {
           placeholder="Nome"
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-        />
-        <select
-          className={styles.select}
-          value={form.shift}
-          onChange={(e) => setForm((f) => ({ ...f, shift: e.target.value as Shift }))}
-        >
-          {SHIFT_OPTIONS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-        <input
-          className={styles.inputSmall}
-          type="number"
-          placeholder="Pontos"
-          value={form.points ?? 0}
-          onChange={(e) => setForm((f) => ({ ...f, points: Number(e.target.value) }))}
         />
         <label className={styles.checkboxGroup}>
           <input
@@ -203,11 +266,15 @@ function TherapistsTab() {
                   {t.code} · {t.name}
                 </span>
                 <span className={styles.rowMeta}>
-                  {t.shiftLabel} · {t.status === "idle" ? "Livre" : t.status === "reception" ? "Na recepção" : "Em terapia"}
+                  {t.present
+                    ? `${t.currentShiftLabel} · ${t.status === "idle" ? "Livre" : t.status === "reception" ? "Na recepção" : "Em terapia"}`
+                    : "Ausente hoje"}
                   {!t.active && " · inativo"}
                 </span>
               </div>
-              <span className={styles.rowStat}>{t.points} pts</span>
+              <span className={styles.rowStat}>
+                {t.pointsManhaToday} manhã · {t.pointsNoturnoToday} noturno
+              </span>
               <div className={styles.rowActions}>
                 <button type="button" className={styles.linkBtn} onClick={() => startEdit(t)}>
                   Editar
@@ -230,10 +297,9 @@ function TherapistsTab() {
 const EMPTY_PROCEDURE_FORM: CreateProcedureInput = {
   code: "",
   name: "",
-  durationMinutes: 30,
   points: 15,
   priceLabel: "",
-  spaceTypes: ["maca"],
+  spaceRequirements: [{ type: "maca", minutes: 30 }],
   category: "",
   active: true,
 };
@@ -251,10 +317,9 @@ function ProceduresTab() {
     setForm({
       code: p.code,
       name: p.name,
-      durationMinutes: p.durationMinutes,
       points: p.points,
       priceLabel: p.priceLabel,
-      spaceTypes: p.spaceTypes,
+      spaceRequirements: p.spaceRequirements.map((r) => ({ type: r.type, minutes: r.minutes })),
       category: p.category,
       active: p.active,
     });
@@ -265,15 +330,27 @@ function ProceduresTab() {
     setForm(EMPTY_PROCEDURE_FORM);
   }
 
-  function toggleSpaceType(type: SpaceType) {
-    setForm((f) => {
-      const has = f.spaceTypes.includes(type);
-      return { ...f, spaceTypes: has ? f.spaceTypes.filter((t) => t !== type) : [...f.spaceTypes, type] };
-    });
+  function updateRequirement(index: number, patch: Partial<SpaceRequirementInput>) {
+    setForm((f) => ({
+      ...f,
+      spaceRequirements: f.spaceRequirements.map((r, i) => (i === index ? { ...r, ...patch } : r)),
+    }));
   }
 
+  function addRequirement() {
+    setForm((f) => ({ ...f, spaceRequirements: [...f.spaceRequirements, { type: "maca", minutes: 15 }] }));
+  }
+
+  function removeRequirement(index: number) {
+    setForm((f) => ({ ...f, spaceRequirements: f.spaceRequirements.filter((_, i) => i !== index) }));
+  }
+
+  const totalMinutes = form.spaceRequirements.reduce((sum, r) => sum + (r.minutes || 0), 0);
+  const requirementsValid =
+    form.spaceRequirements.length > 0 && form.spaceRequirements.every((r) => r.minutes > 0);
+
   async function handleSubmit() {
-    if (!form.code.trim() || !form.name.trim() || form.durationMinutes <= 0 || form.spaceTypes.length === 0) return;
+    if (!form.code.trim() || !form.name.trim() || !requirementsValid) return;
     setSubmitting(true);
     try {
       if (editingId) {
@@ -321,13 +398,6 @@ function ProceduresTab() {
         <input
           className={styles.inputSmall}
           type="number"
-          placeholder="Minutos"
-          value={form.durationMinutes}
-          onChange={(e) => setForm((f) => ({ ...f, durationMinutes: Number(e.target.value) }))}
-        />
-        <input
-          className={styles.inputSmall}
-          type="number"
           placeholder="Pontuação"
           value={form.points}
           onChange={(e) => setForm((f) => ({ ...f, points: Number(e.target.value) }))}
@@ -344,20 +414,53 @@ function ProceduresTab() {
           value={form.category}
           onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
         />
-        <div className={styles.checkboxGroup}>
-          Espaço:
-          {SPACE_TYPE_OPTIONS.map((opt) => (
-            <label key={opt.value}>
-              <input
-                type="checkbox"
-                checked={form.spaceTypes.includes(opt.value)}
-                onChange={() => toggleSpaceType(opt.value)}
-              />
-              {opt.label}
-            </label>
-          ))}
+      </div>
+
+      <div className={styles.form} style={{ flexDirection: "column", alignItems: "stretch" }}>
+        <span className={styles.rowMeta}>
+          Espaços usados pelo procedimento, na ordem — um procedimento pode passar por mais de um
+          espaço (ex.: 30 min numa maca e depois 15 min numa poltrona).
+        </span>
+        {form.spaceRequirements.map((r, i) => (
+          <div key={i} style={{ display: "flex", gap: 9, alignItems: "center" }}>
+            <select
+              className={styles.select}
+              value={r.type}
+              onChange={(e) => updateRequirement(i, { type: e.target.value as SpaceType })}
+            >
+              {SPACE_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <input
+              className={styles.inputSmall}
+              type="number"
+              placeholder="Minutos"
+              value={r.minutes}
+              onChange={(e) => updateRequirement(i, { minutes: Number(e.target.value) })}
+            />
+            <button
+              type="button"
+              className={styles.dangerBtn}
+              onClick={() => removeRequirement(i)}
+              disabled={form.spaceRequirements.length <= 1}
+            >
+              Remover trecho
+            </button>
+          </div>
+        ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button type="button" className={styles.linkBtn} onClick={addRequirement}>
+            + adicionar trecho
+          </button>
+          <span className={styles.rowMeta}>Duração total: {totalMinutes} min</span>
         </div>
-        <Button variant="primary" onClick={() => void handleSubmit()} disabled={submitting}>
+      </div>
+
+      <div className={styles.form}>
+        <Button variant="primary" onClick={() => void handleSubmit()} disabled={submitting || !requirementsValid}>
           {editingId ? "Salvar" : "Adicionar"}
         </Button>
         {editingId && (
@@ -396,6 +499,136 @@ function ProceduresTab() {
             </div>
           ))}
           {data.length === 0 && <div className={styles.row}>Nenhum procedimento cadastrado ainda.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Espaços --------------------------------------------------------------------
+
+const EMPTY_SPACE_FORM: CreateSpaceInput = { code: "", name: "", type: "maca", active: true };
+
+function SpacesTab() {
+  const { data, loading, error, reload } = useSpaces();
+  const actions = useSpaceActions();
+  const { toast } = useToast();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<CreateSpaceInput>(EMPTY_SPACE_FORM);
+  const [submitting, setSubmitting] = useState(false);
+
+  function startEdit(s: SpaceAdmin) {
+    setEditingId(s.id);
+    setForm({ code: s.code, name: s.name, type: s.type, active: s.active });
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setForm(EMPTY_SPACE_FORM);
+  }
+
+  async function handleSubmit() {
+    if (!form.code.trim() || !form.name.trim()) return;
+    setSubmitting(true);
+    try {
+      if (editingId) {
+        await actions.update(editingId, form);
+        toast("Espaço atualizado.");
+      } else {
+        await actions.create(form);
+        toast("Espaço cadastrado.");
+      }
+      resetForm();
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível salvar o espaço.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDelete(s: SpaceAdmin) {
+    if (!confirm(`Excluir o espaço "${s.name}"?`)) return;
+    try {
+      await actions.delete(s.id);
+      toast("Espaço excluído.");
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível excluir — verifique se não está em uso agora.");
+    }
+  }
+
+  return (
+    <div>
+      <div className={styles.form}>
+        <input
+          className={styles.inputSmall}
+          placeholder="Código"
+          value={form.code}
+          onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+        />
+        <input
+          className={styles.input}
+          placeholder="Nome (ex: Maca 01)"
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+        />
+        <select
+          className={styles.select}
+          value={form.type}
+          onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as SpaceType }))}
+        >
+          {SPACE_TYPE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <label className={styles.checkboxGroup}>
+          <input
+            type="checkbox"
+            checked={form.active ?? true}
+            onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
+          />
+          Ativo
+        </label>
+        <Button variant="primary" onClick={() => void handleSubmit()} disabled={submitting}>
+          {editingId ? "Salvar" : "Adicionar"}
+        </Button>
+        {editingId && (
+          <Button variant="ghost" onClick={resetForm}>
+            Cancelar
+          </Button>
+        )}
+      </div>
+
+      {error && <EmptyState title="Não foi possível carregar os espaços" message={error.message} />}
+      {loading && !data && <div className={styles.loading}>Carregando…</div>}
+
+      {data && (
+        <div className={styles.list}>
+          {data.map((s) => (
+            <div key={s.id} className={`${styles.row} ${s.active ? "" : styles.inactive}`}>
+              <div className={styles.rowMain}>
+                <span className={styles.rowName}>
+                  {s.code} · {s.name}
+                </span>
+                <span className={styles.rowMeta}>
+                  {SPACE_TYPE_OPTIONS.find((o) => o.value === s.type)?.label ?? s.type}
+                  {!s.active && " · inativo"}
+                </span>
+              </div>
+              <div className={styles.rowActions}>
+                <button type="button" className={styles.linkBtn} onClick={() => startEdit(s)}>
+                  Editar
+                </button>
+                <button type="button" className={styles.dangerBtn} onClick={() => void handleDelete(s)}>
+                  Excluir
+                </button>
+              </div>
+            </div>
+          ))}
+          {data.length === 0 && <div className={styles.row}>Nenhum espaço cadastrado ainda.</div>}
         </div>
       )}
     </div>
@@ -444,6 +677,62 @@ function ClientsTab() {
 
 // ---- Histórico ------------------------------------------------------------------
 
+/** Pontos resetam todo dia (derivados do histórico de atendimentos, não um
+ * contador salvo) — esta busca consulta o saldo de manhã/noturno de UM
+ * terapeuta num dia específico, pedido do usuário pra continuar enxergando
+ * dias anteriores mesmo com o reset diário. */
+function PointsByDayLookup() {
+  const { data: therapists } = useTherapists();
+  const [therapistId, setTherapistId] = useState("");
+  const [isoDate, setIsoDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [result, setResult] = useState<{ pointsManha: number; pointsNoturno: number } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function lookup() {
+    if (!therapistId || !isoDate) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const points = await operationsApiRepository.getTherapistPoints(therapistId, isoDate);
+      setResult({ pointsManha: points.pointsManha, pointsNoturno: points.pointsNoturno });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível consultar os pontos.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className={styles.filters} style={{ marginBottom: 18, alignItems: "center" }}>
+      <select className={styles.select} value={therapistId} onChange={(e) => setTherapistId(e.target.value)}>
+        <option value="">Ver saldo de um terapeuta…</option>
+        {(therapists ?? []).map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+      <input
+        className={styles.inputSmall}
+        type="date"
+        value={isoDate}
+        onChange={(e) => setIsoDate(e.target.value)}
+      />
+      <Button variant="ghost" onClick={() => void lookup()} disabled={loading || !therapistId}>
+        {loading ? "Consultando…" : "Consultar"}
+      </Button>
+      {error && <span className={styles.rowMeta}>{error}</span>}
+      {result && (
+        <span className={styles.rowStat}>
+          {result.pointsManha} manhã · {result.pointsNoturno} noturno
+        </span>
+      )}
+    </div>
+  );
+}
+
 function HistoryTab() {
   const { data: therapists } = useTherapists();
   const { data: procedures } = useProcedures();
@@ -470,6 +759,7 @@ function HistoryTab() {
 
   return (
     <div>
+      <PointsByDayLookup />
       <div className={styles.filters}>
         <select
           className={styles.select}

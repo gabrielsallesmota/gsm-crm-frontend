@@ -26,6 +26,10 @@ export const router = createBrowserRouter([
   // cheia, sem sidebar, sem exigir sessão do CRM (pedido explícito do
   // cliente: "deve ser aberto").
   { path: ROUTES.terapeutaDaVez, element: <TerapeutaDaVezPage /> },
+  // Gestão também fica FORA do `ProtectedRoute` — pedido explícito do
+  // cliente pra não exigir login do CRM aqui, só a senha simples própria
+  // (ver `TerapeutaDaVezGestaoPage`/`operationsAuth.ts`).
+  { path: ROUTES.terapeutaDaVezGestao, element: <TerapeutaDaVezGestaoPage /> },
   {
     element: <ProtectedRoute />,
     children: [
@@ -37,7 +41,6 @@ export const router = createBrowserRouter([
       { path: ROUTES.tarefas, element: <TasksPage /> },
       { path: ROUTES.agenda, element: <AgendaPage /> },
       { path: ROUTES.relatorios, element: <ReportsPage /> },
-      { path: ROUTES.terapeutaDaVezGestao, element: <TerapeutaDaVezGestaoPage /> },
       { path: ROUTES.configuracoes, element: <SettingsPage /> },
       { path: ROUTES.usuarios, element: <UsersPage /> },
       { path: ROUTES.perfil, element: <ProfilePage /> },

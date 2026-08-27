@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTerapeutaDaVezPanel } from "../hooks/useTerapeutaDaVezPanel";
-import type { PanelState, ProcedureOption, QueueEntry, Shift, SpacePanelView, SpaceType } from "../types/operations";
+import type {
+  AbsentTherapist,
+  PanelState,
+  ProcedureOption,
+  QueueEntry,
+  Shift,
+  SpacePanelView,
+} from "../types/operations";
 import styles from "./TerapeutaDaVezPage.module.css";
 
-const SHIFT_ORDER: Shift[] = ["manha", "inter", "tarde"];
-const SHIFT_DOT: Record<Shift, string> = { manha: "#1E8A86", inter: "#C9A44C", tarde: "#1E8A86" };
+const SHIFT_ORDER: Shift[] = ["manha", "inter", "noturno"];
+const SHIFT_DOT: Record<Shift, string> = { manha: "#1E8A86", inter: "#C9A44C", noturno: "#0B4F4C" };
 const SPACE_DOT: Record<string, string> = { free: "#69C8AF", occupied: "#1E8A86", cleaning: "#C9A44C" };
 const SPACE_STATUS_LABEL: Record<string, string> = { free: "LIVRE", occupied: "OCUPADO", cleaning: "PREPARAÇÃO" };
 
@@ -40,7 +47,6 @@ function formatPhone(raw: string): string {
 }
 
 function queueMetaText(entry: QueueEntry): string {
-  if (entry.status === "out_of_shift") return `${entry.shiftLabel} · ${entry.shiftRange} · fora do turno`;
   if (entry.status === "reception") return `Na recepção · ${entry.clientName ?? ""}`;
   if (entry.status === "therapy") return `Em terapia · ${entry.clientName ?? ""} · ${entry.spaceNames.join(" + ")}`;
   return `${entry.shiftLabel} · ${entry.shiftRange}`;
@@ -53,18 +59,22 @@ interface ShiftChip {
   active: boolean;
 }
 
+// A fila só tem quem está presente e dentro do turno atual (ver
+// `in_current_shift` no backend) — então toda entrada aqui já está "ativa"
+// por definição; a faixa só mostra quais turnos têm gente na fila agora.
 function buildShiftChips(queue: QueueEntry[]): ShiftChip[] {
   const byShift = new Map<Shift, ShiftChip>();
   for (const e of queue) {
     if (!byShift.has(e.shift)) {
-      byShift.set(e.shift, { key: e.shift, label: e.shiftLabel, range: e.shiftRange, active: e.inShift });
+      byShift.set(e.shift, { key: e.shift, label: e.shiftLabel, range: e.shiftRange, active: true });
     }
   }
   return SHIFT_ORDER.filter((s) => byShift.has(s)).map((s) => byShift.get(s)!);
 }
 
 export function TerapeutaDaVezPage() {
-  const { state, loading, error, now, call, decline, start, finish } = useTerapeutaDaVezPanel();
+  const { state, loading, error, now, call, decline, start, finish, checkIn, checkOut } =
+    useTerapeutaDaVezPanel();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -97,7 +107,10 @@ export function TerapeutaDaVezPage() {
   const [wizardEntry, setWizardEntry] = useState<QueueEntry | null>(null);
   const [wizardStep, setWizardStep] = useState<"procedure" | "space" | "confirm">("procedure");
   const [chosenProcedureId, setChosenProcedureId] = useState<string | null>(null);
-  const [chosenSpaceIds, setChosenSpaceIds] = useState<string[]>([]);
+  // Um slot por trecho do procedimento, na mesma ordem de
+  // `chosenProcedure.spaceRequirements` — não é mais "N espaços quaisquer
+  // desse tipo", é "o espaço do trecho 1", "o espaço do trecho 2" etc.
+  const [chosenSpaceIds, setChosenSpaceIds] = useState<(string | null)[]>([]);
 
   function openWizard(entry: QueueEntry) {
     setWizardEntry(entry);
@@ -127,40 +140,32 @@ export function TerapeutaDaVezPage() {
   );
   const chosenProcedure = allProcedures.find((p) => p.id === chosenProcedureId) ?? null;
 
-  const neededByType = useMemo(() => {
-    const m = new Map<SpaceType, number>();
-    for (const t of chosenProcedure?.spaceTypes ?? []) m.set(t, (m.get(t) ?? 0) + 1);
-    return m;
-  }, [chosenProcedure]);
+  function selectProcedure(id: string) {
+    setChosenProcedureId(id);
+    const procedure = allProcedures.find((p) => p.id === id);
+    setChosenSpaceIds(procedure ? procedure.spaceRequirements.map(() => null) : []);
+  }
 
-  const compatibleSpaces: SpacePanelView[] = useMemo(
-    () => (state && chosenProcedure ? state.spaces.filter((s) => chosenProcedure.spaceTypes.includes(s.type)) : []),
-    [state, chosenProcedure],
-  );
+  // Espaços livres compatíveis com CADA trecho, na mesma ordem — um
+  // seletor por trecho, não um multi-select genérico por tipo.
+  const spaceOptionsByRequirement: SpacePanelView[][] = useMemo(() => {
+    if (!state || !chosenProcedure) return [];
+    return chosenProcedure.spaceRequirements.map((req) =>
+      state.spaces.filter((s) => s.type === req.type),
+    );
+  }, [state, chosenProcedure]);
 
-  function toggleSpace(space: SpacePanelView) {
-    if (space.state !== "free") return;
-    setChosenSpaceIds((prev) => {
-      if (prev.includes(space.id)) return prev.filter((id) => id !== space.id);
-      const needed = neededByType.get(space.type) ?? 0;
-      const sameType = prev.filter((id) => compatibleSpaces.find((s) => s.id === id)?.type === space.type);
-      const withoutOverflow = sameType.length >= needed
-        ? prev.filter((id) => compatibleSpaces.find((s) => s.id === id)?.type !== space.type)
-        : prev;
-      return [...withoutOverflow, space.id];
-    });
+  function pickSpaceForRequirement(index: number, spaceId: string) {
+    setChosenSpaceIds((prev) => prev.map((id, i) => (i === index ? spaceId : id)));
   }
 
   const spaceReady =
-    neededByType.size > 0 &&
-    [...neededByType.entries()].every(
-      ([type, needed]) => chosenSpaceIds.filter((id) => compatibleSpaces.find((s) => s.id === id)?.type === type).length >= needed,
-    );
+    chosenSpaceIds.length > 0 && chosenSpaceIds.every((id) => id !== null);
 
   async function confirmStart() {
     if (!wizardEntry?.attendanceId || !chosenProcedureId || !spaceReady) return;
     try {
-      await start(wizardEntry.attendanceId, chosenProcedureId, chosenSpaceIds);
+      await start(wizardEntry.attendanceId, chosenProcedureId, chosenSpaceIds as string[]);
       showToast(`Terapia iniciada — liberação prevista às ${formatHM(new Date(Date.now() + (chosenProcedure?.durationMinutes ?? 0) * 60000).toISOString())}.`);
       closeWizard();
     } catch (err) {
@@ -170,11 +175,58 @@ export function TerapeutaDaVezPage() {
 
   async function finishTherapy(entry: QueueEntry) {
     if (!entry.attendanceId) return;
+    // Terminando antes do previsto (cliente saiu mais cedo, sessão
+    // interrompida etc.) — pergunta se conta os pontos do procedimento pro
+    // terapeuta; no prazo ou atrasado, conta normal sem perguntar.
+    const early = !!entry.plannedEndAt && new Date(entry.plannedEndAt).getTime() > now.getTime();
+    const awardPoints = early
+      ? confirm(`${entry.name} ainda não chegou no horário previsto de término. Contabilizar pontos?`)
+      : true;
     try {
-      await finish(entry.attendanceId);
-      showToast(`${entry.name}: atendimento finalizado. Fila recalculada.`);
+      await finish(entry.attendanceId, awardPoints);
+      showToast(
+        awardPoints
+          ? `${entry.name}: atendimento finalizado. Fila recalculada.`
+          : `${entry.name}: atendimento finalizado sem pontuar (encerrado antes do previsto).`,
+      );
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Não foi possível finalizar o atendimento.");
+    }
+  }
+
+  // ---- Entrada / Saída -------------------------------------------------------
+  // Quando o turno é ambíguo agora (14h–16h: manhã e interturno abertos ao
+  // mesmo tempo), pergunta pra recepção em vez de adivinhar.
+  const [shiftPickTarget, setShiftPickTarget] = useState<AbsentTherapist | null>(null);
+
+  async function doCheckIn(therapist: AbsentTherapist, shift?: Shift) {
+    try {
+      await checkIn(therapist.id, shift);
+      showToast(`${therapist.name}: entrada registrada.`);
+      setShiftPickTarget(null);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível registrar a entrada.");
+    }
+  }
+
+  function requestCheckIn(therapist: AbsentTherapist) {
+    if (therapist.availableShifts.length > 1) {
+      setShiftPickTarget(therapist);
+      return;
+    }
+    if (therapist.availableShifts.length === 1) {
+      void doCheckIn(therapist, therapist.availableShifts[0]);
+      return;
+    }
+    showToast(`${therapist.name}: nenhum turno está aberto agora.`);
+  }
+
+  async function requestCheckOut(entry: QueueEntry) {
+    try {
+      await checkOut(entry.therapistId);
+      showToast(`${entry.name}: saída registrada.`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível registrar a saída.");
     }
   }
 
@@ -196,7 +248,7 @@ export function TerapeutaDaVezPage() {
 
   if (!state) return null;
 
-  const nextIdle = state.queue.find((e) => e.status === "idle" && e.inShift) ?? null;
+  const nextIdle = state.queue.find((e) => e.status === "idle") ?? null;
   const shiftChips = buildShiftChips(state.queue);
 
   return (
@@ -219,7 +271,7 @@ export function TerapeutaDaVezPage() {
           </div>
           <div className={styles.queueList}>
             {state.queue.map((entry) => (
-              <div key={entry.therapistId} className={`${styles.queueRow} ${entry.status !== "out_of_shift" && entry.status !== "idle" ? styles.queueRowTurn : ""}`}>
+              <div key={entry.therapistId} className={`${styles.queueRow} ${entry.status !== "idle" ? styles.queueRowTurn : ""}`}>
                 <div className={styles.queuePos}>{entry.position ?? "—"}</div>
                 <div className={styles.queueInfo}>
                   <span className={styles.queueName}>{entry.name}</span>
@@ -227,10 +279,15 @@ export function TerapeutaDaVezPage() {
                 </div>
                 <div className={styles.queuePoints}>{entry.points}</div>
                 <div className={styles.queueAction}>
-                  {entry.status === "idle" && entry.inShift && (
-                    <button type="button" className={styles.smallBtn} onClick={() => { setCallTarget(entry); setCallForm({ clientName: "", phone: "" }); }}>
-                      Chamar
-                    </button>
+                  {entry.status === "idle" && (
+                    <>
+                      <button type="button" className={styles.smallBtn} onClick={() => { setCallTarget(entry); setCallForm({ clientName: "", phone: "" }); }}>
+                        Chamar
+                      </button>
+                      <button type="button" className={styles.ghostBtn} onClick={() => void requestCheckOut(entry)}>
+                        Saída
+                      </button>
+                    </>
                   )}
                   {entry.status === "reception" && (
                     <button type="button" className={styles.smallBtn} onClick={() => openWizard(entry)}>
@@ -251,7 +308,7 @@ export function TerapeutaDaVezPage() {
           </div>
         </section>
 
-        <Sidebar state={state} />
+        <Sidebar state={state} onCheckIn={requestCheckIn} />
       </div>
 
       <SpacesSection spaces={state.spaces} now={now} />
@@ -277,15 +334,23 @@ export function TerapeutaDaVezPage() {
           procedureGroups={state.procedureGroups}
           chosenProcedure={chosenProcedure}
           chosenProcedureId={chosenProcedureId}
-          setChosenProcedureId={setChosenProcedureId}
-          compatibleSpaces={compatibleSpaces}
+          selectProcedure={selectProcedure}
+          spaceOptionsByRequirement={spaceOptionsByRequirement}
           chosenSpaceIds={chosenSpaceIds}
-          toggleSpace={toggleSpace}
+          pickSpaceForRequirement={pickSpaceForRequirement}
           spaceReady={spaceReady}
           now={now}
           onClose={closeWizard}
           onDecline={() => void declineWizard()}
           onConfirmStart={() => void confirmStart()}
+        />
+      )}
+
+      {shiftPickTarget && (
+        <ShiftPickModal
+          therapist={shiftPickTarget}
+          onCancel={() => setShiftPickTarget(null)}
+          onPick={(shift) => void doCheckIn(shiftPickTarget, shift)}
         />
       )}
     </div>
@@ -387,9 +452,29 @@ function HeroPanel({ nextIdle, onCall }: { nextIdle: QueueEntry | null; onCall: 
 
 // ---- Sidebar --------------------------------------------------------------------
 
-function Sidebar({ state }: { state: PanelState }) {
+const SHIFT_LABEL_FULL: Record<Shift, string> = { manha: "Manhã", inter: "Interturno", noturno: "Noturno" };
+
+function Sidebar({ state, onCheckIn }: { state: PanelState; onCheckIn: (t: AbsentTherapist) => void }) {
   return (
     <aside className={styles.sidebar}>
+      <div className={styles.sidebarBlock}>
+        <span className={styles.sidebarTitle}>Ausentes</span>
+        {state.absent.length === 0 && (
+          <div className={styles.sidebarLine}>Todos os terapeutas ativos já deram entrada.</div>
+        )}
+        {state.absent.map((t) => (
+          <div key={t.id} className={styles.sidebarLine} style={{ alignItems: "center" }}>
+            <span>{t.name}</span>
+            {t.availableShifts.length > 0 ? (
+              <button type="button" className={styles.smallBtn} onClick={() => onCheckIn(t)}>
+                Entrada
+              </button>
+            ) : (
+              <span style={{ fontSize: 10.5 }}>Nenhum turno aberto</span>
+            )}
+          </div>
+        ))}
+      </div>
       <div className={styles.sidebarBlock}>
         <span className={styles.sidebarTitle}>Pontuação por procedimento</span>
         {state.lastEntry && (
@@ -467,7 +552,7 @@ function SpacesSection({ spaces, now }: { spaces: SpacePanelView[]; now: Date })
       <div className={styles.spacesGrid}>
         {spaces.map((s) => (
           <div key={s.id} className={styles.spaceCard} style={{ borderTopColor: SPACE_DOT[s.state], background: s.state === "occupied" ? "#0B4F4C" : "rgba(240,240,230,0.06)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div className={styles.spaceCardTop}>
               <span className={styles.spaceCardName}>{s.name}</span>
               <span className={styles.spaceCardStatus} style={{ color: SPACE_DOT[s.state] }}>
                 {SPACE_STATUS_LABEL[s.state]}
@@ -555,6 +640,47 @@ function CallModal({
   );
 }
 
+// ---- Modal: escolher turno na entrada (sobreposição manhã/interturno 14h-16h) -------
+
+function ShiftPickModal({
+  therapist,
+  onCancel,
+  onPick,
+}: {
+  therapist: AbsentTherapist;
+  onCancel: () => void;
+  onPick: (shift: Shift) => void;
+}) {
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
+        <div>
+          <div className={styles.modalEyebrow}>ENTRADA · MAIS DE UM TURNO ABERTO AGORA</div>
+          <div className={styles.modalTitle}>{therapist.name}</div>
+          <div className={styles.modalSub}>Em qual turno a entrada deve contar?</div>
+        </div>
+        <div className={styles.modalDivider} />
+        <div className={styles.modalActions} style={{ flexDirection: "column" }}>
+          {therapist.availableShifts.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={styles.smallBtn}
+              style={{ padding: "14px 12px" }}
+              onClick={() => onPick(s)}
+            >
+              {SHIFT_LABEL_FULL[s]}
+            </button>
+          ))}
+        </div>
+        <button type="button" className={styles.ghostBtn} onClick={onCancel}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ---- Modal: procedimento / espaço / confirmação ------------------------------------
 
 function WizardModal({
@@ -564,10 +690,10 @@ function WizardModal({
   procedureGroups,
   chosenProcedure,
   chosenProcedureId,
-  setChosenProcedureId,
-  compatibleSpaces,
+  selectProcedure,
+  spaceOptionsByRequirement,
   chosenSpaceIds,
-  toggleSpace,
+  pickSpaceForRequirement,
   spaceReady,
   now,
   onClose,
@@ -580,10 +706,10 @@ function WizardModal({
   procedureGroups: Record<string, ProcedureOption[]>;
   chosenProcedure: ProcedureOption | null;
   chosenProcedureId: string | null;
-  setChosenProcedureId: (id: string) => void;
-  compatibleSpaces: SpacePanelView[];
-  chosenSpaceIds: string[];
-  toggleSpace: (space: SpacePanelView) => void;
+  selectProcedure: (id: string) => void;
+  spaceOptionsByRequirement: SpacePanelView[][];
+  chosenSpaceIds: (string | null)[];
+  pickSpaceForRequirement: (index: number, spaceId: string) => void;
   spaceReady: boolean;
   now: Date;
   onClose: () => void;
@@ -613,7 +739,7 @@ function WizardModal({
                         key={p.id}
                         type="button"
                         className={`${styles.procedureCard} ${chosenProcedureId === p.id ? styles.procedureCardActive : ""}`}
-                        onClick={() => setChosenProcedureId(p.id)}
+                        onClick={() => selectProcedure(p.id)}
                       >
                         <span className={styles.procedureCardName}>{p.name}</span>
                         <div className={styles.procedureCardMeta}>
@@ -655,29 +781,39 @@ function WizardModal({
               <div className={styles.modalTitle}>
                 {chosenProcedure.name} · {chosenProcedure.durationLabel}
               </div>
-              <div className={styles.modalSub}>Espaço necessário: {chosenProcedure.typeLabel}</div>
+              <div className={styles.modalSub}>{chosenProcedure.typeLabel}</div>
             </div>
-            <div className={styles.spaceGrid}>
-              {compatibleSpaces.map((s) => {
-                const selected = chosenSpaceIds.includes(s.id);
-                const disabled = s.state !== "free" && !selected;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    className={`${styles.spaceOption} ${selected ? styles.spaceOptionSelected : ""} ${disabled ? styles.spaceOptionDisabled : ""}`}
-                    onClick={() => toggleSpace(s)}
-                    disabled={disabled}
-                  >
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{s.name}</div>
-                    <div style={{ fontSize: 11.5, color: "#5A5A5A" }}>
-                      {s.state === "free" ? "Disponível agora" : `Ocupado até ${formatHM(s.availableAt)}`}
-                    </div>
-                  </button>
-                );
-              })}
-              {compatibleSpaces.length === 0 && <div>Nenhum espaço compatível cadastrado.</div>}
-            </div>
+            {chosenProcedure.spaceRequirements.map((req, i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <span style={{ fontSize: 10, letterSpacing: 1.6, color: "#9A7426" }}>
+                  TRECHO {i + 1} · {req.label}
+                </span>
+                <div className={styles.spaceGrid}>
+                  {spaceOptionsByRequirement[i]?.map((s) => {
+                    const selected = chosenSpaceIds[i] === s.id;
+                    // Livre em geral, OU já selecionado num trecho anterior/posterior
+                    // deste mesmo procedimento (reaproveitar o mesmo espaço em
+                    // trechos não sequenciais no tempo é permitido pelo backend).
+                    const disabled = s.state !== "free" && !selected;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className={`${styles.spaceOption} ${selected ? styles.spaceOptionSelected : ""} ${disabled ? styles.spaceOptionDisabled : ""}`}
+                        onClick={() => pickSpaceForRequirement(i, s.id)}
+                        disabled={disabled}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>{s.name}</div>
+                        <div style={{ fontSize: 11.5, color: "#5A5A5A" }}>
+                          {s.state === "free" ? "Disponível agora" : `Ocupado até ${formatHM(s.availableAt)}`}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {(spaceOptionsByRequirement[i]?.length ?? 0) === 0 && <div>Nenhum espaço desse tipo cadastrado.</div>}
+                </div>
+              </div>
+            ))}
             <div className={styles.modalActions}>
               <button type="button" className={styles.ghostBtn} onClick={() => setStep("procedure")} style={{ flex: 1 }}>
                 Voltar
@@ -705,7 +841,13 @@ function WizardModal({
               <SummaryField label="CLIENTE" value={entry.clientName ?? "—"} />
               <SummaryField label="TERAPEUTA" value={entry.name} />
               <SummaryField label="PROCEDIMENTO" value={chosenProcedure.name} />
-              <SummaryField label="ESPAÇO" value={chosenSpaceIds.map((id) => compatibleSpaces.find((s) => s.id === id)?.name).filter(Boolean).join(" + ")} />
+              <SummaryField
+                label="ESPAÇO"
+                value={chosenSpaceIds
+                  .map((id, i) => spaceOptionsByRequirement[i]?.find((s) => s.id === id)?.name)
+                  .filter(Boolean)
+                  .join(" + ")}
+              />
               <SummaryField label="VALOR · PONTOS" value={`${chosenProcedure.priceLabel} · +${chosenProcedure.points} pts`} />
             </div>
             <div className={`${styles.summaryGrid} ${styles.summaryDark}`}>

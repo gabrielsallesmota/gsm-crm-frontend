@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { terapeutaDaVezPanelService } from "../services/TerapeutaDaVezPanelService";
-import type { AttendanceRecord, PanelState } from "../types/operations";
+import type { AttendanceRecord, PanelState, Shift, Therapist } from "../types/operations";
 
 const POLL_MS = 3000;
 const CLOCK_MS = 1000;
@@ -16,7 +16,9 @@ export interface TerapeutaDaVezPanel {
   call: (therapistId: string, clientName: string, phone: string) => Promise<AttendanceRecord>;
   decline: (attendanceId: string) => Promise<AttendanceRecord>;
   start: (attendanceId: string, procedureId: string, spaceIds: string[]) => Promise<AttendanceRecord>;
-  finish: (attendanceId: string) => Promise<AttendanceRecord>;
+  finish: (attendanceId: string, awardPoints: boolean) => Promise<AttendanceRecord>;
+  checkIn: (therapistId: string, shift?: Shift) => Promise<Therapist>;
+  checkOut: (therapistId: string) => Promise<Therapist>;
 }
 
 export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
@@ -70,11 +72,23 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     return result.attendance;
   }
 
-  async function finish(attendanceId: string) {
-    const result = await terapeutaDaVezPanelService.finish(attendanceId);
+  async function finish(attendanceId: string, awardPoints: boolean) {
+    const result = await terapeutaDaVezPanelService.finish(attendanceId, awardPoints);
     setState(result.state);
     return result.attendance;
   }
 
-  return { state, loading, error, now, call, decline, start, finish };
+  async function checkIn(therapistId: string, shift?: Shift) {
+    const result = await terapeutaDaVezPanelService.checkIn(therapistId, shift);
+    setState(result.state);
+    return result.therapist;
+  }
+
+  async function checkOut(therapistId: string) {
+    const result = await terapeutaDaVezPanelService.checkOut(therapistId);
+    setState(result.state);
+    return result.therapist;
+  }
+
+  return { state, loading, error, now, call, decline, start, finish, checkIn, checkOut };
 }

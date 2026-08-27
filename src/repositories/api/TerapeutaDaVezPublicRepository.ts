@@ -1,7 +1,14 @@
 import { ApiError } from "../../types/common";
 import { BASE_URL } from "./ApiClient";
-import { toAttendanceAction, toPanelState, type AttendanceActionDto, type PanelStateDto } from "./operationsMapping";
-import type { AttendanceAction, PanelState } from "../../types/operations";
+import {
+  toAttendanceAction,
+  toPanelState,
+  toTherapistAction,
+  type AttendanceActionDto,
+  type PanelStateDto,
+  type TherapistActionDto,
+} from "./operationsMapping";
+import type { AttendanceAction, PanelState, Shift, TherapistAction } from "../../types/operations";
 
 const BASE = "/api/v1/public/terapeuta-da-vez";
 
@@ -56,11 +63,28 @@ export class TerapeutaDaVezPublicRepository {
     return toAttendanceAction(dto);
   }
 
-  async finish(attendanceId: string): Promise<AttendanceAction> {
+  async finish(attendanceId: string, awardPoints: boolean): Promise<AttendanceAction> {
     const dto = await publicRequest<AttendanceActionDto>(`${BASE}/attendances/${attendanceId}/finish`, {
       method: "POST",
+      body: JSON.stringify({ award_points: awardPoints }),
     });
     return toAttendanceAction(dto);
+  }
+
+  async checkIn(therapistId: string, shift?: Shift): Promise<TherapistAction> {
+    const dto = await publicRequest<TherapistActionDto>(
+      `${BASE}/therapists/${therapistId}/check-in`,
+      { method: "POST", body: JSON.stringify({ shift: shift ?? null }) },
+    );
+    return toTherapistAction(dto);
+  }
+
+  async checkOut(therapistId: string): Promise<TherapistAction> {
+    const dto = await publicRequest<TherapistActionDto>(
+      `${BASE}/therapists/${therapistId}/check-out`,
+      { method: "POST" },
+    );
+    return toTherapistAction(dto);
   }
 }
 

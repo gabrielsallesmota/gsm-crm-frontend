@@ -6,6 +6,7 @@
  * de terapeuta/procedimento/atendimento.
  */
 import type {
+  AbsentTherapist,
   AttendanceAction,
   AttendanceRecord,
   HistoryPage,
@@ -15,21 +16,48 @@ import type {
   Procedure,
   ProcedureOption,
   QueueEntry,
+  SpaceAdmin,
   SpacePanelView,
+  SpaceRequirement,
   Therapist,
+  TherapistAction,
+  TherapistPoints,
 } from "../../types/operations";
 
 export interface TherapistDto {
   id: string;
   code: string;
   name: string;
-  shift: string;
-  shift_label: string;
-  points: number;
   active: boolean;
   status: string;
+  present: boolean;
+  current_shift: string | null;
+  current_shift_label: string | null;
+  checked_in_at: string | null;
+  checked_out_at: string | null;
+  points_manha_today: number;
+  points_noturno_today: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface TherapistPointsDto {
+  date: string;
+  points_manha: number;
+  points_noturno: number;
+}
+
+export interface AbsentTherapistDto {
+  id: string;
+  code: string;
+  name: string;
+  available_shifts: string[];
+}
+
+export interface SpaceRequirementDto {
+  type: string;
+  minutes: number;
+  label: string;
 }
 
 export interface ProcedureDto {
@@ -40,12 +68,20 @@ export interface ProcedureDto {
   duration_label: string;
   points: number;
   price_label: string;
-  space_types: string[];
+  space_requirements: SpaceRequirementDto[];
   type_label: string;
   category: string;
   active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface SpaceAdminDto {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  active: boolean;
 }
 
 export interface ClientDto {
@@ -63,12 +99,12 @@ export interface QueueEntryDto {
   code: string;
   name: string;
   points: number;
+  real_points: number;
   shift: string;
   shift_label: string;
   shift_range: string;
-  in_shift: boolean;
   status: string;
-  position: number | null;
+  position: number;
   bar_pct: number;
   attendance_id: string | null;
   client_name: string | null;
@@ -105,7 +141,7 @@ export interface ProcedureOptionDto {
   duration_label: string;
   points: number;
   price_label: string;
-  space_types: string[];
+  space_requirements: SpaceRequirementDto[];
   type_label: string;
   category: string;
 }
@@ -120,6 +156,7 @@ export interface PanelStateDto {
   points_min: number;
   points_max: number;
   queue: QueueEntryDto[];
+  absent: AbsentTherapistDto[];
   spaces: SpaceDto[];
   alerts: AlertDto[];
   services_today: number;
@@ -152,6 +189,11 @@ export interface AttendanceActionDto {
   state: PanelStateDto;
 }
 
+export interface TherapistActionDto {
+  therapist: TherapistDto;
+  state: PanelStateDto;
+}
+
 export interface HistoryPageDto {
   items: AttendanceDto[];
   total: number;
@@ -164,14 +206,35 @@ export function toTherapist(dto: TherapistDto): Therapist {
     id: dto.id,
     code: dto.code,
     name: dto.name,
-    shift: dto.shift as Therapist["shift"],
-    shiftLabel: dto.shift_label,
-    points: dto.points,
     active: dto.active,
     status: dto.status as Therapist["status"],
+    present: dto.present,
+    currentShift: dto.current_shift as Therapist["currentShift"],
+    currentShiftLabel: dto.current_shift_label,
+    checkedInAt: dto.checked_in_at,
+    checkedOutAt: dto.checked_out_at,
+    pointsManhaToday: dto.points_manha_today,
+    pointsNoturnoToday: dto.points_noturno_today,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
   };
+}
+
+export function toTherapistPoints(dto: TherapistPointsDto): TherapistPoints {
+  return { date: dto.date, pointsManha: dto.points_manha, pointsNoturno: dto.points_noturno };
+}
+
+function toAbsentTherapist(dto: AbsentTherapistDto): AbsentTherapist {
+  return {
+    id: dto.id,
+    code: dto.code,
+    name: dto.name,
+    availableShifts: dto.available_shifts as AbsentTherapist["availableShifts"],
+  };
+}
+
+function toSpaceRequirement(dto: SpaceRequirementDto): SpaceRequirement {
+  return { type: dto.type as SpaceRequirement["type"], minutes: dto.minutes, label: dto.label };
 }
 
 export function toProcedure(dto: ProcedureDto): Procedure {
@@ -183,12 +246,22 @@ export function toProcedure(dto: ProcedureDto): Procedure {
     durationLabel: dto.duration_label,
     points: dto.points,
     priceLabel: dto.price_label,
-    spaceTypes: dto.space_types as Procedure["spaceTypes"],
+    spaceRequirements: dto.space_requirements.map(toSpaceRequirement),
     typeLabel: dto.type_label,
     category: dto.category,
     active: dto.active,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
+  };
+}
+
+export function toSpaceAdmin(dto: SpaceAdminDto): SpaceAdmin {
+  return {
+    id: dto.id,
+    code: dto.code,
+    name: dto.name,
+    type: dto.type as SpaceAdmin["type"],
+    active: dto.active,
   };
 }
 
@@ -210,10 +283,10 @@ function toQueueEntry(dto: QueueEntryDto): QueueEntry {
     code: dto.code,
     name: dto.name,
     points: dto.points,
+    realPoints: dto.real_points,
     shift: dto.shift as QueueEntry["shift"],
     shiftLabel: dto.shift_label,
     shiftRange: dto.shift_range,
-    inShift: dto.in_shift,
     status: dto.status as QueueEntry["status"],
     position: dto.position,
     barPct: dto.bar_pct,
@@ -254,7 +327,7 @@ function toProcedureOption(dto: ProcedureOptionDto): ProcedureOption {
     durationLabel: dto.duration_label,
     points: dto.points,
     priceLabel: dto.price_label,
-    spaceTypes: dto.space_types as ProcedureOption["spaceTypes"],
+    spaceRequirements: dto.space_requirements.map(toSpaceRequirement),
     typeLabel: dto.type_label,
     category: dto.category,
   };
@@ -270,6 +343,7 @@ export function toPanelState(dto: PanelStateDto): PanelState {
     pointsMin: dto.points_min,
     pointsMax: dto.points_max,
     queue: dto.queue.map(toQueueEntry),
+    absent: dto.absent.map(toAbsentTherapist),
     spaces: dto.spaces.map(toSpace),
     alerts: dto.alerts.map(toAlert),
     servicesToday: dto.services_today,
@@ -304,6 +378,15 @@ export function toAttendanceAction(dto: AttendanceActionDto): AttendanceAction {
   return { attendance: toAttendance(dto.attendance), state: toPanelState(dto.state) };
 }
 
+export function toTherapistAction(dto: TherapistActionDto): TherapistAction {
+  return { therapist: toTherapist(dto.therapist), state: toPanelState(dto.state) };
+}
+
 export function toHistoryPage(dto: HistoryPageDto): HistoryPage {
-  return { items: dto.items.map(toAttendance), total: dto.total, page: dto.page, pageSize: dto.page_size };
+  return {
+    items: dto.items.map(toAttendance),
+    total: dto.total,
+    page: dto.page,
+    pageSize: dto.page_size,
+  };
 }
