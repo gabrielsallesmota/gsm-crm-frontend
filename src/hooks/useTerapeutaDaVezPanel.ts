@@ -4,6 +4,11 @@ import type { AttendanceRecord, PanelState, Shift, Therapist } from "../types/op
 
 const POLL_MS = 3000;
 const CLOCK_MS = 1000;
+// Pequena folga depois do instante calculado da transição, garantindo que o
+// `now` do SERVIDOR já passou daquele instante antes do poll extra chegar lá
+// (evita pedir de novo um pouquinho cedo demais e receber o mesmo estado
+// "ainda não mudou").
+const TRANSITION_BUFFER_MS = 250;
 
 export interface TerapeutaDaVezPanel {
   state: PanelState | null;
@@ -21,6 +26,28 @@ export interface TerapeutaDaVezPanel {
    * trabalhista, terapeutas são PJ). A presença termina sozinha quando a
    * janela do turno passa. */
   checkIn: (therapistId: string, shift?: Shift) => Promise<Therapist>;
+  /** Botão pequeno "Liberar" ao lado de um espaço em higienização. */
+  releaseCleaning: (spaceId: string) => Promise<void>;
+}
+
+/** Próximo instante em que ALGUMA coisa do painel muda sozinha, sem clique
+ * de ninguém: loja abrindo, espaço liberando (fim de higienização ou de
+ * trecho), espaço prestes a ser ocupado por um trecho futuro reservado, ou
+ * um atendimento em terapia batendo o horário previsto (libera terapeuta e
+ * espaço — ver sweep automático no backend). `null` quando não há nenhuma
+ * transição conhecida pela frente. */
+function nextTransitionAt(state: PanelState): number | null {
+  const candidates: string[] = [];
+  if (state.nextOpenAt) candidates.push(state.nextOpenAt);
+  for (const s of state.spaces) {
+    if (s.availableAt) candidates.push(s.availableAt);
+    if (s.occupiesAt) candidates.push(s.occupiesAt);
+  }
+  for (const q of state.queue) {
+    if (q.plannedEndAt) candidates.push(q.plannedEndAt);
+  }
+  if (candidates.length === 0) return null;
+  return Math.min(...candidates.map((iso) => new Date(iso).getTime()));
 }
 
 export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
@@ -29,6 +56,7 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
   const [error, setError] = useState<Error | null>(null);
   const [now, setNow] = useState(() => new Date());
   const mounted = useRef(true);
+  const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const poll = useCallback(async () => {
     try {
@@ -43,6 +71,27 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
       if (mounted.current) setLoading(false);
     }
   }, []);
+
+  // Agenda (ou reagenda) um poll extra bem em cima da próxima transição
+  // conhecida — sem isto, uma mudança automática (loja abrir, procedimento
+  // terminar) só refletia na tela na próxima batida do polling de 3s em 3s,
+  // até 3s de atraso. Roda de novo a cada `state` novo (poll normal OU
+  // resposta de uma ação), porque cada um pode trazer uma transição
+  // diferente (ex.: iniciar terapia cria um `plannedEndAt` novo).
+  useEffect(() => {
+    if (transitionTimer.current !== null) {
+      clearTimeout(transitionTimer.current);
+      transitionTimer.current = null;
+    }
+    if (!state) return;
+    const at = nextTransitionAt(state);
+    if (at === null) return;
+    const delay = Math.max(0, at - Date.now()) + TRANSITION_BUFFER_MS;
+    transitionTimer.current = setTimeout(() => void poll(), delay);
+    return () => {
+      if (transitionTimer.current !== null) clearTimeout(transitionTimer.current);
+    };
+  }, [state, poll]);
 
   useEffect(() => {
     mounted.current = true;
@@ -86,5 +135,10 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     return result.therapist;
   }
 
-  return { state, loading, error, now, call, decline, start, finish, checkIn };
+  async function releaseCleaning(spaceId: string) {
+    const next = await terapeutaDaVezPanelService.releaseCleaning(spaceId);
+    setState(next);
+  }
+
+  return { state, loading, error, now, call, decline, start, finish, checkIn, releaseCleaning };
 }

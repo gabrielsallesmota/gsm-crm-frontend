@@ -8,6 +8,7 @@ import {
   toImportSummary,
   toProcedure,
   toScheduleEntry,
+  toShiftHoursEntry,
   toSpaceAdmin,
   toTherapist,
   toTherapistDailyPoints,
@@ -18,6 +19,7 @@ import {
   type ImportSummaryDto,
   type ProcedureDto,
   type ScheduleEntryDto,
+  type ShiftHoursEntryDto,
   type SpaceAdminDto,
   type TherapistDailyPointsDto,
   type TherapistDto,
@@ -37,6 +39,7 @@ import type {
   Procedure,
   ProcedureImportRowInput,
   ScheduleEntry,
+  ShiftHoursEntry,
   SpaceAdmin,
   Therapist,
   TherapistDailyPoints,
@@ -272,6 +275,26 @@ export class OperationsApiRepository {
         })),
       }),
     }).then((items) => items.map(toBusinessHoursEntry));
+  }
+
+  getShiftHours(): Promise<ShiftHoursEntry[]> {
+    return operationsRequest<ShiftHoursEntryDto[]>(`${BASE}/shift-hours`).then((items) =>
+      items.map(toShiftHoursEntry),
+    );
+  }
+
+  updateShiftHours(entries: ShiftHoursEntry[]): Promise<ShiftHoursEntry[]> {
+    return operationsRequest<ShiftHoursEntryDto[]>(`${BASE}/shift-hours`, {
+      method: "PUT",
+      body: JSON.stringify({
+        entries: entries.map((e) => ({
+          weekday: e.weekday,
+          shift: e.shift,
+          opens_at: e.opensAt,
+          closes_at: e.closesAt,
+        })),
+      }),
+    }).then((items) => items.map(toShiftHoursEntry));
   }
 
   listSchedule(dateFrom: string, dateTo: string, therapistId?: string): Promise<ScheduleEntry[]> {

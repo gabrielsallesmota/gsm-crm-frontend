@@ -20,6 +20,8 @@ import type {
   ProcedureOption,
   QueueEntry,
   ScheduleEntry,
+  Shift,
+  ShiftHoursEntry,
   SpaceAdmin,
   SpacePanelView,
   SpaceRequirement,
@@ -83,6 +85,16 @@ export interface BusinessHoursEntryDto {
   closed: boolean;
   opens_at: number | null;
   closes_at: number | null;
+  label: string;
+}
+
+export interface ShiftHoursEntryDto {
+  weekday: number;
+  weekday_label: string;
+  shift: string;
+  shift_label: string;
+  opens_at: number;
+  closes_at: number;
   label: string;
 }
 
@@ -327,6 +339,18 @@ export function toBusinessHoursEntry(dto: BusinessHoursEntryDto): BusinessHoursE
     weekday: dto.weekday,
     weekdayLabel: dto.weekday_label,
     closed: dto.closed,
+    opensAt: dto.opens_at,
+    closesAt: dto.closes_at,
+    label: dto.label,
+  };
+}
+
+export function toShiftHoursEntry(dto: ShiftHoursEntryDto): ShiftHoursEntry {
+  return {
+    weekday: dto.weekday,
+    weekdayLabel: dto.weekday_label,
+    shift: dto.shift as Shift,
+    shiftLabel: dto.shift_label,
     opensAt: dto.opens_at,
     closesAt: dto.closes_at,
     label: dto.label,

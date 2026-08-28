@@ -81,6 +81,16 @@ export class TerapeutaDaVezPublicRepository {
     );
     return toTherapistAction(dto);
   }
+
+  /** Botão pequeno "Liberar" ao lado de um espaço em higienização — pula o
+   * resto da espera quando a limpeza de verdade já terminou antes do
+   * `CLEANING_MINUTES` padrão. */
+  async releaseCleaning(spaceId: string): Promise<PanelState> {
+    const dto = await publicRequest<PanelStateDto>(`${BASE}/spaces/${spaceId}/release-cleaning`, {
+      method: "POST",
+    });
+    return toPanelState(dto);
+  }
 }
 
 export const terapeutaDaVezPublicRepository = new TerapeutaDaVezPublicRepository();

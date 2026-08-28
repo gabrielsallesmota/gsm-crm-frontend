@@ -93,6 +93,21 @@ export interface BusinessHoursEntry {
   label: string;
 }
 
+/** Janela de UM turno (Manhã/Interturno/Noturno) NUM dia da semana —
+ * diferente de `BusinessHoursEntry` (horário de funcionamento da loja):
+ * isto é a janela do turno em si, que também pode variar por dia ("domingo
+ * pode ser que manhã, interjornada e tarde sejam diferentes"). 21 linhas
+ * fixas (7 dias × 3 turnos), editadas juntas na gestão. */
+export interface ShiftHoursEntry {
+  weekday: number;
+  weekdayLabel: string;
+  shift: Shift;
+  shiftLabel: string;
+  opensAt: number;
+  closesAt: number;
+  label: string;
+}
+
 /** Um "trecho" do procedimento num tipo de espaço — ex.: 30 min numa maca
  * seguidos de 15 min numa poltrona. A ordem importa: é a ordem de uso. */
 export interface SpaceRequirement {

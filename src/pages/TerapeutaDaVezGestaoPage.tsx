@@ -26,6 +26,7 @@ import type {
   Procedure,
   ScheduleEntry,
   Shift,
+  ShiftHoursEntry,
   SpaceAdmin,
   SpaceRequirementInput,
   SpaceType,
@@ -803,6 +804,132 @@ function BusinessHoursTab() {
           <div className={styles.form}>
             <Button variant="primary" onClick={() => void handleSave()} disabled={submitting}>
               Salvar horário
+            </Button>
+          </div>
+        </>
+      )}
+
+      <ShiftHoursSection />
+    </div>
+  );
+}
+
+// Horário de cada TURNO por dia da semana — diferente do horário de
+// funcionamento acima: isto é a janela do turno em si (Manhã/Interturno/
+// Noturno), que também pode variar por dia ("domingo pode ser que manhã,
+// interjornada e tarde sejam diferentes"). 21 linhas (7 dias × 3 turnos),
+// editadas juntas.
+
+const SHIFT_ORDER: Shift[] = ["manha", "inter", "noturno"];
+
+function ShiftHoursSection() {
+  const { data, loading, error, reload } = useAsyncResource(
+    () => operationsApiRepository.getShiftHours(),
+    [],
+  );
+  const { toast } = useToast();
+  const [entries, setEntries] = useState<ShiftHoursEntry[] | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (data) setEntries(data);
+  }, [data]);
+
+  function updateEntry(weekday: number, shift: Shift, patch: Partial<ShiftHoursEntry>) {
+    setEntries((prev) =>
+      prev
+        ? prev.map((e) => (e.weekday === weekday && e.shift === shift ? { ...e, ...patch } : e))
+        : prev,
+    );
+  }
+
+  async function handleSave() {
+    if (!entries) return;
+    setSubmitting(true);
+    try {
+      const updated = await operationsApiRepository.updateShiftHours(entries);
+      setEntries(updated);
+      toast("Horário dos turnos salvo.");
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível salvar o horário dos turnos.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const byWeekday = useMemo(() => {
+    const map = new Map<number, ShiftHoursEntry[]>();
+    for (const e of entries ?? []) {
+      const list = map.get(e.weekday) ?? [];
+      list.push(e);
+      map.set(e.weekday, list);
+    }
+    return [...map.entries()].sort(([a], [b]) => a - b);
+  }, [entries]);
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <p className={styles.rowMeta} style={{ marginBottom: 10 }}>
+        Janela de cada turno (Manhã/Interturno/Noturno) por dia da semana — pode ser diferente em
+        cada dia (ex.: domingo com manhã e interturno mais curtos). É o que o painel usa pra saber
+        quando oferecer "Iniciar turno" e pra separar a pontuação entre manhã e noturno.
+      </p>
+
+      {error && (
+        <EmptyState title="Não foi possível carregar o horário dos turnos" message={error.message} />
+      )}
+      {loading && !entries && <div className={styles.loading}>Carregando…</div>}
+
+      {entries && (
+        <>
+          <div className={styles.list}>
+            {byWeekday.map(([weekday, dayEntries]) => (
+              <div key={weekday} className={styles.row} style={{ alignItems: "flex-start" }}>
+                <div className={styles.rowMain}>
+                  <span className={styles.rowName}>{dayEntries[0]?.weekdayLabel}</span>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 6 }}>
+                    {SHIFT_ORDER.map((shift) => {
+                      const entry = dayEntries.find((e) => e.shift === shift);
+                      if (!entry) return null;
+                      return (
+                        <div
+                          key={shift}
+                          style={{ display: "flex", alignItems: "center", gap: 6 }}
+                        >
+                          <span className={styles.rowMeta}>{entry.shiftLabel}</span>
+                          <input
+                            className={styles.inputSmall}
+                            type="time"
+                            value={minutesToTime(entry.opensAt)}
+                            onChange={(e) =>
+                              updateEntry(weekday, shift, {
+                                opensAt: timeToMinutes(e.target.value) ?? entry.opensAt,
+                              })
+                            }
+                          />
+                          <span className={styles.rowMeta}>até</span>
+                          <input
+                            className={styles.inputSmall}
+                            type="time"
+                            value={minutesToTime(entry.closesAt)}
+                            onChange={(e) =>
+                              updateEntry(weekday, shift, {
+                                closesAt: timeToMinutes(e.target.value) ?? entry.closesAt,
+                              })
+                            }
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className={styles.form}>
+            <Button variant="primary" onClick={() => void handleSave()} disabled={submitting}>
+              Salvar horário dos turnos
             </Button>
           </div>
         </>

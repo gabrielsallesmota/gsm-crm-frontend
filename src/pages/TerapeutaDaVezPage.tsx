@@ -73,7 +73,7 @@ function buildShiftChips(queue: QueueEntry[]): ShiftChip[] {
 }
 
 export function TerapeutaDaVezPage() {
-  const { state, loading, error, now, call, decline, start, finish, checkIn } =
+  const { state, loading, error, now, call, decline, start, finish, checkIn, releaseCleaning } =
     useTerapeutaDaVezPanel();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,6 +131,17 @@ export function TerapeutaDaVezPage() {
       closeWizard();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Não foi possível recusar o atendimento.");
+    }
+  }
+
+  // Botão pequeno "Liberar" ao lado de um espaço em higienização — pula o
+  // resto da espera quando a limpeza de verdade já terminou antes do tempo
+  // padrão.
+  async function handleReleaseCleaning(spaceId: string) {
+    try {
+      await releaseCleaning(spaceId);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível liberar o espaço.");
     }
   }
 
@@ -322,7 +333,7 @@ export function TerapeutaDaVezPage() {
         <Sidebar state={state} onCheckIn={requestCheckIn} />
       </div>
 
-      <SpacesSection spaces={state.spaces} now={now} />
+      <SpacesSection spaces={state.spaces} now={now} onReleaseCleaning={handleReleaseCleaning} />
 
       {toastMsg && <div className={styles.toast}>{toastMsg}</div>}
 
@@ -575,7 +586,15 @@ function Sidebar({ state, onCheckIn }: { state: PanelState; onCheckIn: (t: Absen
 
 // ---- Espaços --------------------------------------------------------------------
 
-function SpacesSection({ spaces, now }: { spaces: SpacePanelView[]; now: Date }) {
+function SpacesSection({
+  spaces,
+  now,
+  onReleaseCleaning,
+}: {
+  spaces: SpacePanelView[];
+  now: Date;
+  onReleaseCleaning: (spaceId: string) => void;
+}) {
   const free = spaces.filter((s) => s.state === "free").length;
   return (
     <section className={styles.spacesSection}>
@@ -620,9 +639,20 @@ function SpacesSection({ spaces, now }: { spaces: SpacePanelView[]; now: Date })
               </span>
             )}
             {s.state === "cleaning" && (
-              <span className={styles.spaceCardLine}>
-                Higienização · disponível às {formatHM(s.availableAt)} (faltam {remainingMinutes(s.availableAt, now)} min)
-              </span>
+              <div className={styles.spaceCleaningRow}>
+                <span className={styles.spaceCardLine}>
+                  Higienização · disponível às {formatHM(s.availableAt)} (faltam {remainingMinutes(s.availableAt, now)} min)
+                </span>
+                <button
+                  type="button"
+                  className={styles.releaseCleaningBtn}
+                  title="Já limpei — liberar agora"
+                  aria-label={`Liberar ${s.name} agora`}
+                  onClick={() => onReleaseCleaning(s.id)}
+                >
+                  ✓
+                </button>
+              </div>
             )}
           </div>
         ))}

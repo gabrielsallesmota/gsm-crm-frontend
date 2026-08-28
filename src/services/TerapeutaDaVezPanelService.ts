@@ -27,6 +27,10 @@ export class TerapeutaDaVezPanelService {
   checkIn(therapistId: string, shift?: Shift): Promise<TherapistAction> {
     return terapeutaDaVezPublicRepository.checkIn(therapistId, shift);
   }
+
+  releaseCleaning(spaceId: string): Promise<PanelState> {
+    return terapeutaDaVezPublicRepository.releaseCleaning(spaceId);
+  }
 }
 
 export const terapeutaDaVezPanelService = new TerapeutaDaVezPanelService();
