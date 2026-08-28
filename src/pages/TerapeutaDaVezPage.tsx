@@ -932,17 +932,28 @@ function WizardModal({
                     // deste mesmo procedimento (reaproveitar o mesmo espaço em
                     // trechos não sequenciais no tempo é permitido pelo backend).
                     const disabled = s.state !== "free" && !selected;
+                    // "Livre agora" mas com reserva futura chegando (outro
+                    // atendimento já em andamento vai usar este espaço daqui a
+                    // pouco) — não dá pra saber com certeza no front se bate com
+                    // o horário deste combo (o backend é quem valida de verdade
+                    // no fim), mas o recepcionista PRECISA ver isso antes de
+                    // escolher, não só depois de um erro — pedido explícito.
+                    const reservedSoon = s.state === "free" && !!s.occupiesAt;
                     return (
                       <button
                         key={s.id}
                         type="button"
-                        className={`${styles.spaceOption} ${selected ? styles.spaceOptionSelected : ""} ${disabled ? styles.spaceOptionDisabled : ""}`}
+                        className={`${styles.spaceOption} ${selected ? styles.spaceOptionSelected : ""} ${disabled ? styles.spaceOptionDisabled : ""} ${reservedSoon ? styles.spaceOptionWarning : ""}`}
                         onClick={() => pickSpaceForRequirement(i, s.id)}
                         disabled={disabled}
                       >
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{s.name}</div>
-                        <div style={{ fontSize: 11.5, color: "#5A5A5A" }}>
-                          {s.state === "free" ? "Disponível agora" : `Ocupado até ${formatHM(s.availableAt)}`}
+                        <div style={{ fontSize: 11.5, color: reservedSoon ? "#9A7426" : "#5A5A5A" }}>
+                          {s.state === "free" && !reservedSoon && "Disponível agora"}
+                          {s.state === "free" &&
+                            reservedSoon &&
+                            `⚠ Ocupada em ${remainingMinutes(s.occupiesAt, now)} min — confira o horário`}
+                          {s.state !== "free" && `Ocupado até ${formatHM(s.availableAt)}`}
                         </div>
                       </button>
                     );

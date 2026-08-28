@@ -701,6 +701,16 @@
   cursor: not-allowed;
 }
 
+/* Espaço "livre agora" mas com reserva futura chegando — continua
+   selecionável (o backend valida de verdade se bate com o horário deste
+   combo), mas precisa se destacar visualmente do resto pra quem está
+   escolhendo, não só falhar depois com um erro. */
+.spaceOptionWarning {
+  border-color: #c9a44c;
+  border-left-color: #c9a44c;
+  background: #fff9ec;
+}
+
 .summaryGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
