@@ -421,20 +421,19 @@ export function TerapeutaDaVezPage() {
                 </div>
               </div>
             ))}
+            {state.waitlist.length > 0 && (
+              <WaitlistSection
+                entries={state.waitlist}
+                now={now}
+                onConfirm={(e) => void handleConfirmWaitlistEntry(e)}
+                onCancel={(e) => void handleCancelWaitlistEntry(e)}
+              />
+            )}
           </div>
         </section>
 
         <Sidebar state={state} onCheckIn={requestCheckIn} />
       </div>
-
-      {state.waitlist.length > 0 && (
-        <WaitlistSection
-          entries={state.waitlist}
-          now={now}
-          onConfirm={(e) => void handleConfirmWaitlistEntry(e)}
-          onCancel={(e) => void handleCancelWaitlistEntry(e)}
-        />
-      )}
 
       <SpacesSection spaces={state.spaces} now={now} onReleaseCleaning={handleReleaseCleaning} />
 
