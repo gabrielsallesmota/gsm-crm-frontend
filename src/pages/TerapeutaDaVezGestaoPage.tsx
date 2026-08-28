@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/common/Button";
 import { EmptyState } from "../components/common/EmptyState";
+import { ToastHost } from "../components/common/ToastHost";
 import { ProcedureImportModal } from "../components/operations/ProcedureImportModal";
 import { TherapistImportModal } from "../components/operations/TherapistImportModal";
 import { useAsyncResource } from "../hooks/useAsyncResource";
@@ -153,6 +154,13 @@ export function TerapeutaDaVezGestaoPage() {
       </div>
 
       <GestaoTabs />
+      {/* `ToastHost` normalmente é montado só dentro de `AppLayout` — esta
+          página fica FORA do `ProtectedRoute`/`AppLayout` de propósito (senha
+          própria, não login do CRM), então sem isto aqui todo `toast(...)`
+          desta tela (criar/editar/excluir/salvar em qualquer aba) atualizava
+          o estado normalmente mas nunca aparecia na tela — o pedido que
+          motivou este ajuste. */}
+      <ToastHost />
     </div>
   );
 }
