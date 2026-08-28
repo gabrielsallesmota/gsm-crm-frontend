@@ -427,8 +427,6 @@ export function TerapeutaDaVezPage() {
         <Sidebar state={state} onCheckIn={requestCheckIn} />
       </div>
 
-      <SpacesSection spaces={state.spaces} now={now} onReleaseCleaning={handleReleaseCleaning} />
-
       {state.waitlist.length > 0 && (
         <WaitlistSection
           entries={state.waitlist}
@@ -437,6 +435,8 @@ export function TerapeutaDaVezPage() {
           onCancel={(e) => void handleCancelWaitlistEntry(e)}
         />
       )}
+
+      <SpacesSection spaces={state.spaces} now={now} onReleaseCleaning={handleReleaseCleaning} />
 
       {toastMsg && <div className={styles.toast}>{toastMsg}</div>}
 
@@ -822,6 +822,11 @@ function WaitlistSection({
                 type="button"
                 className={styles.smallBtn}
                 disabled={!e.ready}
+                title={
+                  e.ready
+                    ? "Iniciar o atendimento deste cliente com este terapeuta"
+                    : "Ainda não está livre — só dá pra confirmar quando o status virar \"pronto pra confirmar\""
+                }
                 onClick={() => onConfirm(e)}
               >
                 Confirmar

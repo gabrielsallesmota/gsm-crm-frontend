@@ -418,25 +418,26 @@
 
 .waitlistSection {
   flex: none;
-  background: #fff;
-  padding: clamp(12px, 1.6vw, 22px) clamp(14px, 2vw, 28px);
+  padding: 10px clamp(14px, 2vw, 28px) 4px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  border-top: 3px solid #c9a44c;
+  gap: 2px;
 }
 
 .waitlistTitle {
   font-weight: 700;
-  font-size: 16px;
-  color: #012a2a;
+  font-size: 12.5px;
+  letter-spacing: 0.4px;
+  color: #5a5a5a;
+  text-transform: uppercase;
+  margin-bottom: 4px;
 }
 
 .waitlistRow {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px 0;
+  padding: 7px 0;
   border-bottom: 1px solid #e4e0d2;
   flex-wrap: wrap;
 }
@@ -459,6 +460,13 @@
   padding: 4px 10px;
   border-radius: 999px;
   white-space: nowrap;
+}
+
+.smallBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #d9d9d9;
+  color: #7a7a7a;
 }
 
 .spacesSection {
