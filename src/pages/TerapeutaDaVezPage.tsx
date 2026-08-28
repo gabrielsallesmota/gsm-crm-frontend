@@ -7,6 +7,7 @@ import type {
   QueueEntry,
   Shift,
   SpacePanelView,
+  WaitlistEntry,
 } from "../types/operations";
 import styles from "./TerapeutaDaVezPage.module.css";
 
@@ -73,8 +74,21 @@ function buildShiftChips(queue: QueueEntry[]): ShiftChip[] {
 }
 
 export function TerapeutaDaVezPage() {
-  const { state, loading, error, now, call, decline, start, finish, checkIn, releaseCleaning } =
-    useTerapeutaDaVezPanel();
+  const {
+    state,
+    loading,
+    error,
+    now,
+    call,
+    decline,
+    start,
+    finish,
+    checkIn,
+    releaseCleaning,
+    createWaitlistEntry,
+    confirmWaitlistEntry,
+    cancelWaitlistEntry,
+  } = useTerapeutaDaVezPanel();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -100,6 +114,51 @@ export function TerapeutaDaVezPage() {
       setCallTarget(null);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Não foi possível chamar o terapeuta.");
+    }
+  }
+
+  // ---- Fila de espera (reserva de terapeuta específico) ---------------------
+  // Cliente quer um terapeuta específico, que está livre mas o ESPAÇO que o
+  // procedimento precisa não está — pedido do usuário.
+  const [waitlistTarget, setWaitlistTarget] = useState<QueueEntry | null>(null);
+  const [waitlistForm, setWaitlistForm] = useState({ clientName: "", phone: "", procedureId: "" });
+  const waitlistOk =
+    waitlistForm.clientName.trim().length > 2 &&
+    onlyDigits(waitlistForm.phone).length >= 10 &&
+    waitlistForm.procedureId !== "";
+
+  async function confirmWaitlist() {
+    if (!waitlistTarget || !waitlistOk) return;
+    try {
+      await createWaitlistEntry({
+        therapistId: waitlistTarget.therapistId,
+        clientName: waitlistForm.clientName.trim(),
+        phone: waitlistForm.phone,
+        procedureId: waitlistForm.procedureId,
+      });
+      showToast(`${waitlistTarget.name} reservado(a) para ${waitlistForm.clientName.trim()}.`);
+      setWaitlistTarget(null);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível criar a reserva.");
+    }
+  }
+
+  async function handleConfirmWaitlistEntry(entry: WaitlistEntry) {
+    try {
+      await confirmWaitlistEntry(entry.id);
+      showToast(`Atendimento de ${entry.clientName} com ${entry.therapistName} iniciado.`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível confirmar o atendimento.");
+    }
+  }
+
+  async function handleCancelWaitlistEntry(entry: WaitlistEntry) {
+    if (!confirm(`Cancelar a reserva de ${entry.clientName} com ${entry.therapistName}?`)) return;
+    try {
+      await cancelWaitlistEntry(entry.id);
+      showToast("Reserva cancelada.");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível cancelar a reserva.");
     }
   }
 
@@ -309,6 +368,20 @@ export function TerapeutaDaVezPage() {
                       <button type="button" className={styles.smallBtn} onClick={() => { setCallTarget(entry); setCallForm({ clientName: "", phone: "" }); }}>
                         Chamar
                       </button>
+                      {state.waitlist.some((w) => w.therapistId === entry.therapistId) ? (
+                        <span className={styles.queueMeta}>reservado</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.ghostBtn}
+                          onClick={() => {
+                            setWaitlistTarget(entry);
+                            setWaitlistForm({ clientName: "", phone: "", procedureId: "" });
+                          }}
+                        >
+                          Fila de espera
+                        </button>
+                      )}
                     </>
                   )}
                   {entry.status === "reception" && (
@@ -335,6 +408,15 @@ export function TerapeutaDaVezPage() {
 
       <SpacesSection spaces={state.spaces} now={now} onReleaseCleaning={handleReleaseCleaning} />
 
+      {state.waitlist.length > 0 && (
+        <WaitlistSection
+          entries={state.waitlist}
+          now={now}
+          onConfirm={(e) => void handleConfirmWaitlistEntry(e)}
+          onCancel={(e) => void handleCancelWaitlistEntry(e)}
+        />
+      )}
+
       {toastMsg && <div className={styles.toast}>{toastMsg}</div>}
 
       {callTarget && (
@@ -345,6 +427,18 @@ export function TerapeutaDaVezPage() {
           ok={callOk}
           onCancel={() => setCallTarget(null)}
           onConfirm={() => void confirmCall()}
+        />
+      )}
+
+      {waitlistTarget && (
+        <WaitlistModal
+          entry={waitlistTarget}
+          form={waitlistForm}
+          setForm={setWaitlistForm}
+          procedures={allProcedures}
+          ok={waitlistOk}
+          onCancel={() => setWaitlistTarget(null)}
+          onConfirm={() => void confirmWaitlist()}
         />
       )}
 
@@ -661,6 +755,65 @@ function SpacesSection({
   );
 }
 
+// ---- Reservas (fila de espera de terapeuta específico) --------------------------
+
+function waitlistStatusLabel(e: WaitlistEntry, now: Date): string {
+  if (e.ready) return "PRONTO PRA CONFIRMAR";
+  if (e.conflict) return "PODE ATRASAR";
+  const minutes = remainingMinutes(e.availableAt, now);
+  return minutes === null ? "AGUARDANDO" : `LIBERA EM ${minutes} MIN`;
+}
+
+function WaitlistSection({
+  entries,
+  now,
+  onConfirm,
+  onCancel,
+}: {
+  entries: WaitlistEntry[];
+  now: Date;
+  onConfirm: (entry: WaitlistEntry) => void;
+  onCancel: (entry: WaitlistEntry) => void;
+}) {
+  return (
+    <section className={styles.waitlistSection}>
+      <span className={styles.waitlistTitle}>Fila de espera</span>
+      {entries.map((e) => {
+        const color = e.ready ? "#1E8A86" : e.conflict ? "#c0392b" : "#C9A44C";
+        return (
+          <div key={e.id} className={styles.waitlistRow}>
+            <div className={styles.waitlistInfo}>
+              <span className={styles.queueName}>
+                {e.clientName} · {e.therapistName}
+              </span>
+              <span className={styles.queueMeta}>{e.procedureName}</span>
+            </div>
+            <span
+              className={styles.waitlistStatus}
+              style={{ background: `${color}22`, color }}
+            >
+              {waitlistStatusLabel(e, now)}
+            </span>
+            <div className={styles.queueAction}>
+              <button
+                type="button"
+                className={styles.smallBtn}
+                disabled={!e.ready}
+                onClick={() => onConfirm(e)}
+              >
+                Confirmar
+              </button>
+              <button type="button" className={styles.ghostBtn} onClick={() => onCancel(e)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 // ---- Modal: chamar terapeuta -----------------------------------------------------
 
 function CallModal({
@@ -718,6 +871,96 @@ function CallModal({
           </button>
           <button type="button" className={styles.smallBtn} disabled={!ok} onClick={onConfirm} style={{ flex: 2, padding: "14px 12px" }}>
             Confirmar chamada
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Modal: fila de espera (reserva de terapeuta específico) ----------------------
+
+function WaitlistModal({
+  entry,
+  form,
+  setForm,
+  procedures,
+  ok,
+  onCancel,
+  onConfirm,
+}: {
+  entry: QueueEntry;
+  form: { clientName: string; phone: string; procedureId: string };
+  setForm: (
+    updater: (f: { clientName: string; phone: string; procedureId: string }) => {
+      clientName: string;
+      phone: string;
+      procedureId: string;
+    },
+  ) => void;
+  procedures: ProcedureOption[];
+  ok: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
+        <div>
+          <div className={styles.modalEyebrow}>FILA DE ESPERA</div>
+          <div className={styles.modalTitle}>{entry.name}</div>
+          <div className={styles.modalSub}>
+            Terapeuta livre, mas o espaço do procedimento ainda não está — reserva pra este
+            terapeuta assim que liberar.
+          </div>
+        </div>
+        <div className={styles.modalDivider} />
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>NOME DO CLIENTE</span>
+          <input
+            className={styles.fieldInput}
+            placeholder="Digite o nome completo"
+            value={form.clientName}
+            onChange={(e) => setForm((f) => ({ ...f, clientName: e.target.value }))}
+          />
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>TELEFONE</span>
+          <input
+            className={styles.fieldInput}
+            placeholder="(00) 00000-0000"
+            inputMode="tel"
+            value={form.phone}
+            onChange={(e) => setForm((f) => ({ ...f, phone: formatPhone(e.target.value) }))}
+          />
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>PROCEDIMENTO</span>
+          <select
+            className={styles.fieldInput}
+            value={form.procedureId}
+            onChange={(e) => setForm((f) => ({ ...f, procedureId: e.target.value }))}
+          >
+            <option value="">Selecione…</option>
+            {procedures.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.ghostBtn} onClick={onCancel} style={{ flex: 1 }}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className={styles.smallBtn}
+            disabled={!ok}
+            onClick={onConfirm}
+            style={{ flex: 2, padding: "14px 12px" }}
+          >
+            Reservar
           </button>
         </div>
       </div>

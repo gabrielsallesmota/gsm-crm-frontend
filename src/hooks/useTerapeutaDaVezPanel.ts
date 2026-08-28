@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { terapeutaDaVezPanelService } from "../services/TerapeutaDaVezPanelService";
-import type { AttendanceRecord, PanelState, Shift, Therapist } from "../types/operations";
+import type {
+  AttendanceRecord,
+  CreateWaitlistEntryInput,
+  PanelState,
+  Shift,
+  Therapist,
+  WaitlistEntry,
+} from "../types/operations";
 
 const POLL_MS = 3000;
 const CLOCK_MS = 1000;
@@ -28,6 +35,11 @@ export interface TerapeutaDaVezPanel {
   checkIn: (therapistId: string, shift?: Shift) => Promise<Therapist>;
   /** Botão pequeno "Liberar" ao lado de um espaço em higienização. */
   releaseCleaning: (spaceId: string) => Promise<void>;
+  /** "Colocar na fila de espera" — terapeuta específico, livre, mas o
+   * espaço que o procedimento precisa não está. */
+  createWaitlistEntry: (input: CreateWaitlistEntryInput) => Promise<WaitlistEntry>;
+  confirmWaitlistEntry: (entryId: string) => Promise<AttendanceRecord>;
+  cancelWaitlistEntry: (entryId: string) => Promise<void>;
 }
 
 /** Próximo instante em que ALGUMA coisa do painel muda sozinha, sem clique
@@ -45,6 +57,9 @@ function nextTransitionAt(state: PanelState): number | null {
   }
   for (const q of state.queue) {
     if (q.plannedEndAt) candidates.push(q.plannedEndAt);
+  }
+  for (const w of state.waitlist) {
+    if (w.availableAt) candidates.push(w.availableAt);
   }
   if (candidates.length === 0) return null;
   return Math.min(...candidates.map((iso) => new Date(iso).getTime()));
@@ -140,5 +155,36 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     setState(next);
   }
 
-  return { state, loading, error, now, call, decline, start, finish, checkIn, releaseCleaning };
+  async function createWaitlistEntry(input: CreateWaitlistEntryInput) {
+    const result = await terapeutaDaVezPanelService.createWaitlistEntry(input);
+    setState(result.state);
+    return result.entry;
+  }
+
+  async function confirmWaitlistEntry(entryId: string) {
+    const result = await terapeutaDaVezPanelService.confirmWaitlistEntry(entryId);
+    setState(result.state);
+    return result.attendance;
+  }
+
+  async function cancelWaitlistEntry(entryId: string) {
+    const next = await terapeutaDaVezPanelService.cancelWaitlistEntry(entryId);
+    setState(next);
+  }
+
+  return {
+    state,
+    loading,
+    error,
+    now,
+    call,
+    decline,
+    start,
+    finish,
+    checkIn,
+    releaseCleaning,
+    createWaitlistEntry,
+    confirmWaitlistEntry,
+    cancelWaitlistEntry,
+  };
 }

@@ -237,6 +237,30 @@ export interface HistoryEntrySummary {
   points: string;
 }
 
+/** Reserva de terapeuta específico — cliente quer um terapeuta que está
+ * livre, mas o ESPAÇO que o procedimento precisa não está. `ready`/
+ * `conflict`/`availableAt` são recalculados a cada leitura do painel, nunca
+ * travam chamar/iniciar outro cliente nesse meio tempo (só avisam). */
+export interface WaitlistEntry {
+  id: string;
+  clientName: string;
+  clientPhone: string;
+  therapistId: string;
+  therapistName: string;
+  procedureName: string;
+  createdAt: string;
+  ready: boolean;
+  conflict: boolean;
+  availableAt: string | null;
+}
+
+export interface CreateWaitlistEntryInput {
+  therapistId: string;
+  clientName: string;
+  phone: string;
+  procedureId: string;
+}
+
 export interface PanelState {
   serverTime: string;
   pointsMin: number;
@@ -255,6 +279,7 @@ export interface PanelState {
   clientSuggestions: string[];
   storeOpen: boolean;
   nextOpenAt: string | null;
+  waitlist: WaitlistEntry[];
 }
 
 export interface AttendanceRecord {
@@ -274,6 +299,11 @@ export interface AttendanceRecord {
 
 export interface AttendanceAction {
   attendance: AttendanceRecord;
+  state: PanelState;
+}
+
+export interface WaitlistAction {
+  entry: WaitlistEntry;
   state: PanelState;
 }
 

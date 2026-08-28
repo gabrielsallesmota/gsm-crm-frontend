@@ -4,11 +4,20 @@ import {
   toAttendanceAction,
   toPanelState,
   toTherapistAction,
+  toWaitlistAction,
   type AttendanceActionDto,
   type PanelStateDto,
   type TherapistActionDto,
+  type WaitlistActionDto,
 } from "./operationsMapping";
-import type { AttendanceAction, PanelState, Shift, TherapistAction } from "../../types/operations";
+import type {
+  AttendanceAction,
+  CreateWaitlistEntryInput,
+  PanelState,
+  Shift,
+  TherapistAction,
+  WaitlistAction,
+} from "../../types/operations";
 
 const BASE = "/api/v1/public/terapeuta-da-vez";
 
@@ -87,6 +96,35 @@ export class TerapeutaDaVezPublicRepository {
    * `CLEANING_MINUTES` padrão. */
   async releaseCleaning(spaceId: string): Promise<PanelState> {
     const dto = await publicRequest<PanelStateDto>(`${BASE}/spaces/${spaceId}/release-cleaning`, {
+      method: "POST",
+    });
+    return toPanelState(dto);
+  }
+
+  /** "Colocar na fila de espera" — cliente quer um terapeuta específico,
+   * que está livre mas o espaço que o procedimento precisa não está. */
+  async createWaitlistEntry(input: CreateWaitlistEntryInput): Promise<WaitlistAction> {
+    const dto = await publicRequest<WaitlistActionDto>(`${BASE}/waitlist`, {
+      method: "POST",
+      body: JSON.stringify({
+        therapist_id: input.therapistId,
+        client_name: input.clientName,
+        phone: input.phone,
+        procedure_id: input.procedureId,
+      }),
+    });
+    return toWaitlistAction(dto);
+  }
+
+  async confirmWaitlistEntry(entryId: string): Promise<AttendanceAction> {
+    const dto = await publicRequest<AttendanceActionDto>(`${BASE}/waitlist/${entryId}/confirm`, {
+      method: "POST",
+    });
+    return toAttendanceAction(dto);
+  }
+
+  async cancelWaitlistEntry(entryId: string): Promise<PanelState> {
+    const dto = await publicRequest<PanelStateDto>(`${BASE}/waitlist/${entryId}/cancel`, {
       method: "POST",
     });
     return toPanelState(dto);

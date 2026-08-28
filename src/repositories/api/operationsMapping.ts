@@ -29,6 +29,8 @@ import type {
   TherapistAction,
   TherapistDailyPoints,
   TherapistPoints,
+  WaitlistAction,
+  WaitlistEntry,
 } from "../../types/operations";
 
 export interface TherapistDto {
@@ -196,6 +198,19 @@ export interface HistoryEntryDto {
   points: string;
 }
 
+export interface WaitlistEntryDto {
+  id: string;
+  client_name: string;
+  client_phone: string;
+  therapist_id: string;
+  therapist_name: string;
+  procedure_name: string;
+  created_at: string;
+  ready: boolean;
+  conflict: boolean;
+  available_at: string | null;
+}
+
 export interface PanelStateDto {
   server_time: string;
   points_min: number;
@@ -214,6 +229,7 @@ export interface PanelStateDto {
   client_suggestions: string[];
   store_open: boolean;
   next_open_at: string | null;
+  waitlist: WaitlistEntryDto[];
 }
 
 export interface AttendanceDto {
@@ -238,6 +254,11 @@ export interface AttendanceActionDto {
 
 export interface TherapistActionDto {
   therapist: TherapistDto;
+  state: PanelStateDto;
+}
+
+export interface WaitlistActionDto {
+  entry: WaitlistEntryDto;
   state: PanelStateDto;
 }
 
@@ -458,6 +479,25 @@ function toProcedureOption(dto: ProcedureOptionDto): ProcedureOption {
   };
 }
 
+export function toWaitlistEntry(dto: WaitlistEntryDto): WaitlistEntry {
+  return {
+    id: dto.id,
+    clientName: dto.client_name,
+    clientPhone: dto.client_phone,
+    therapistId: dto.therapist_id,
+    therapistName: dto.therapist_name,
+    procedureName: dto.procedure_name,
+    createdAt: dto.created_at,
+    ready: dto.ready,
+    conflict: dto.conflict,
+    availableAt: dto.available_at,
+  };
+}
+
+export function toWaitlistAction(dto: WaitlistActionDto): WaitlistAction {
+  return { entry: toWaitlistEntry(dto.entry), state: toPanelState(dto.state) };
+}
+
 export function toPanelState(dto: PanelStateDto): PanelState {
   const groups: Record<string, ProcedureOption[]> = {};
   for (const [category, items] of Object.entries(dto.procedure_groups)) {
@@ -481,6 +521,7 @@ export function toPanelState(dto: PanelStateDto): PanelState {
     clientSuggestions: dto.client_suggestions,
     storeOpen: dto.store_open,
     nextOpenAt: dto.next_open_at,
+    waitlist: dto.waitlist.map(toWaitlistEntry),
   };
 }
 

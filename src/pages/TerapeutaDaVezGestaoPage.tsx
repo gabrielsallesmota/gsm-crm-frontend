@@ -19,6 +19,7 @@ import { operationsApiRepository } from "../repositories/api/OperationsApiReposi
 import { getOperationsPassword, setOperationsPassword } from "../repositories/api/operationsAuth";
 import type {
   AttendancePhase,
+  AttendanceRecord,
   BusinessHoursEntry,
   CreateProcedureInput,
   CreateSpaceInput,
@@ -1519,7 +1520,7 @@ function HistoryTab() {
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
 
-  const { data, loading, error } = useAttendanceHistory({
+  const { data, loading, error, reload } = useAttendanceHistory({
     therapistId: therapistId || undefined,
     procedureId: procedureId || undefined,
     clientSearch: clientSearch || undefined,
@@ -1532,6 +1533,36 @@ function HistoryTab() {
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const { toast } = useToast();
+
+  // Correção pontual de pontos de um atendimento já finalizado — pontos não
+  // são mais um contador à parte no terapeuta, o saldo do dia é sempre
+  // somado a partir do histórico, então corrigir aqui é o único lugar que
+  // faz sentido.
+  const [editingAttendance, setEditingAttendance] = useState<AttendanceRecord | null>(null);
+  const [editPoints, setEditPoints] = useState("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  function startEditPoints(a: AttendanceRecord) {
+    setEditingAttendance(a);
+    setEditPoints(String(a.pointsAwarded ?? 0));
+  }
+
+  async function handleSaveEditPoints() {
+    if (!editingAttendance) return;
+    const parsed = Number(editPoints);
+    if (!Number.isFinite(parsed) || parsed < 0) return;
+    setEditSubmitting(true);
+    try {
+      await operationsApiRepository.updateAttendancePoints(editingAttendance.id, Math.round(parsed));
+      toast("Pontuação corrigida.");
+      setEditingAttendance(null);
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível corrigir a pontuação.");
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
 
   async function handleExport() {
     try {
@@ -1650,6 +1681,7 @@ function HistoryTab() {
                   <th>Pontos</th>
                   <th>Chamado em</th>
                   <th>Finalizado em</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -1667,11 +1699,22 @@ function HistoryTab() {
                     <td>{a.pointsAwarded != null ? `+${a.pointsAwarded}` : "—"}</td>
                     <td>{formatDateTime(a.calledAt)}</td>
                     <td>{formatDateTime(a.finishedAt)}</td>
+                    <td>
+                      {a.phase === "finished" && (
+                        <button
+                          type="button"
+                          className={styles.linkBtn}
+                          onClick={() => startEditPoints(a)}
+                        >
+                          Editar pontos
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {data.items.length === 0 && (
                   <tr>
-                    <td colSpan={8}>Nenhum atendimento encontrado para os filtros selecionados.</td>
+                    <td colSpan={9}>Nenhum atendimento encontrado para os filtros selecionados.</td>
                   </tr>
                 )}
               </tbody>
@@ -1689,6 +1732,37 @@ function HistoryTab() {
             </Button>
           </div>
         </>
+      )}
+
+      {editingAttendance && (
+        <Modal
+          title="Editar pontuação"
+          subtitle={`${editingAttendance.clientName} · ${editingAttendance.therapistName} · ${editingAttendance.procedureName ?? "—"}`}
+          onClose={() => setEditingAttendance(null)}
+        >
+          <div className={styles.form} style={{ margin: 0 }}>
+            <input
+              className={styles.inputSmall}
+              type="number"
+              min={0}
+              value={editPoints}
+              onChange={(e) => setEditPoints(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className={styles.rowActions} style={{ marginTop: 16, justifyContent: "flex-end" }}>
+            <Button variant="ghost" onClick={() => setEditingAttendance(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void handleSaveEditPoints()}
+              disabled={editSubmitting || editPoints.trim() === "" || Number(editPoints) < 0}
+            >
+              Salvar
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import { ApiError } from "../../types/common";
 import { BASE_URL } from "./ApiClient";
 import { getOperationsPassword } from "./operationsAuth";
 import {
+  toAttendance,
   toBusinessHoursEntry,
   toClient,
   toHistoryPage,
@@ -13,6 +14,7 @@ import {
   toTherapist,
   toTherapistDailyPoints,
   toTherapistPoints,
+  type AttendanceDto,
   type BusinessHoursEntryDto,
   type ClientDto,
   type HistoryPageDto,
@@ -26,6 +28,7 @@ import {
   type TherapistPointsDto,
 } from "./operationsMapping";
 import type {
+  AttendanceRecord,
   BusinessHoursEntry,
   CreateProcedureInput,
   CreateScheduleEntryInput,
@@ -326,6 +329,17 @@ export class OperationsApiRepository {
     params.set("page_size", String(filter.pageSize ?? 20));
     const dto = await operationsRequest<HistoryPageDto>(`${BASE}/attendances?${params.toString()}`);
     return toHistoryPage(dto);
+  }
+
+  /** Correção pontual de pontos de um atendimento já finalizado, direto no
+   * Histórico — pontos não são mais um contador à parte no terapeuta, o
+   * saldo do dia reflete a mudança sozinho. */
+  async updateAttendancePoints(id: string, pointsAwarded: number): Promise<AttendanceRecord> {
+    const dto = await operationsRequest<AttendanceDto>(`${BASE}/attendances/${id}/points`, {
+      method: "PATCH",
+      body: JSON.stringify({ points_awarded: pointsAwarded }),
+    });
+    return toAttendance(dto);
   }
 
   exportHistory(filter: HistoryFilter): Promise<string> {

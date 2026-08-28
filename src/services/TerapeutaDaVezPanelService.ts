@@ -1,5 +1,12 @@
 import { terapeutaDaVezPublicRepository } from "../repositories/api/TerapeutaDaVezPublicRepository";
-import type { AttendanceAction, PanelState, Shift, TherapistAction } from "../types/operations";
+import type {
+  AttendanceAction,
+  CreateWaitlistEntryInput,
+  PanelState,
+  Shift,
+  TherapistAction,
+  WaitlistAction,
+} from "../types/operations";
 
 /** Painel aberto (sem login) — chamar/recusar/iniciar/finalizar e o estado
  * completo da fila. Ver `TerapeutaDaVezPublicRepository`. */
@@ -30,6 +37,18 @@ export class TerapeutaDaVezPanelService {
 
   releaseCleaning(spaceId: string): Promise<PanelState> {
     return terapeutaDaVezPublicRepository.releaseCleaning(spaceId);
+  }
+
+  createWaitlistEntry(input: CreateWaitlistEntryInput): Promise<WaitlistAction> {
+    return terapeutaDaVezPublicRepository.createWaitlistEntry(input);
+  }
+
+  confirmWaitlistEntry(entryId: string): Promise<AttendanceAction> {
+    return terapeutaDaVezPublicRepository.confirmWaitlistEntry(entryId);
+  }
+
+  cancelWaitlistEntry(entryId: string): Promise<PanelState> {
+    return terapeutaDaVezPublicRepository.cancelWaitlistEntry(entryId);
   }
 }
 
