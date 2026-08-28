@@ -111,6 +111,7 @@ export class TerapeutaDaVezPublicRepository {
         client_name: input.clientName,
         phone: input.phone,
         procedure_id: input.procedureId,
+        attendance_id: input.attendanceId ?? null,
       }),
     });
     return toWaitlistAction(dto);

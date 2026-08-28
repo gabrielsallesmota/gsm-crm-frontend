@@ -190,6 +190,7 @@ export interface QueueEntry {
   barPct: number;
   attendanceId: string | null;
   clientName: string | null;
+  clientPhone: string | null;
   procedureName: string | null;
   spaceNames: string[];
   calledAt: string | null;
@@ -259,6 +260,11 @@ export interface CreateWaitlistEntryInput {
   clientName: string;
   phone: string;
   procedureId: string;
+  /** Atendimento em recepção que originou a reserva (ex.: terapeuta já
+   * chamado, mas nenhum espaço livre no passo de escolher espaço) — se
+   * vier preenchido, o backend recusa esse atendimento junto, liberando o
+   * terapeuta pra fila normal de novo. */
+  attendanceId?: string;
 }
 
 export interface PanelState {

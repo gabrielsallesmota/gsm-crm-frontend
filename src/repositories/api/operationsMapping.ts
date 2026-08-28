@@ -154,6 +154,7 @@ export interface QueueEntryDto {
   bar_pct: number;
   attendance_id: string | null;
   client_name: string | null;
+  client_phone: string | null;
   procedure_name: string | null;
   space_names: string[];
   called_at: string | null;
@@ -437,6 +438,7 @@ function toQueueEntry(dto: QueueEntryDto): QueueEntry {
     barPct: dto.bar_pct,
     attendanceId: dto.attendance_id,
     clientName: dto.client_name,
+    clientPhone: dto.client_phone,
     procedureName: dto.procedure_name,
     spaceNames: dto.space_names,
     calledAt: dto.called_at,

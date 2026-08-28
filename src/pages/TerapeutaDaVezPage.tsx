@@ -193,6 +193,27 @@ export function TerapeutaDaVezPage() {
     }
   }
 
+  // "Colocar na fila de espera" direto do passo 3 (escolher espaço) — nome
+  // e telefone já estão no atendimento em recepção, não precisa perguntar
+  // de novo. O atendimento pendente é recusado junto (backend), liberando o
+  // terapeuta pra fila normal.
+  async function waitlistFromWizard() {
+    if (!wizardEntry || !chosenProcedureId) return;
+    try {
+      await createWaitlistEntry({
+        therapistId: wizardEntry.therapistId,
+        clientName: wizardEntry.clientName ?? "",
+        phone: wizardEntry.clientPhone ?? "",
+        procedureId: chosenProcedureId,
+        ...(wizardEntry.attendanceId ? { attendanceId: wizardEntry.attendanceId } : {}),
+      });
+      showToast(`${wizardEntry.name} reservado(a) para ${wizardEntry.clientName}.`);
+      closeWizard();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível criar a reserva.");
+    }
+  }
+
   // Botão pequeno "Liberar" ao lado de um espaço em higienização — pula o
   // resto da espera quando a limpeza de verdade já terminou antes do tempo
   // padrão.
@@ -455,9 +476,11 @@ export function TerapeutaDaVezPage() {
           chosenSpaceIds={chosenSpaceIds}
           pickSpaceForRequirement={pickSpaceForRequirement}
           spaceReady={spaceReady}
+          spaces={state.spaces}
           now={now}
           onClose={closeWizard}
           onDecline={() => void declineWizard()}
+          onWaitlist={() => void waitlistFromWizard()}
           onConfirmStart={() => void confirmStart()}
         />
       )}
@@ -1063,6 +1086,29 @@ function PointsConfirmModal({
 
 // ---- Modal: procedimento / espaço / confirmação ------------------------------------
 
+/** Disponibilidade do PRIMEIRO trecho de um procedimento — é o único que
+ * precisa estar livre AGORA pra dar pra iniciar (os trechos seguintes têm
+ * mais folga: podem liberar até a terapia chegar neles). `null` = já dá pra
+ * começar sem esperar nada (algum espaço desse tipo está livre de verdade,
+ * sem reserva futura pendente). */
+function procedureFirstSegmentWait(
+  p: ProcedureOption,
+  spaces: SpacePanelView[],
+): { typeLabel: string; iso: string } | null {
+  const firstType = p.spaceRequirements[0]?.type;
+  if (!firstType) return null;
+  const candidates = spaces.filter((s) => s.type === firstType);
+  if (candidates.length === 0) return null;
+  if (candidates.some((s) => s.state === "free" && !s.occupiesAt)) return null;
+  const isos = candidates
+    .map((s) => s.availableAt ?? s.occupiesAt)
+    .filter((v): v is string => v !== null);
+  if (isos.length === 0) return null;
+  const soonest = isos.reduce((a, b) => (new Date(a).getTime() < new Date(b).getTime() ? a : b));
+  const typeLabel = firstType.charAt(0).toUpperCase() + firstType.slice(1);
+  return { typeLabel, iso: soonest };
+}
+
 function WizardModal({
   entry,
   step,
@@ -1075,9 +1121,11 @@ function WizardModal({
   chosenSpaceIds,
   pickSpaceForRequirement,
   spaceReady,
+  spaces,
   now,
   onClose,
   onDecline,
+  onWaitlist,
   onConfirmStart,
 }: {
   entry: QueueEntry;
@@ -1091,9 +1139,11 @@ function WizardModal({
   chosenSpaceIds: (string | null)[];
   pickSpaceForRequirement: (index: number, spaceId: string) => void;
   spaceReady: boolean;
+  spaces: SpacePanelView[];
   now: Date;
   onClose: () => void;
   onDecline: () => void;
+  onWaitlist: () => void;
   onConfirmStart: () => void;
 }) {
   const plannedEnd = chosenProcedure ? new Date(now.getTime() + chosenProcedure.durationMinutes * 60000) : null;
@@ -1114,22 +1164,31 @@ function WizardModal({
                 <div key={category} style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
                   <span style={{ fontSize: 10, letterSpacing: 1.6, color: "#9A7426" }}>{category}</span>
                   <div className={styles.procedureGrid} style={{ maxHeight: "none" }}>
-                    {items.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className={`${styles.procedureCard} ${chosenProcedureId === p.id ? styles.procedureCardActive : ""}`}
-                        onClick={() => selectProcedure(p.id)}
-                      >
-                        <span className={styles.procedureCardName}>{p.name}</span>
-                        <div className={styles.procedureCardMeta}>
-                          <span>{p.durationLabel}</span>
-                          <span>{p.priceLabel}</span>
-                          <span style={{ color: "#9A7426" }}>+{p.points} pts</span>
-                        </div>
-                        <span style={{ fontSize: 10, color: "#5A5A5A" }}>{p.typeLabel}</span>
-                      </button>
-                    ))}
+                    {items.map((p) => {
+                      const wait = procedureFirstSegmentWait(p, spaces);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className={`${styles.procedureCard} ${chosenProcedureId === p.id ? styles.procedureCardActive : ""}`}
+                          onClick={() => selectProcedure(p.id)}
+                        >
+                          <span className={styles.procedureCardName}>{p.name}</span>
+                          <div className={styles.procedureCardMeta}>
+                            <span>{p.durationLabel}</span>
+                            <span>{p.priceLabel}</span>
+                            <span style={{ color: "#9A7426" }}>+{p.points} pts</span>
+                          </div>
+                          <span style={{ fontSize: 10, color: "#5A5A5A" }}>{p.typeLabel}</span>
+                          {wait && (
+                            <span style={{ fontSize: 10.5, color: "#9A7426", fontWeight: 700 }}>
+                              ⚠ {wait.typeLabel} ocupada — libera às {formatHM(wait.iso)} (faltam{" "}
+                              {remainingMinutes(wait.iso, now)} min)
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -1205,10 +1264,29 @@ function WizardModal({
                 </div>
               </div>
             ))}
+            {(spaceOptionsByRequirement[0]?.length ?? 0) > 0 &&
+              spaceOptionsByRequirement[0]?.every((s) => s.state !== "free") && (
+                <div className={styles.heroHint} style={{ borderColor: "#c9a44c" }}>
+                  Nenhuma opção livre agora pro trecho 1 — em vez de esperar aqui, dá pra colocar
+                  {" "}{entry.clientName} na fila de espera desse terapeuta: o painel avisa sozinho
+                  quando liberar.
+                </div>
+              )}
             <div className={styles.modalActions}>
               <button type="button" className={styles.ghostBtn} onClick={() => setStep("procedure")} style={{ flex: 1 }}>
                 Voltar
               </button>
+              {(spaceOptionsByRequirement[0]?.length ?? 0) > 0 &&
+                spaceOptionsByRequirement[0]?.every((s) => s.state !== "free") && (
+                  <button
+                    type="button"
+                    className={styles.ghostBtn}
+                    style={{ flex: 2, padding: "14px 12px", borderColor: "#c9a44c", color: "#9A7426" }}
+                    onClick={onWaitlist}
+                  >
+                    Colocar na fila de espera
+                  </button>
+                )}
               <button
                 type="button"
                 className={styles.smallBtn}
