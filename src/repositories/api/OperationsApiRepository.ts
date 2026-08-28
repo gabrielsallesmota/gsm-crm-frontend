@@ -75,6 +75,17 @@ async function operationsRequest<T>(path: string, options: RequestInit = {}): Pr
   return (await resp.json()) as T;
 }
 
+/** Variante que devolve texto cru (CSV de export), não JSON — mesma senha,
+ * mesmo tratamento de erro. */
+async function operationsRequestText(path: string): Promise<string> {
+  const headers = new Headers();
+  const password = getOperationsPassword();
+  if (password) headers.set("X-Operations-Password", password);
+  const resp = await fetch(`${BASE_URL}${path}`, { headers });
+  if (!resp.ok) throw new ApiError(resp.status, await readErrorDetail(resp));
+  return resp.text();
+}
+
 /** camelCase -> snake_case explícito nos corpos de request (o backend não
  * tem alias de camelCase nos schemas Pydantic) — mesma convenção usada em
  * `LeadsApiRepository`. */
@@ -96,6 +107,19 @@ function procedureBody(input: CreateProcedureInput | UpdateProcedureInput) {
 
 function spaceBody(input: CreateSpaceInput | UpdateSpaceInput) {
   return { code: input.code, name: input.name, type: input.type, active: input.active };
+}
+
+/** Filtros compartilhados entre a listagem paginada e o export (CSV) do
+ * histórico — os dois aceitam os mesmos parâmetros, só o export não pagina. */
+function historyFilterParams(filter: HistoryFilter): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filter.therapistId) params.set("therapist_id", filter.therapistId);
+  if (filter.procedureId) params.set("procedure_id", filter.procedureId);
+  if (filter.clientSearch) params.set("client_search", filter.clientSearch);
+  if (filter.phase) params.set("phase", filter.phase);
+  if (filter.dateFrom) params.set("date_from", filter.dateFrom);
+  if (filter.dateTo) params.set("date_to", filter.dateTo);
+  return params;
 }
 
 export class OperationsApiRepository {
@@ -274,17 +298,16 @@ export class OperationsApiRepository {
   }
 
   async listHistory(filter: HistoryFilter): Promise<HistoryPage> {
-    const params = new URLSearchParams();
-    if (filter.therapistId) params.set("therapist_id", filter.therapistId);
-    if (filter.procedureId) params.set("procedure_id", filter.procedureId);
-    if (filter.clientSearch) params.set("client_search", filter.clientSearch);
-    if (filter.phase) params.set("phase", filter.phase);
-    if (filter.dateFrom) params.set("date_from", filter.dateFrom);
-    if (filter.dateTo) params.set("date_to", filter.dateTo);
+    const params = historyFilterParams(filter);
     params.set("page", String(filter.page ?? 1));
     params.set("page_size", String(filter.pageSize ?? 20));
     const dto = await operationsRequest<HistoryPageDto>(`${BASE}/attendances?${params.toString()}`);
     return toHistoryPage(dto);
+  }
+
+  exportHistory(filter: HistoryFilter): Promise<string> {
+    const params = historyFilterParams(filter);
+    return operationsRequestText(`${BASE}/attendances/export?${params.toString()}`);
   }
 }
 

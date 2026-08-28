@@ -1292,6 +1292,29 @@ function HistoryTab() {
   });
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  const { toast } = useToast();
+
+  async function handleExport() {
+    try {
+      const csv = await operationsApiRepository.exportHistory({
+        therapistId: therapistId || undefined,
+        procedureId: procedureId || undefined,
+        clientSearch: clientSearch || undefined,
+        phase: phase || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "terapeuta-da-vez-historico.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível exportar o histórico.");
+    }
+  }
 
   return (
     <div>
@@ -1366,6 +1389,9 @@ function HistoryTab() {
             setPage(1);
           }}
         />
+        <Button variant="ghost" onClick={() => void handleExport()}>
+          Exportar CSV
+        </Button>
       </div>
 
       {error && <EmptyState title="Não foi possível carregar o histórico" message={error.message} />}
