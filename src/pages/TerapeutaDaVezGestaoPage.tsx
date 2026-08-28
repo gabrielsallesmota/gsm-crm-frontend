@@ -69,6 +69,40 @@ function addDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Dia-a-dia num intervalo, filtrado por dia da semana — o "de/para de data"
+// da escala: "seg a sex" vira um intervalo com sáb/dom desmarcados, em vez
+// de cadastrar cada dia útil um por um. Usa campos locais (não
+// toISOString) pra não arriscar cair no dia errado perto da virada de fuso.
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function datesInRange(fromIso: string, toIso: string, allowedWeekdays: Set<number>): string[] {
+  const result: string[] = [];
+  const cursor = new Date(`${fromIso}T00:00:00`);
+  const end = new Date(`${toIso}T00:00:00`);
+  while (cursor <= end) {
+    if (allowedWeekdays.has(cursor.getDay())) result.push(toIsoDate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return result;
+}
+
+// getDay(): 0=domingo...6=sábado — reordenado começando na segunda só pra
+// exibição, mais natural pra escala de trabalho.
+const WEEKDAY_TOGGLE_OPTIONS: { js: number; label: string }[] = [
+  { js: 1, label: "Seg" },
+  { js: 2, label: "Ter" },
+  { js: 3, label: "Qua" },
+  { js: 4, label: "Qui" },
+  { js: 5, label: "Sex" },
+  { js: 6, label: "Sáb" },
+  { js: 0, label: "Dom" },
+];
+
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -373,28 +407,63 @@ function ScheduleTab() {
   const [formShifts, setFormShifts] = useState<Shift[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
+  // "De/para" de data — repetir o mesmo cadastro por vários dias em vez de
+  // um por um (ex.: "segunda a sexta" = intervalo com sáb/dom desmarcados).
+  const [repeatMode, setRepeatMode] = useState(false);
+  const [formDateTo, setFormDateTo] = useState(() => todayIso());
+  const [repeatWeekdays, setRepeatWeekdays] = useState<Set<number>>(
+    () => new Set(WEEKDAY_TOGGLE_OPTIONS.map((o) => o.js)),
+  );
+
   function toggleFormShift(shift: Shift) {
     setFormShifts((prev) =>
       prev.includes(shift) ? prev.filter((s) => s !== shift) : [...prev, shift],
     );
   }
 
+  function toggleRepeatWeekday(js: number) {
+    setRepeatWeekdays((prev) => {
+      const next = new Set(prev);
+      if (next.has(js)) next.delete(js);
+      else next.add(js);
+      return next;
+    });
+  }
+
+  const targetDates = repeatMode
+    ? datesInRange(formDate, formDateTo, repeatWeekdays)
+    : [formDate];
+
   async function handleAdd() {
     if (!formTherapistId || !formDate || formShifts.length === 0) return;
+    if (repeatMode && targetDates.length === 0) return;
     setSubmitting(true);
+    let created = 0;
+    let failed = 0;
     try {
-      for (const shift of formShifts) {
-        await operationsApiRepository.createScheduleEntry({
-          therapistId: formTherapistId,
-          date: formDate,
-          shift,
-        });
+      for (const day of targetDates) {
+        for (const shift of formShifts) {
+          try {
+            await operationsApiRepository.createScheduleEntry({
+              therapistId: formTherapistId,
+              date: day,
+              shift,
+            });
+            created++;
+          } catch {
+            // provavelmente já escalado nesse dia/turno — não aborta o
+            // resto do lote por causa de uma data que já existia.
+            failed++;
+          }
+        }
       }
-      toast("Escala cadastrada.");
+      toast(
+        failed > 0
+          ? `${created} escala(s) cadastrada(s), ${failed} já existiam ou falharam.`
+          : `${created} escala(s) cadastrada(s).`,
+      );
       setFormShifts([]);
       reload();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível cadastrar a escala.");
     } finally {
       setSubmitting(false);
     }
@@ -423,10 +492,12 @@ function ScheduleTab() {
   return (
     <div>
       <p className={styles.rowMeta} style={{ marginBottom: 10 }}>
-        Cadastre por dia específico quem trabalha e em qual turno — não é um padrão fixo semanal,
-        cada dia é registrado à parte (ex.: amanhã manhã e interturno, depois de amanhã só à noite).
-        O painel só oferece "Iniciar turno" pros turnos escalados aqui que já estiverem na janela de
-        horário.
+        Cadastre quem trabalha e em qual turno — não é um padrão fixo semanal, cada dia fica
+        registrado à parte (ex.: amanhã manhã e interturno, depois de amanhã só à noite), então dá
+        pra ter exceção quando quiser. Pra repetir o mesmo cadastro em vários dias de uma vez (ex.:
+        segunda a sexta), marque "Repetir por vários dias" e desmarque os dias da semana que não
+        entram. O painel só oferece "Iniciar turno" pros turnos escalados aqui que já estiverem na
+        janela de horário.
       </p>
 
       <div className={styles.form}>
@@ -448,6 +519,25 @@ function ScheduleTab() {
           value={formDate}
           onChange={(e) => setFormDate(e.target.value)}
         />
+        <label className={styles.checkboxGroup}>
+          <input
+            type="checkbox"
+            checked={repeatMode}
+            onChange={(e) => setRepeatMode(e.target.checked)}
+          />
+          Repetir por vários dias
+        </label>
+        {repeatMode && (
+          <>
+            <span className={styles.rowMeta}>até</span>
+            <input
+              className={styles.inputSmall}
+              type="date"
+              value={formDateTo}
+              onChange={(e) => setFormDateTo(e.target.value)}
+            />
+          </>
+        )}
         <div className={styles.checkboxGroup}>
           {SHIFT_OPTIONS.map((opt) => (
             <label key={opt.value}>
@@ -460,10 +550,36 @@ function ScheduleTab() {
             </label>
           ))}
         </div>
+      </div>
+
+      {repeatMode && (
+        <div className={styles.form}>
+          <span className={styles.rowMeta}>Repetir só nos dias:</span>
+          <div className={styles.checkboxGroup}>
+            {WEEKDAY_TOGGLE_OPTIONS.map((opt) => (
+              <label key={opt.js}>
+                <input
+                  type="checkbox"
+                  checked={repeatWeekdays.has(opt.js)}
+                  onChange={() => toggleRepeatWeekday(opt.js)}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+          <span className={styles.rowMeta}>
+            {targetDates.length} dia(s) × {formShifts.length || 0} turno(s) selecionado(s)
+          </span>
+        </div>
+      )}
+
+      <div className={styles.form}>
         <Button
           variant="primary"
           onClick={() => void handleAdd()}
-          disabled={submitting || !formTherapistId || !formDate || formShifts.length === 0}
+          disabled={
+            submitting || !formTherapistId || !formDate || formShifts.length === 0 || targetDates.length === 0
+          }
         >
           Adicionar
         </Button>
