@@ -157,6 +157,7 @@ export interface SpaceDto {
   client_name: string | null;
   procedure_name: string | null;
   available_at: string | null;
+  occupies_at: string | null;
 }
 
 export interface AlertDto {
@@ -410,6 +411,7 @@ function toSpace(dto: SpaceDto): SpacePanelView {
     clientName: dto.client_name,
     procedureName: dto.procedure_name,
     availableAt: dto.available_at,
+    occupiesAt: dto.occupies_at,
   };
 }
 

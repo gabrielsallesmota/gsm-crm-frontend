@@ -192,6 +192,10 @@ export interface SpacePanelView {
   clientName: string | null;
   procedureName: string | null;
   availableAt: string | null;
+  /** Só preenchido quando `state === "free"` mas um atendimento já em
+   * andamento tem um trecho futuro reservado aqui (procedimento com mais
+   * de um espaço, ex.: maca agora + esta poltrona daqui a pouco). */
+  occupiesAt: string | null;
 }
 
 export interface PanelAlert {

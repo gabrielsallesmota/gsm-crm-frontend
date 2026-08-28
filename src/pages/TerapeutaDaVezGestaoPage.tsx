@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/common/Button";
 import { EmptyState } from "../components/common/EmptyState";
+import { Modal } from "../components/common/Modal";
 import { ToastHost } from "../components/common/ToastHost";
 import { ProcedureImportModal } from "../components/operations/ProcedureImportModal";
 import { TherapistImportModal } from "../components/operations/TherapistImportModal";
@@ -254,42 +255,84 @@ function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
 
 // ---- Terapeutas ---------------------------------------------------------------
 
+function TherapistFormFields({
+  form,
+  setForm,
+}: {
+  form: CreateTherapistInput;
+  setForm: (updater: (f: CreateTherapistInput) => CreateTherapistInput) => void;
+}) {
+  return (
+    <>
+      <input
+        className={styles.inputSmall}
+        placeholder="Código"
+        value={form.code}
+        onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+      />
+      <input
+        className={styles.input}
+        placeholder="Nome"
+        value={form.name}
+        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+      />
+      <label className={styles.checkboxGroup}>
+        <input
+          type="checkbox"
+          checked={form.active ?? true}
+          onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
+        />
+        Ativo
+      </label>
+    </>
+  );
+}
+
+const EMPTY_THERAPIST_FORM: CreateTherapistInput = { code: "", name: "", active: true };
+
 function TherapistsTab() {
   const { data, loading, error, reload } = useTherapists();
   const actions = useTherapistActions();
   const { toast } = useToast();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<CreateTherapistInput>({ code: "", name: "", active: true });
+  const [form, setForm] = useState<CreateTherapistInput>(EMPTY_THERAPIST_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [editing, setEditing] = useState<Therapist | null>(null);
+  const [editForm, setEditForm] = useState<CreateTherapistInput>(EMPTY_THERAPIST_FORM);
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   function startEdit(t: Therapist) {
-    setEditingId(t.id);
-    setForm({ code: t.code, name: t.name, active: t.active });
+    setEditing(t);
+    setEditForm({ code: t.code, name: t.name, active: t.active });
   }
 
-  function resetForm() {
-    setEditingId(null);
-    setForm({ code: "", name: "", active: true });
-  }
-
-  async function handleSubmit() {
+  async function handleAdd() {
     if (!form.code.trim() || !form.name.trim()) return;
     setSubmitting(true);
     try {
-      if (editingId) {
-        await actions.update(editingId, form);
-        toast("Terapeuta atualizado.");
-      } else {
-        await actions.create(form);
-        toast("Terapeuta cadastrado.");
-      }
-      resetForm();
+      await actions.create(form);
+      toast("Terapeuta cadastrado.");
+      setForm(EMPTY_THERAPIST_FORM);
       reload();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Não foi possível salvar o terapeuta.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editing || !editForm.code.trim() || !editForm.name.trim()) return;
+    setEditSubmitting(true);
+    try {
+      await actions.update(editing.id, editForm);
+      toast("Terapeuta atualizado.");
+      setEditing(null);
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível salvar o terapeuta.");
+    } finally {
+      setEditSubmitting(false);
     }
   }
 
@@ -314,34 +357,10 @@ function TherapistsTab() {
         um dia específico, use a aba Histórico.
       </p>
       <div className={styles.form}>
-        <input
-          className={styles.inputSmall}
-          placeholder="Código"
-          value={form.code}
-          onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-        />
-        <input
-          className={styles.input}
-          placeholder="Nome"
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-        />
-        <label className={styles.checkboxGroup}>
-          <input
-            type="checkbox"
-            checked={form.active ?? true}
-            onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
-          />
-          Ativo
-        </label>
-        <Button variant="primary" onClick={() => void handleSubmit()} disabled={submitting}>
-          {editingId ? "Salvar" : "Adicionar"}
+        <TherapistFormFields form={form} setForm={setForm} />
+        <Button variant="primary" onClick={() => void handleAdd()} disabled={submitting}>
+          Adicionar
         </Button>
-        {editingId && (
-          <Button variant="ghost" onClick={resetForm}>
-            Cancelar
-          </Button>
-        )}
         <Button variant="ghost" onClick={() => setImportOpen(true)}>
           Importar CSV
         </Button>
@@ -352,6 +371,22 @@ function TherapistsTab() {
           onClose={() => setImportOpen(false)}
           onImported={reload}
         />
+      )}
+
+      {editing && (
+        <Modal title={`Editar terapeuta`} onClose={() => setEditing(null)}>
+          <div className={styles.form} style={{ margin: 0 }}>
+            <TherapistFormFields form={editForm} setForm={setEditForm} />
+          </div>
+          <div className={styles.rowActions} style={{ marginTop: 16, justifyContent: "flex-end" }}>
+            <Button variant="ghost" onClick={() => setEditing(null)}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={() => void handleSaveEdit()} disabled={editSubmitting}>
+              Salvar
+            </Button>
+          </div>
+        </Modal>
       )}
 
       {error && <EmptyState title="Não foi possível carregar os terapeutas" message={error.message} />}
@@ -788,33 +823,13 @@ const EMPTY_PROCEDURE_FORM: CreateProcedureInput = {
   active: true,
 };
 
-function ProceduresTab() {
-  const { data, loading, error, reload } = useProcedures();
-  const actions = useProcedureActions();
-  const { toast } = useToast();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<CreateProcedureInput>(EMPTY_PROCEDURE_FORM);
-  const [submitting, setSubmitting] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
-
-  function startEdit(p: Procedure) {
-    setEditingId(p.id);
-    setForm({
-      code: p.code,
-      name: p.name,
-      points: p.points,
-      priceLabel: p.priceLabel,
-      spaceRequirements: p.spaceRequirements.map((r) => ({ type: r.type, minutes: r.minutes })),
-      category: p.category,
-      active: p.active,
-    });
-  }
-
-  function resetForm() {
-    setEditingId(null);
-    setForm(EMPTY_PROCEDURE_FORM);
-  }
-
+function ProcedureFormFields({
+  form,
+  setForm,
+}: {
+  form: CreateProcedureInput;
+  setForm: (updater: (f: CreateProcedureInput) => CreateProcedureInput) => void;
+}) {
   function updateRequirement(index: number, patch: Partial<SpaceRequirementInput>) {
     setForm((f) => ({
       ...f,
@@ -831,43 +846,10 @@ function ProceduresTab() {
   }
 
   const totalMinutes = form.spaceRequirements.reduce((sum, r) => sum + (r.minutes || 0), 0);
-  const requirementsValid =
-    form.spaceRequirements.length > 0 && form.spaceRequirements.every((r) => r.minutes > 0);
-
-  async function handleSubmit() {
-    if (!form.code.trim() || !form.name.trim() || !requirementsValid) return;
-    setSubmitting(true);
-    try {
-      if (editingId) {
-        await actions.update(editingId, form);
-        toast("Procedimento atualizado.");
-      } else {
-        await actions.create(form);
-        toast("Procedimento cadastrado.");
-      }
-      resetForm();
-      reload();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível salvar o procedimento.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleDelete(p: Procedure) {
-    if (!confirm(`Excluir o procedimento "${p.name}"?`)) return;
-    try {
-      await actions.delete(p.id);
-      toast("Procedimento excluído.");
-      reload();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível excluir o procedimento.");
-    }
-  }
 
   return (
-    <div>
-      <div className={styles.form}>
+    <>
+      <div className={styles.form} style={{ margin: 0, marginBottom: 12 }}>
         <input
           className={styles.inputSmall}
           placeholder="Código"
@@ -902,7 +884,7 @@ function ProceduresTab() {
         />
       </div>
 
-      <div className={styles.form} style={{ flexDirection: "column", alignItems: "stretch" }}>
+      <div className={styles.form} style={{ flexDirection: "column", alignItems: "stretch", margin: 0 }}>
         <span className={styles.rowMeta}>
           Espaços usados pelo procedimento, na ordem — um procedimento pode passar por mais de um
           espaço (ex.: 30 min numa maca e depois 15 min numa poltrona).
@@ -944,16 +926,88 @@ function ProceduresTab() {
           <span className={styles.rowMeta}>Duração total: {totalMinutes} min</span>
         </div>
       </div>
+    </>
+  );
+}
+
+function ProceduresTab() {
+  const { data, loading, error, reload } = useProcedures();
+  const actions = useProcedureActions();
+  const { toast } = useToast();
+  const [form, setForm] = useState<CreateProcedureInput>(EMPTY_PROCEDURE_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [editing, setEditing] = useState<Procedure | null>(null);
+  const [editForm, setEditForm] = useState<CreateProcedureInput>(EMPTY_PROCEDURE_FORM);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  function startEdit(p: Procedure) {
+    setEditing(p);
+    setEditForm({
+      code: p.code,
+      name: p.name,
+      points: p.points,
+      priceLabel: p.priceLabel,
+      spaceRequirements: p.spaceRequirements.map((r) => ({ type: r.type, minutes: r.minutes })),
+      category: p.category,
+      active: p.active,
+    });
+  }
+
+  const requirementsValid =
+    form.spaceRequirements.length > 0 && form.spaceRequirements.every((r) => r.minutes > 0);
+  const editRequirementsValid =
+    editForm.spaceRequirements.length > 0 && editForm.spaceRequirements.every((r) => r.minutes > 0);
+
+  async function handleAdd() {
+    if (!form.code.trim() || !form.name.trim() || !requirementsValid) return;
+    setSubmitting(true);
+    try {
+      await actions.create(form);
+      toast("Procedimento cadastrado.");
+      setForm(EMPTY_PROCEDURE_FORM);
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível salvar o procedimento.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editing || !editForm.code.trim() || !editForm.name.trim() || !editRequirementsValid) return;
+    setEditSubmitting(true);
+    try {
+      await actions.update(editing.id, editForm);
+      toast("Procedimento atualizado.");
+      setEditing(null);
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível salvar o procedimento.");
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
+
+  async function handleDelete(p: Procedure) {
+    if (!confirm(`Excluir o procedimento "${p.name}"?`)) return;
+    try {
+      await actions.delete(p.id);
+      toast("Procedimento excluído.");
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível excluir o procedimento.");
+    }
+  }
+
+  return (
+    <div>
+      <ProcedureFormFields form={form} setForm={setForm} />
 
       <div className={styles.form}>
-        <Button variant="primary" onClick={() => void handleSubmit()} disabled={submitting || !requirementsValid}>
-          {editingId ? "Salvar" : "Adicionar"}
+        <Button variant="primary" onClick={() => void handleAdd()} disabled={submitting || !requirementsValid}>
+          Adicionar
         </Button>
-        {editingId && (
-          <Button variant="ghost" onClick={resetForm}>
-            Cancelar
-          </Button>
-        )}
         <Button variant="ghost" onClick={() => setImportOpen(true)}>
           Importar CSV
         </Button>
@@ -964,6 +1018,24 @@ function ProceduresTab() {
           onClose={() => setImportOpen(false)}
           onImported={reload}
         />
+      )}
+
+      {editing && (
+        <Modal title="Editar procedimento" onClose={() => setEditing(null)}>
+          <ProcedureFormFields form={editForm} setForm={setEditForm} />
+          <div className={styles.rowActions} style={{ marginTop: 16, justifyContent: "flex-end" }}>
+            <Button variant="ghost" onClick={() => setEditing(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void handleSaveEdit()}
+              disabled={editSubmitting || !editRequirementsValid}
+            >
+              Salvar
+            </Button>
+          </div>
+        </Modal>
       )}
 
       {error && <EmptyState title="Não foi possível carregar os procedimentos" message={error.message} />}
@@ -1005,41 +1077,92 @@ function ProceduresTab() {
 
 const EMPTY_SPACE_FORM: CreateSpaceInput = { code: "", name: "", type: "maca", active: true };
 
+function SpaceFormFields({
+  form,
+  setForm,
+}: {
+  form: CreateSpaceInput;
+  setForm: (updater: (f: CreateSpaceInput) => CreateSpaceInput) => void;
+}) {
+  return (
+    <>
+      <input
+        className={styles.inputSmall}
+        placeholder="Código"
+        value={form.code}
+        onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+      />
+      <input
+        className={styles.input}
+        placeholder="Nome (ex: Maca 01)"
+        value={form.name}
+        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+      />
+      <select
+        className={styles.select}
+        value={form.type}
+        onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as SpaceType }))}
+      >
+        {SPACE_TYPE_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      <label className={styles.checkboxGroup}>
+        <input
+          type="checkbox"
+          checked={form.active ?? true}
+          onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
+        />
+        Ativo
+      </label>
+    </>
+  );
+}
+
 function SpacesTab() {
   const { data, loading, error, reload } = useSpaces();
   const actions = useSpaceActions();
   const { toast } = useToast();
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateSpaceInput>(EMPTY_SPACE_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [editing, setEditing] = useState<SpaceAdmin | null>(null);
+  const [editForm, setEditForm] = useState<CreateSpaceInput>(EMPTY_SPACE_FORM);
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   function startEdit(s: SpaceAdmin) {
-    setEditingId(s.id);
-    setForm({ code: s.code, name: s.name, type: s.type, active: s.active });
+    setEditing(s);
+    setEditForm({ code: s.code, name: s.name, type: s.type, active: s.active });
   }
 
-  function resetForm() {
-    setEditingId(null);
-    setForm(EMPTY_SPACE_FORM);
-  }
-
-  async function handleSubmit() {
+  async function handleAdd() {
     if (!form.code.trim() || !form.name.trim()) return;
     setSubmitting(true);
     try {
-      if (editingId) {
-        await actions.update(editingId, form);
-        toast("Espaço atualizado.");
-      } else {
-        await actions.create(form);
-        toast("Espaço cadastrado.");
-      }
-      resetForm();
+      await actions.create(form);
+      toast("Espaço cadastrado.");
+      setForm(EMPTY_SPACE_FORM);
       reload();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Não foi possível salvar o espaço.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editing || !editForm.code.trim() || !editForm.name.trim()) return;
+    setEditSubmitting(true);
+    try {
+      await actions.update(editing.id, editForm);
+      toast("Espaço atualizado.");
+      setEditing(null);
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível salvar o espaço.");
+    } finally {
+      setEditSubmitting(false);
     }
   }
 
@@ -1057,46 +1180,27 @@ function SpacesTab() {
   return (
     <div>
       <div className={styles.form}>
-        <input
-          className={styles.inputSmall}
-          placeholder="Código"
-          value={form.code}
-          onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-        />
-        <input
-          className={styles.input}
-          placeholder="Nome (ex: Maca 01)"
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-        />
-        <select
-          className={styles.select}
-          value={form.type}
-          onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as SpaceType }))}
-        >
-          {SPACE_TYPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <label className={styles.checkboxGroup}>
-          <input
-            type="checkbox"
-            checked={form.active ?? true}
-            onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
-          />
-          Ativo
-        </label>
-        <Button variant="primary" onClick={() => void handleSubmit()} disabled={submitting}>
-          {editingId ? "Salvar" : "Adicionar"}
+        <SpaceFormFields form={form} setForm={setForm} />
+        <Button variant="primary" onClick={() => void handleAdd()} disabled={submitting}>
+          Adicionar
         </Button>
-        {editingId && (
-          <Button variant="ghost" onClick={resetForm}>
-            Cancelar
-          </Button>
-        )}
       </div>
+
+      {editing && (
+        <Modal title="Editar espaço" onClose={() => setEditing(null)}>
+          <div className={styles.form} style={{ margin: 0 }}>
+            <SpaceFormFields form={editForm} setForm={setEditForm} />
+          </div>
+          <div className={styles.rowActions} style={{ marginTop: 16, justifyContent: "flex-end" }}>
+            <Button variant="ghost" onClick={() => setEditing(null)}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={() => void handleSaveEdit()} disabled={editSubmitting}>
+              Salvar
+            </Button>
+          </div>
+        </Modal>
+      )}
 
       {error && <EmptyState title="Não foi possível carregar os espaços" message={error.message} />}
       {loading && !data && <div className={styles.loading}>Carregando…</div>}

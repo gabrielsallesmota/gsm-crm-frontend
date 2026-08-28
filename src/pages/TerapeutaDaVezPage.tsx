@@ -606,7 +606,14 @@ function SpacesSection({ spaces, now }: { spaces: SpacePanelView[]; now: Date })
                 {SPACE_STATUS_LABEL[s.state]}
               </span>
             </div>
-            {s.state === "free" && <span className={styles.spaceCardLine}>Pronto para uso</span>}
+            {s.state === "free" && !s.occupiesAt && (
+              <span className={styles.spaceCardLine}>Pronto para uso</span>
+            )}
+            {s.state === "free" && s.occupiesAt && (
+              <span className={styles.spaceCardLine} style={{ color: "#C9A44C" }}>
+                Ocupada em {remainingMinutes(s.occupiesAt, now)} min
+              </span>
+            )}
             {s.state === "occupied" && (
               <span className={styles.spaceCardLine}>
                 {s.procedureName} · {s.therapistName} · libera às {formatHM(s.availableAt)} (faltam {remainingMinutes(s.availableAt, now)} min)
