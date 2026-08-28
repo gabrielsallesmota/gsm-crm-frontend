@@ -2,29 +2,45 @@ import { ApiError } from "../../types/common";
 import { BASE_URL } from "./ApiClient";
 import { getOperationsPassword } from "./operationsAuth";
 import {
+  toBusinessHoursEntry,
   toClient,
   toHistoryPage,
+  toImportSummary,
   toProcedure,
+  toScheduleEntry,
   toSpaceAdmin,
   toTherapist,
+  toTherapistDailyPoints,
   toTherapistPoints,
+  type BusinessHoursEntryDto,
   type ClientDto,
   type HistoryPageDto,
+  type ImportSummaryDto,
   type ProcedureDto,
+  type ScheduleEntryDto,
   type SpaceAdminDto,
+  type TherapistDailyPointsDto,
   type TherapistDto,
   type TherapistPointsDto,
 } from "./operationsMapping";
 import type {
+  BusinessHoursEntry,
   CreateProcedureInput,
+  CreateScheduleEntryInput,
   CreateSpaceInput,
   CreateTherapistInput,
+  DedupeStrategy,
   HistoryFilter,
   HistoryPage,
+  ImportSummary,
   OperationsClient,
   Procedure,
+  ProcedureImportRowInput,
+  ScheduleEntry,
   SpaceAdmin,
   Therapist,
+  TherapistDailyPoints,
+  TherapistImportRowInput,
   TherapistPoints,
   UpdateProcedureInput,
   UpdateSpaceInput,
@@ -107,6 +123,19 @@ export class OperationsApiRepository {
     return operationsRequest<void>(`${BASE}/therapists/${id}`, { method: "DELETE" });
   }
 
+  bulkImportTherapists(
+    rows: TherapistImportRowInput[],
+    dedupeStrategy: DedupeStrategy,
+  ): Promise<ImportSummary> {
+    return operationsRequest<ImportSummaryDto>(`${BASE}/therapists/bulk-import`, {
+      method: "POST",
+      body: JSON.stringify({
+        dedupe_strategy: dedupeStrategy,
+        rows: rows.map((r) => ({ code: r.code, name: r.name, active: r.active ?? true })),
+      }),
+    }).then(toImportSummary);
+  }
+
   getTherapistPoints(id: string, isoDate: string): Promise<TherapistPoints> {
     return operationsRequest<TherapistPointsDto>(
       `${BASE}/therapists/${id}/points?on_date=${isoDate}`,
@@ -135,6 +164,28 @@ export class OperationsApiRepository {
 
   deleteProcedure(id: string): Promise<void> {
     return operationsRequest<void>(`${BASE}/procedures/${id}`, { method: "DELETE" });
+  }
+
+  bulkImportProcedures(
+    rows: ProcedureImportRowInput[],
+    dedupeStrategy: DedupeStrategy,
+  ): Promise<ImportSummary> {
+    return operationsRequest<ImportSummaryDto>(`${BASE}/procedures/bulk-import`, {
+      method: "POST",
+      body: JSON.stringify({
+        dedupe_strategy: dedupeStrategy,
+        rows: rows.map((r) => ({
+          code: r.code,
+          name: r.name,
+          points: r.points ?? 0,
+          price_label: r.priceLabel ?? "",
+          space_type: r.spaceType ?? "maca",
+          space_minutes: r.spaceMinutes ?? 30,
+          category: r.category ?? "",
+          active: r.active ?? true,
+        })),
+      }),
+    }).then(toImportSummary);
   }
 
   listSpaces(onlyActive = false): Promise<SpaceAdmin[]> {
@@ -171,6 +222,55 @@ export class OperationsApiRepository {
       method: "POST",
       body: JSON.stringify({ name, phone }),
     }).then(toClient);
+  }
+
+  listPointsByDay(isoDate: string): Promise<TherapistDailyPoints[]> {
+    return operationsRequest<TherapistDailyPointsDto[]>(
+      `${BASE}/points-by-day?on_date=${isoDate}`,
+    ).then((items) => items.map(toTherapistDailyPoints));
+  }
+
+  getBusinessHours(): Promise<BusinessHoursEntry[]> {
+    return operationsRequest<BusinessHoursEntryDto[]>(`${BASE}/business-hours`).then((items) =>
+      items.map(toBusinessHoursEntry),
+    );
+  }
+
+  updateBusinessHours(days: BusinessHoursEntry[]): Promise<BusinessHoursEntry[]> {
+    return operationsRequest<BusinessHoursEntryDto[]>(`${BASE}/business-hours`, {
+      method: "PUT",
+      body: JSON.stringify({
+        days: days.map((d) => ({
+          weekday: d.weekday,
+          closed: d.closed,
+          opens_at: d.opensAt,
+          closes_at: d.closesAt,
+        })),
+      }),
+    }).then((items) => items.map(toBusinessHoursEntry));
+  }
+
+  listSchedule(dateFrom: string, dateTo: string, therapistId?: string): Promise<ScheduleEntry[]> {
+    const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+    if (therapistId) params.set("therapist_id", therapistId);
+    return operationsRequest<ScheduleEntryDto[]>(`${BASE}/schedule?${params.toString()}`).then(
+      (items) => items.map(toScheduleEntry),
+    );
+  }
+
+  createScheduleEntry(input: CreateScheduleEntryInput): Promise<ScheduleEntry> {
+    return operationsRequest<ScheduleEntryDto>(`${BASE}/schedule`, {
+      method: "POST",
+      body: JSON.stringify({
+        therapist_id: input.therapistId,
+        date: input.date,
+        shift: input.shift,
+      }),
+    }).then(toScheduleEntry);
+  }
+
+  deleteScheduleEntry(id: string): Promise<void> {
+    return operationsRequest<void>(`${BASE}/schedule/${id}`, { method: "DELETE" });
   }
 
   async listHistory(filter: HistoryFilter): Promise<HistoryPage> {

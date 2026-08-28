@@ -9,18 +9,23 @@ import type {
   AbsentTherapist,
   AttendanceAction,
   AttendanceRecord,
+  BusinessHoursEntry,
   HistoryPage,
+  ImportRowResult,
+  ImportSummary,
   OperationsClient,
   PanelAlert,
   PanelState,
   Procedure,
   ProcedureOption,
   QueueEntry,
+  ScheduleEntry,
   SpaceAdmin,
   SpacePanelView,
   SpaceRequirement,
   Therapist,
   TherapistAction,
+  TherapistDailyPoints,
   TherapistPoints,
 } from "../../types/operations";
 
@@ -52,6 +57,33 @@ export interface AbsentTherapistDto {
   code: string;
   name: string;
   available_shifts: string[];
+}
+
+export interface ScheduleEntryDto {
+  id: string;
+  therapist_id: string;
+  therapist_name: string;
+  date: string;
+  shift: string;
+  shift_label: string;
+}
+
+export interface TherapistDailyPointsDto {
+  therapist_id: string;
+  code: string;
+  name: string;
+  points_manha: number;
+  points_noturno: number;
+  points_total: number;
+}
+
+export interface BusinessHoursEntryDto {
+  weekday: number;
+  weekday_label: string;
+  closed: boolean;
+  opens_at: number | null;
+  closes_at: number | null;
+  label: string;
 }
 
 export interface SpaceRequirementDto {
@@ -167,6 +199,8 @@ export interface PanelStateDto {
   recent_history: HistoryEntryDto[];
   procedure_groups: Record<string, ProcedureOptionDto[]>;
   client_suggestions: string[];
+  store_open: boolean;
+  next_open_at: string | null;
 }
 
 export interface AttendanceDto {
@@ -201,6 +235,38 @@ export interface HistoryPageDto {
   page_size: number;
 }
 
+export interface ImportRowResultDto {
+  row_index: number;
+  outcome: string;
+  name: string;
+  detail: string | null;
+}
+
+export interface ImportSummaryDto {
+  total: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  rows: ImportRowResultDto[];
+}
+
+export function toImportSummary(dto: ImportSummaryDto): ImportSummary {
+  return {
+    total: dto.total,
+    created: dto.created,
+    updated: dto.updated,
+    skipped: dto.skipped,
+    errors: dto.errors,
+    rows: dto.rows.map((r) => ({
+      rowIndex: r.row_index,
+      outcome: r.outcome as ImportRowResult["outcome"],
+      name: r.name,
+      detail: r.detail,
+    })),
+  };
+}
+
 export function toTherapist(dto: TherapistDto): Therapist {
   return {
     id: dto.id,
@@ -230,6 +296,39 @@ function toAbsentTherapist(dto: AbsentTherapistDto): AbsentTherapist {
     code: dto.code,
     name: dto.name,
     availableShifts: dto.available_shifts as AbsentTherapist["availableShifts"],
+  };
+}
+
+export function toScheduleEntry(dto: ScheduleEntryDto): ScheduleEntry {
+  return {
+    id: dto.id,
+    therapistId: dto.therapist_id,
+    therapistName: dto.therapist_name,
+    date: dto.date,
+    shift: dto.shift as ScheduleEntry["shift"],
+    shiftLabel: dto.shift_label,
+  };
+}
+
+export function toTherapistDailyPoints(dto: TherapistDailyPointsDto): TherapistDailyPoints {
+  return {
+    therapistId: dto.therapist_id,
+    code: dto.code,
+    name: dto.name,
+    pointsManha: dto.points_manha,
+    pointsNoturno: dto.points_noturno,
+    pointsTotal: dto.points_total,
+  };
+}
+
+export function toBusinessHoursEntry(dto: BusinessHoursEntryDto): BusinessHoursEntry {
+  return {
+    weekday: dto.weekday,
+    weekdayLabel: dto.weekday_label,
+    closed: dto.closed,
+    opensAt: dto.opens_at,
+    closesAt: dto.closes_at,
+    label: dto.label,
   };
 }
 
@@ -354,6 +453,8 @@ export function toPanelState(dto: PanelStateDto): PanelState {
     recentHistory: dto.recent_history,
     procedureGroups: groups,
     clientSuggestions: dto.client_suggestions,
+    storeOpen: dto.store_open,
+    nextOpenAt: dto.next_open_at,
   };
 }
 

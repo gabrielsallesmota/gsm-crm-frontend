@@ -73,7 +73,7 @@ function buildShiftChips(queue: QueueEntry[]): ShiftChip[] {
 }
 
 export function TerapeutaDaVezPage() {
-  const { state, loading, error, now, call, decline, start, finish, checkIn, checkOut } =
+  const { state, loading, error, now, call, decline, start, finish, checkIn } =
     useTerapeutaDaVezPanel();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -173,15 +173,17 @@ export function TerapeutaDaVezPage() {
     }
   }
 
-  async function finishTherapy(entry: QueueEntry) {
+  // Terminando com folga considerável antes do previsto (cliente saiu mais
+  // cedo, sessão interrompida etc.) — pergunta se conta os pontos do
+  // procedimento pro terapeuta. Nos últimos 10 min do previsto (ou no prazo,
+  // ou atrasado) conta normal sem perguntar — é tempo curto demais pra valer
+  // a pena interromper a recepção com uma pergunta.
+  const EARLY_FINISH_GRACE_MINUTES = 10;
+
+  const [pointsConfirmTarget, setPointsConfirmTarget] = useState<QueueEntry | null>(null);
+
+  async function doFinish(entry: QueueEntry, awardPoints: boolean) {
     if (!entry.attendanceId) return;
-    // Terminando antes do previsto (cliente saiu mais cedo, sessão
-    // interrompida etc.) — pergunta se conta os pontos do procedimento pro
-    // terapeuta; no prazo ou atrasado, conta normal sem perguntar.
-    const early = !!entry.plannedEndAt && new Date(entry.plannedEndAt).getTime() > now.getTime();
-    const awardPoints = early
-      ? confirm(`${entry.name} ainda não chegou no horário previsto de término. Contabilizar pontos?`)
-      : true;
     try {
       await finish(entry.attendanceId, awardPoints);
       showToast(
@@ -191,21 +193,38 @@ export function TerapeutaDaVezPage() {
       );
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Não foi possível finalizar o atendimento.");
+    } finally {
+      setPointsConfirmTarget(null);
     }
   }
 
-  // ---- Entrada / Saída -------------------------------------------------------
-  // Quando o turno é ambíguo agora (14h–16h: manhã e interturno abertos ao
-  // mesmo tempo), pergunta pra recepção em vez de adivinhar.
+  function finishTherapy(entry: QueueEntry) {
+    if (!entry.attendanceId) return;
+    const minutesRemaining = remainingMinutes(entry.plannedEndAt, now) ?? 0;
+    if (minutesRemaining > EARLY_FINISH_GRACE_MINUTES) {
+      setPointsConfirmTarget(entry);
+      return;
+    }
+    void doFinish(entry, true);
+  }
+
+  // ---- Iniciar turno -------------------------------------------------------
+  // Sem Saída manual (questão trabalhista: terapeutas são PJ) — a presença
+  // termina sozinha quando a janela do turno passa. "Iniciar turno" só
+  // aparece pros turnos que a escala de hoje (cadastrada na gestão) coloca
+  // pra aquele terapeuta E que já estão na janela de horário agora
+  // (`AbsentTherapist.availableShifts`, calculado pelo backend). Quando há
+  // mais de um turno escalado aberto ao mesmo tempo (14h–16h: manhã e
+  // interturno), pergunta pra recepção em vez de adivinhar.
   const [shiftPickTarget, setShiftPickTarget] = useState<AbsentTherapist | null>(null);
 
   async function doCheckIn(therapist: AbsentTherapist, shift?: Shift) {
     try {
       await checkIn(therapist.id, shift);
-      showToast(`${therapist.name}: entrada registrada.`);
+      showToast(`${therapist.name}: turno iniciado.`);
       setShiftPickTarget(null);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Não foi possível registrar a entrada.");
+      showToast(err instanceof Error ? err.message : "Não foi possível iniciar o turno.");
     }
   }
 
@@ -218,16 +237,7 @@ export function TerapeutaDaVezPage() {
       void doCheckIn(therapist, therapist.availableShifts[0]);
       return;
     }
-    showToast(`${therapist.name}: nenhum turno está aberto agora.`);
-  }
-
-  async function requestCheckOut(entry: QueueEntry) {
-    try {
-      await checkOut(entry.therapistId);
-      showToast(`${entry.name}: saída registrada.`);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Não foi possível registrar a saída.");
-    }
+    showToast(`${therapist.name}: nenhum turno escalado está aberto agora.`);
   }
 
   if (loading && !state) {
@@ -247,6 +257,10 @@ export function TerapeutaDaVezPage() {
   }
 
   if (!state) return null;
+
+  if (!state.storeOpen) {
+    return <StoreClosedScreen now={now} nextOpenAt={state.nextOpenAt} />;
+  }
 
   const nextIdle = state.queue.find((e) => e.status === "idle") ?? null;
   const shiftChips = buildShiftChips(state.queue);
@@ -284,9 +298,6 @@ export function TerapeutaDaVezPage() {
                       <button type="button" className={styles.smallBtn} onClick={() => { setCallTarget(entry); setCallForm({ clientName: "", phone: "" }); }}>
                         Chamar
                       </button>
-                      <button type="button" className={styles.ghostBtn} onClick={() => void requestCheckOut(entry)}>
-                        Saída
-                      </button>
                     </>
                   )}
                   {entry.status === "reception" && (
@@ -297,7 +308,7 @@ export function TerapeutaDaVezPage() {
                   {entry.status === "therapy" && (
                     <>
                       <span className={styles.queueMeta}>restam {remainingMinutes(entry.plannedEndAt, now)} min</span>
-                      <button type="button" className={styles.smallBtn} onClick={() => void finishTherapy(entry)}>
+                      <button type="button" className={styles.smallBtn} onClick={() => finishTherapy(entry)}>
                         Finalizar
                       </button>
                     </>
@@ -352,6 +363,43 @@ export function TerapeutaDaVezPage() {
           onCancel={() => setShiftPickTarget(null)}
           onPick={(shift) => void doCheckIn(shiftPickTarget, shift)}
         />
+      )}
+
+      {pointsConfirmTarget && (
+        <PointsConfirmModal
+          entry={pointsConfirmTarget}
+          onCancel={() => setPointsConfirmTarget(null)}
+          onAnswer={(awardPoints) => void doFinish(pointsConfirmTarget, awardPoints)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---- Loja fechada -------------------------------------------------------------
+
+function StoreClosedScreen({ now, nextOpenAt }: { now: Date; nextOpenAt: string | null }) {
+  const opensLabel = nextOpenAt
+    ? new Date(nextOpenAt).toLocaleString("pt-BR", {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
+  return (
+    <div className={styles.page} style={{ alignItems: "center", justifyContent: "center", gap: 18, textAlign: "center", padding: 24 }}>
+      <div className={styles.headerClockValue} style={{ color: "#012A2A" }}>
+        {formatClock(now)}
+      </div>
+      <div className={styles.heroTag} style={{ color: "#5A5A5A" }}>
+        <span className={styles.dot} style={{ background: "#C0453A" }} />
+        LOJA FECHADA
+      </div>
+      {opensLabel && (
+        <div style={{ fontSize: 14, color: "#5A5A5A" }}>Abre {opensLabel}</div>
       )}
     </div>
   );
@@ -460,17 +508,17 @@ function Sidebar({ state, onCheckIn }: { state: PanelState; onCheckIn: (t: Absen
       <div className={styles.sidebarBlock}>
         <span className={styles.sidebarTitle}>Ausentes</span>
         {state.absent.length === 0 && (
-          <div className={styles.sidebarLine}>Todos os terapeutas ativos já deram entrada.</div>
+          <div className={styles.sidebarLine}>Todos os terapeutas escalados já iniciaram o turno.</div>
         )}
         {state.absent.map((t) => (
           <div key={t.id} className={styles.sidebarLine} style={{ alignItems: "center" }}>
             <span>{t.name}</span>
             {t.availableShifts.length > 0 ? (
               <button type="button" className={styles.smallBtn} onClick={() => onCheckIn(t)}>
-                Entrada
+                Iniciar turno
               </button>
             ) : (
-              <span style={{ fontSize: 10.5 }}>Nenhum turno aberto</span>
+              <span style={{ fontSize: 10.5 }}>Sem turno escalado agora</span>
             )}
           </div>
         ))}
@@ -655,9 +703,9 @@ function ShiftPickModal({
     <div className={styles.overlay}>
       <div className={styles.modal}>
         <div>
-          <div className={styles.modalEyebrow}>ENTRADA · MAIS DE UM TURNO ABERTO AGORA</div>
+          <div className={styles.modalEyebrow}>INICIAR TURNO · MAIS DE UM TURNO ABERTO AGORA</div>
           <div className={styles.modalTitle}>{therapist.name}</div>
-          <div className={styles.modalSub}>Em qual turno a entrada deve contar?</div>
+          <div className={styles.modalSub}>Em qual turno iniciar?</div>
         </div>
         <div className={styles.modalDivider} />
         <div className={styles.modalActions} style={{ flexDirection: "column" }}>
@@ -676,6 +724,58 @@ function ShiftPickModal({
         <button type="button" className={styles.ghostBtn} onClick={onCancel}>
           Cancelar
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ---- Modal: contabilizar pontos ao finalizar bem antes do previsto ------------------
+
+function PointsConfirmModal({
+  entry,
+  onCancel,
+  onAnswer,
+}: {
+  entry: QueueEntry;
+  onCancel: () => void;
+  onAnswer: (awardPoints: boolean) => void;
+}) {
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
+        <div>
+          <div className={styles.modalEyebrow}>FINALIZAR ANTES DO PREVISTO</div>
+          <div className={styles.modalTitle}>Contabilizar pontos para {entry.name}?</div>
+          <div className={styles.modalSub}>
+            {entry.clientName ?? "Cliente"} ainda não chegou no horário previsto de término.
+          </div>
+        </div>
+        <div className={styles.modalDivider} />
+        <div className={styles.heroHint}>
+          Se o cliente concluiu o procedimento normalmente, contabilize. Se o atendimento foi
+          interrompido antes do fim (cliente desistiu, saiu mais cedo etc.), não contabilize.
+        </div>
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.ghostBtn} onClick={onCancel} style={{ flex: 1 }}>
+            Voltar
+          </button>
+          <button
+            type="button"
+            className={styles.ghostBtn}
+            style={{ flex: 1, borderColor: "#C0453A", color: "#C0453A" }}
+            onClick={() => onAnswer(false)}
+          >
+            Não
+          </button>
+          <button
+            type="button"
+            className={styles.smallBtn}
+            style={{ flex: 1, padding: "14px 12px" }}
+            onClick={() => onAnswer(true)}
+          >
+            Sim, contabilizar
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/common/Button";
 import { EmptyState } from "../components/common/EmptyState";
+import { ProcedureImportModal } from "../components/operations/ProcedureImportModal";
+import { TherapistImportModal } from "../components/operations/TherapistImportModal";
+import { useAsyncResource } from "../hooks/useAsyncResource";
 import { useAttendanceHistory } from "../hooks/useAttendanceHistory";
 import { useOperationsClients } from "../hooks/useOperationsClients";
 import { useProcedureActions } from "../hooks/useProcedureActions";
@@ -14,10 +17,13 @@ import { operationsApiRepository } from "../repositories/api/OperationsApiReposi
 import { getOperationsPassword, setOperationsPassword } from "../repositories/api/operationsAuth";
 import type {
   AttendancePhase,
+  BusinessHoursEntry,
   CreateProcedureInput,
   CreateSpaceInput,
   CreateTherapistInput,
   Procedure,
+  ScheduleEntry,
+  Shift,
   SpaceAdmin,
   SpaceRequirementInput,
   SpaceType,
@@ -38,11 +44,46 @@ const PHASE_LABELS: Record<string, string> = {
   therapy: "Terapia",
 };
 
-type Tab = "terapeutas" | "procedimentos" | "espacos" | "clientes" | "historico";
+type Tab =
+  | "terapeutas"
+  | "escala"
+  | "horario"
+  | "procedimentos"
+  | "espacos"
+  | "clientes"
+  | "historico";
+
+const SHIFT_OPTIONS: { value: Shift; label: string }[] = [
+  { value: "manha", label: "Manhã (10h–16h)" },
+  { value: "inter", label: "Interturno (14h–20h)" },
+  { value: "noturno", label: "Noturno (16h–22h)" },
+];
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+/** Máscara de moeda: cada dígito digitado entra como centavo, sempre
+ * formatado como "R$ 1.234,56" — nunca deixa o campo sair do padrão (não
+ * dá pra digitar texto livre nem apagar só o "R$"). Extrai os dígitos do
+ * valor JÁ editado pelo campo (inclui backspace) e reformata do zero, então
+ * apagar o último caractere remove o último dígito do valor, não da máscara. */
+function formatPriceInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  const cents = Number(digits);
+  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 /**
@@ -61,7 +102,8 @@ export function TerapeutaDaVezGestaoPage() {
         <div>
           <h1 className={styles.pageTitle}>Terapeuta da Vez</h1>
           <p className={styles.pageSubtitle}>
-            Cadastro de terapeutas e procedimentos, clientes e histórico de atendimentos do painel de fila.
+            Cadastro de terapeutas, escala, procedimentos, clientes e histórico de atendimentos do
+            painel de fila.
           </p>
         </div>
         <button
@@ -90,6 +132,8 @@ function GestaoTabs() {
         {(
           [
             ["terapeutas", "Terapeutas"],
+            ["escala", "Escala"],
+            ["horario", "Horário"],
             ["procedimentos", "Procedimentos"],
             ["espacos", "Espaços"],
             ["clientes", "Clientes"],
@@ -108,6 +152,8 @@ function GestaoTabs() {
       </div>
 
       {tab === "terapeutas" && <TherapistsTab />}
+      {tab === "escala" && <ScheduleTab />}
+      {tab === "horario" && <BusinessHoursTab />}
       {tab === "procedimentos" && <ProceduresTab />}
       {tab === "espacos" && <SpacesTab />}
       {tab === "clientes" && <ClientsTab />}
@@ -173,6 +219,7 @@ function TherapistsTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateTherapistInput>({ code: "", name: "", active: true });
   const [submitting, setSubmitting] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   function startEdit(t: Therapist) {
     setEditingId(t.id);
@@ -218,10 +265,11 @@ function TherapistsTab() {
   return (
     <div>
       <p className={styles.rowMeta} style={{ marginBottom: 10 }}>
-        Turno e pontuação não são cadastrados aqui — cada terapeuta dá Entrada/Saída e escolhe o
-        turno diretamente na tela do painel (<code>/terapeuta-da-vez</code>), porque a escala muda
-        dia a dia (folgas etc.). Para consultar o saldo de pontos de um dia específico, use a aba
-        Histórico.
+        Turno e pontuação não são cadastrados aqui — o turno de cada dia é definido na aba{" "}
+        <b>Escala</b>, e o terapeuta aperta "Iniciar turno" no painel (<code>/terapeuta-da-vez</code>)
+        quando chega. Não existe mais Entrada/Saída livre nem botão de Saída (terapeutas são PJ) — a
+        presença termina sozinha quando a janela do turno passa. Para consultar o saldo de pontos de
+        um dia específico, use a aba Histórico.
       </p>
       <div className={styles.form}>
         <input
@@ -252,7 +300,17 @@ function TherapistsTab() {
             Cancelar
           </Button>
         )}
+        <Button variant="ghost" onClick={() => setImportOpen(true)}>
+          Importar CSV
+        </Button>
       </div>
+
+      {importOpen && (
+        <TherapistImportModal
+          onClose={() => setImportOpen(false)}
+          onImported={reload}
+        />
+      )}
 
       {error && <EmptyState title="Não foi possível carregar os terapeutas" message={error.message} />}
       {loading && !data && <div className={styles.loading}>Carregando…</div>}
@@ -292,6 +350,308 @@ function TherapistsTab() {
   );
 }
 
+// ---- Escala -----------------------------------------------------------------------
+// Substitui Entrada/Saída livre (questão trabalhista: terapeutas são PJ) —
+// quem trabalha quando é cadastrado aqui, dia por dia (nunca um padrão
+// semanal fixo: "amanhã manhã e interturno, depois de amanhã só à noite").
+
+function ScheduleTab() {
+  const { data: therapists } = useTherapists();
+  const { toast } = useToast();
+
+  const [rangeFrom, setRangeFrom] = useState(() => todayIso());
+  const [rangeTo, setRangeTo] = useState(() => addDaysIso(todayIso(), 13));
+  const [filterTherapistId, setFilterTherapistId] = useState("");
+
+  const { data, loading, error, reload } = useAsyncResource(
+    () => operationsApiRepository.listSchedule(rangeFrom, rangeTo, filterTherapistId || undefined),
+    [rangeFrom, rangeTo, filterTherapistId],
+  );
+
+  const [formTherapistId, setFormTherapistId] = useState("");
+  const [formDate, setFormDate] = useState(() => todayIso());
+  const [formShifts, setFormShifts] = useState<Shift[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  function toggleFormShift(shift: Shift) {
+    setFormShifts((prev) =>
+      prev.includes(shift) ? prev.filter((s) => s !== shift) : [...prev, shift],
+    );
+  }
+
+  async function handleAdd() {
+    if (!formTherapistId || !formDate || formShifts.length === 0) return;
+    setSubmitting(true);
+    try {
+      for (const shift of formShifts) {
+        await operationsApiRepository.createScheduleEntry({
+          therapistId: formTherapistId,
+          date: formDate,
+          shift,
+        });
+      }
+      toast("Escala cadastrada.");
+      setFormShifts([]);
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível cadastrar a escala.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDelete(entryId: string) {
+    try {
+      await operationsApiRepository.deleteScheduleEntry(entryId);
+      toast("Escala removida.");
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível remover a escala.");
+    }
+  }
+
+  const grouped = useMemo(() => {
+    const byDate = new Map<string, ScheduleEntry[]>();
+    for (const entry of data ?? []) {
+      const list = byDate.get(entry.date) ?? [];
+      list.push(entry);
+      byDate.set(entry.date, list);
+    }
+    return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [data]);
+
+  return (
+    <div>
+      <p className={styles.rowMeta} style={{ marginBottom: 10 }}>
+        Cadastre por dia específico quem trabalha e em qual turno — não é um padrão fixo semanal,
+        cada dia é registrado à parte (ex.: amanhã manhã e interturno, depois de amanhã só à noite).
+        O painel só oferece "Iniciar turno" pros turnos escalados aqui que já estiverem na janela de
+        horário.
+      </p>
+
+      <div className={styles.form}>
+        <select
+          className={styles.select}
+          value={formTherapistId}
+          onChange={(e) => setFormTherapistId(e.target.value)}
+        >
+          <option value="">Terapeuta…</option>
+          {(therapists ?? []).map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <input
+          className={styles.inputSmall}
+          type="date"
+          value={formDate}
+          onChange={(e) => setFormDate(e.target.value)}
+        />
+        <div className={styles.checkboxGroup}>
+          {SHIFT_OPTIONS.map((opt) => (
+            <label key={opt.value}>
+              <input
+                type="checkbox"
+                checked={formShifts.includes(opt.value)}
+                onChange={() => toggleFormShift(opt.value)}
+              />
+              {opt.label}
+            </label>
+          ))}
+        </div>
+        <Button
+          variant="primary"
+          onClick={() => void handleAdd()}
+          disabled={submitting || !formTherapistId || !formDate || formShifts.length === 0}
+        >
+          Adicionar
+        </Button>
+      </div>
+
+      <div className={styles.filters}>
+        <select
+          className={styles.select}
+          value={filterTherapistId}
+          onChange={(e) => setFilterTherapistId(e.target.value)}
+        >
+          <option value="">Todos os terapeutas</option>
+          {(therapists ?? []).map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <input
+          className={styles.inputSmall}
+          type="date"
+          value={rangeFrom}
+          onChange={(e) => setRangeFrom(e.target.value)}
+        />
+        <input
+          className={styles.inputSmall}
+          type="date"
+          value={rangeTo}
+          onChange={(e) => setRangeTo(e.target.value)}
+        />
+      </div>
+
+      {error && <EmptyState title="Não foi possível carregar a escala" message={error.message} />}
+      {loading && !data && <div className={styles.loading}>Carregando…</div>}
+
+      {data && (
+        <div className={styles.list}>
+          {grouped.map(([date, entries]) => (
+            <div key={date} className={styles.row} style={{ alignItems: "flex-start" }}>
+              <div className={styles.rowMain}>
+                <span className={styles.rowName}>
+                  {new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", {
+                    weekday: "short",
+                    day: "2-digit",
+                    month: "2-digit",
+                  })}
+                </span>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                  {entries.map((entry) => (
+                    <span key={entry.id} className={styles.phaseBadge} style={{ display: "inline-flex", gap: 6, alignItems: "center", background: "var(--card-bg-alt)" }}>
+                      {entry.therapistName} · {entry.shiftLabel}
+                      <button
+                        type="button"
+                        className={styles.dangerBtn}
+                        style={{ padding: 0 }}
+                        onClick={() => void handleDelete(entry.id)}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+          {grouped.length === 0 && (
+            <div className={styles.row}>Nenhuma escala cadastrada nesse período.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Horário de funcionamento ------------------------------------------------------
+// Regra de negócio própria, separada dos turnos: mesmo dentro da janela de
+// um turno, a loja pode estar fechada (dia inteiro ou fora de um
+// intervalo). Edita a semana inteira de uma vez (7 linhas fixas).
+
+function minutesToTime(m: number | null): string {
+  if (m == null) return "";
+  const h = Math.floor(m / 60)
+    .toString()
+    .padStart(2, "0");
+  const mm = (m % 60).toString().padStart(2, "0");
+  return `${h}:${mm}`;
+}
+
+function timeToMinutes(t: string): number | null {
+  if (!t) return null;
+  const parts = t.split(":");
+  const h = Number(parts[0] ?? 0);
+  const m = Number(parts[1] ?? 0);
+  return h * 60 + m;
+}
+
+function BusinessHoursTab() {
+  const { data, loading, error, reload } = useAsyncResource(
+    () => operationsApiRepository.getBusinessHours(),
+    [],
+  );
+  const { toast } = useToast();
+  const [days, setDays] = useState<BusinessHoursEntry[] | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (data) setDays(data);
+  }, [data]);
+
+  function updateDay(weekday: number, patch: Partial<BusinessHoursEntry>) {
+    setDays((prev) =>
+      prev ? prev.map((d) => (d.weekday === weekday ? { ...d, ...patch } : d)) : prev,
+    );
+  }
+
+  async function handleSave() {
+    if (!days) return;
+    setSubmitting(true);
+    try {
+      const updated = await operationsApiRepository.updateBusinessHours(days);
+      setDays(updated);
+      toast("Horário de funcionamento salvo.");
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível salvar o horário.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className={styles.rowMeta} style={{ marginBottom: 10 }}>
+        Dias e horários em que a loja está aberta — independente dos turnos, se estiver marcado
+        como fechado (ou fora do intervalo) aqui, o painel mostra "loja fechada" e ninguém consegue
+        iniciar turno.
+      </p>
+
+      {error && <EmptyState title="Não foi possível carregar o horário" message={error.message} />}
+      {loading && !days && <div className={styles.loading}>Carregando…</div>}
+
+      {days && (
+        <>
+          <div className={styles.list}>
+            {days.map((d) => (
+              <div key={d.weekday} className={styles.row}>
+                <div className={styles.rowMain}>
+                  <span className={styles.rowName}>{d.weekdayLabel}</span>
+                </div>
+                <label className={styles.checkboxGroup}>
+                  <input
+                    type="checkbox"
+                    checked={d.closed}
+                    onChange={(e) => updateDay(d.weekday, { closed: e.target.checked })}
+                  />
+                  Fechado
+                </label>
+                {!d.closed && (
+                  <>
+                    <input
+                      className={styles.inputSmall}
+                      type="time"
+                      value={minutesToTime(d.opensAt)}
+                      onChange={(e) => updateDay(d.weekday, { opensAt: timeToMinutes(e.target.value) })}
+                    />
+                    <span className={styles.rowMeta}>até</span>
+                    <input
+                      className={styles.inputSmall}
+                      type="time"
+                      value={minutesToTime(d.closesAt)}
+                      onChange={(e) => updateDay(d.weekday, { closesAt: timeToMinutes(e.target.value) })}
+                    />
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className={styles.form}>
+            <Button variant="primary" onClick={() => void handleSave()} disabled={submitting}>
+              Salvar horário
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ---- Procedimentos --------------------------------------------------------------
 
 const EMPTY_PROCEDURE_FORM: CreateProcedureInput = {
@@ -311,6 +671,7 @@ function ProceduresTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateProcedureInput>(EMPTY_PROCEDURE_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   function startEdit(p: Procedure) {
     setEditingId(p.id);
@@ -404,9 +765,10 @@ function ProceduresTab() {
         />
         <input
           className={styles.input}
-          placeholder="Preço (texto livre, ex: R$ 120)"
+          placeholder="R$ 0,00"
+          inputMode="numeric"
           value={form.priceLabel}
-          onChange={(e) => setForm((f) => ({ ...f, priceLabel: e.target.value }))}
+          onChange={(e) => setForm((f) => ({ ...f, priceLabel: formatPriceInput(e.target.value) }))}
         />
         <input
           className={styles.input}
@@ -468,7 +830,17 @@ function ProceduresTab() {
             Cancelar
           </Button>
         )}
+        <Button variant="ghost" onClick={() => setImportOpen(true)}>
+          Importar CSV
+        </Button>
       </div>
+
+      {importOpen && (
+        <ProcedureImportModal
+          onClose={() => setImportOpen(false)}
+          onImported={reload}
+        />
+      )}
 
       {error && <EmptyState title="Não foi possível carregar os procedimentos" message={error.message} />}
       {loading && !data && <div className={styles.loading}>Carregando…</div>}
@@ -678,56 +1050,104 @@ function ClientsTab() {
 // ---- Histórico ------------------------------------------------------------------
 
 /** Pontos resetam todo dia (derivados do histórico de atendimentos, não um
- * contador salvo) — esta busca consulta o saldo de manhã/noturno de UM
- * terapeuta num dia específico, pedido do usuário pra continuar enxergando
- * dias anteriores mesmo com o reset diário. */
+ * contador salvo) — esta consulta mostra, pra um dia específico (ex.:
+ * ontem), TODOS os terapeutas que pontuaram naquele dia, do maior pro
+ * menor. Complementada por uma busca rápida de UM terapeuta específico. */
 function PointsByDayLookup() {
   const { data: therapists } = useTherapists();
-  const [therapistId, setTherapistId] = useState("");
   const [isoDate, setIsoDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [result, setResult] = useState<{ pointsManha: number; pointsNoturno: number } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error } = useAsyncResource(
+    () => operationsApiRepository.listPointsByDay(isoDate),
+    [isoDate],
+  );
 
-  async function lookup() {
-    if (!therapistId || !isoDate) return;
-    setLoading(true);
-    setError(null);
-    setResult(null);
+  const [singleTherapistId, setSingleTherapistId] = useState("");
+  const [singleResult, setSingleResult] = useState<{
+    pointsManha: number;
+    pointsNoturno: number;
+  } | null>(null);
+  const [singleLoading, setSingleLoading] = useState(false);
+
+  async function lookupSingle() {
+    if (!singleTherapistId) return;
+    setSingleLoading(true);
+    setSingleResult(null);
     try {
-      const points = await operationsApiRepository.getTherapistPoints(therapistId, isoDate);
-      setResult({ pointsManha: points.pointsManha, pointsNoturno: points.pointsNoturno });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível consultar os pontos.");
+      const points = await operationsApiRepository.getTherapistPoints(singleTherapistId, isoDate);
+      setSingleResult({ pointsManha: points.pointsManha, pointsNoturno: points.pointsNoturno });
+    } catch {
+      setSingleResult(null);
     } finally {
-      setLoading(false);
+      setSingleLoading(false);
     }
   }
 
   return (
-    <div className={styles.filters} style={{ marginBottom: 18, alignItems: "center" }}>
-      <select className={styles.select} value={therapistId} onChange={(e) => setTherapistId(e.target.value)}>
-        <option value="">Ver saldo de um terapeuta…</option>
-        {(therapists ?? []).map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.name}
-          </option>
-        ))}
-      </select>
-      <input
-        className={styles.inputSmall}
-        type="date"
-        value={isoDate}
-        onChange={(e) => setIsoDate(e.target.value)}
-      />
-      <Button variant="ghost" onClick={() => void lookup()} disabled={loading || !therapistId}>
-        {loading ? "Consultando…" : "Consultar"}
-      </Button>
-      {error && <span className={styles.rowMeta}>{error}</span>}
-      {result && (
-        <span className={styles.rowStat}>
-          {result.pointsManha} manhã · {result.pointsNoturno} noturno
-        </span>
+    <div style={{ marginBottom: 18 }}>
+      <div className={styles.filters} style={{ alignItems: "center" }}>
+        <span className={styles.rowMeta}>Pontos de:</span>
+        <input
+          className={styles.inputSmall}
+          type="date"
+          value={isoDate}
+          onChange={(e) => setIsoDate(e.target.value)}
+        />
+        <select
+          className={styles.select}
+          value={singleTherapistId}
+          onChange={(e) => setSingleTherapistId(e.target.value)}
+        >
+          <option value="">Ou busque um terapeuta específico…</option>
+          {(therapists ?? []).map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <Button
+          variant="ghost"
+          onClick={() => void lookupSingle()}
+          disabled={singleLoading || !singleTherapistId}
+        >
+          {singleLoading ? "Consultando…" : "Consultar"}
+        </Button>
+        {singleResult && (
+          <span className={styles.rowStat}>
+            {singleResult.pointsManha} manhã · {singleResult.pointsNoturno} noturno
+          </span>
+        )}
+      </div>
+
+      {error && <div className={styles.rowMeta}>Não foi possível carregar os pontos do dia.</div>}
+      {loading && !data && <div className={styles.loading}>Carregando…</div>}
+      {data && data.length > 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Terapeuta</th>
+                <th>Manhã</th>
+                <th>Noturno</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row) => (
+                <tr key={row.therapistId}>
+                  <td>
+                    {row.code} · {row.name}
+                  </td>
+                  <td>{row.pointsManha}</td>
+                  <td>{row.pointsNoturno}</td>
+                  <td>{row.pointsTotal}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {data && data.length === 0 && (
+        <div className={styles.rowMeta}>Ninguém pontuou nesse dia.</div>
       )}
     </div>
   );

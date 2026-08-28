@@ -27,10 +27,6 @@ export class TerapeutaDaVezPanelService {
   checkIn(therapistId: string, shift?: Shift): Promise<TherapistAction> {
     return terapeutaDaVezPublicRepository.checkIn(therapistId, shift);
   }
-
-  checkOut(therapistId: string): Promise<TherapistAction> {
-    return terapeutaDaVezPublicRepository.checkOut(therapistId);
-  }
 }
 
 export const terapeutaDaVezPanelService = new TerapeutaDaVezPanelService();

@@ -112,6 +112,20 @@
   width: 100px;
 }
 
+/* Campo numérico continua digitável normalmente, só sem as setinhas de
+   incrementar/decrementar do navegador (visual desalinhado com o resto do
+   formulário e sem uso real aqui — ninguém clica seta pra digitar pontos ou
+   minutos). */
+.input[type="number"]::-webkit-outer-spin-button,
+.input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 .select {
   background: var(--card-bg-alt);
   border: 1px solid var(--border-strong);

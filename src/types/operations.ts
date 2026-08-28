@@ -1,6 +1,9 @@
 export type Shift = "manha" | "inter" | "noturno";
 export type SpaceType = "maca" | "cadeira" | "poltrona";
-// "ausente" = sem Entrada hoje (ou turno já encerrado sem Saída).
+// "ausente" = ainda não iniciou o turno hoje (ou o turno escalado já
+// passou da janela de horário). Não existe mais Saída manual — questão
+// trabalhista (terapeutas são PJ): a presença termina sozinha quando a
+// janela do turno passa.
 export type TherapistStatus = "ausente" | "idle" | "reception" | "therapy";
 export type QueueStatus = "idle" | "reception" | "therapy";
 export type SpaceState = "free" | "occupied" | "cleaning";
@@ -49,6 +52,45 @@ export interface AbsentTherapist {
 export interface TherapistAction {
   therapist: Therapist;
   state: PanelState;
+}
+
+/** Escala: "fulano trabalha o turno X no dia D" — cadastrada por dia
+ * específico nas configs, nunca um padrão semanal fixo. Substitui
+ * Entrada/Saída livre (terapeutas são PJ — ver TherapistStatus). O painel
+ * só oferece "Iniciar turno" pros turnos escalados de hoje que já estão
+ * na janela de horário (`AbsentTherapist.availableShifts`, calculado pelo
+ * backend). */
+export interface ScheduleEntry {
+  id: string;
+  therapistId: string;
+  therapistName: string;
+  date: string;
+  shift: Shift;
+  shiftLabel: string;
+}
+
+export interface CreateScheduleEntryInput {
+  therapistId: string;
+  date: string;
+  shift: Shift;
+}
+
+export interface TherapistDailyPoints {
+  therapistId: string;
+  code: string;
+  name: string;
+  pointsManha: number;
+  pointsNoturno: number;
+  pointsTotal: number;
+}
+
+export interface BusinessHoursEntry {
+  weekday: number;
+  weekdayLabel: string;
+  closed: boolean;
+  opensAt: number | null;
+  closesAt: number | null;
+  label: string;
 }
 
 /** Um "trecho" do procedimento num tipo de espaço — ex.: 30 min numa maca
@@ -192,6 +234,8 @@ export interface PanelState {
   recentHistory: HistoryEntrySummary[];
   procedureGroups: Record<string, ProcedureOption[]>;
   clientSuggestions: string[];
+  storeOpen: boolean;
+  nextOpenAt: string | null;
 }
 
 export interface AttendanceRecord {
@@ -231,3 +275,58 @@ export interface HistoryPage {
   page: number;
   pageSize: number;
 }
+
+// ---- Import em massa (CSV) — de/para feito no frontend, mesmo padrão de
+// leads/prospects. Sem "duplicate": código é único no banco. ------------
+
+export type DedupeStrategy = "skip" | "update";
+
+export interface ImportRowResult {
+  rowIndex: number;
+  outcome: "created" | "updated" | "skipped" | "error";
+  name: string;
+  detail: string | null;
+}
+
+export interface ImportSummary {
+  total: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  rows: ImportRowResult[];
+}
+
+export interface TherapistImportRowInput {
+  code: string;
+  name: string;
+  active?: boolean;
+}
+
+export const IMPORTABLE_THERAPIST_FIELDS: { key: keyof TherapistImportRowInput; label: string }[] = [
+  { key: "code", label: "Código" },
+  { key: "name", label: "Nome" },
+  { key: "active", label: "Ativo" },
+];
+
+export interface ProcedureImportRowInput {
+  code: string;
+  name: string;
+  points?: number;
+  priceLabel?: string;
+  spaceType?: SpaceType;
+  spaceMinutes?: number;
+  category?: string;
+  active?: boolean;
+}
+
+export const IMPORTABLE_PROCEDURE_FIELDS: { key: keyof ProcedureImportRowInput; label: string }[] = [
+  { key: "code", label: "Código" },
+  { key: "name", label: "Nome" },
+  { key: "points", label: "Pontuação" },
+  { key: "priceLabel", label: "Preço" },
+  { key: "spaceType", label: "Tipo de espaço (maca/cadeira/poltrona)" },
+  { key: "spaceMinutes", label: "Minutos do espaço" },
+  { key: "category", label: "Categoria" },
+  { key: "active", label: "Ativo" },
+];

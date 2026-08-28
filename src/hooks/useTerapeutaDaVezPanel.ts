@@ -17,8 +17,10 @@ export interface TerapeutaDaVezPanel {
   decline: (attendanceId: string) => Promise<AttendanceRecord>;
   start: (attendanceId: string, procedureId: string, spaceIds: string[]) => Promise<AttendanceRecord>;
   finish: (attendanceId: string, awardPoints: boolean) => Promise<AttendanceRecord>;
+  /** "Iniciar turno" — sem `checkOut`: não existe Saída manual (questão
+   * trabalhista, terapeutas são PJ). A presença termina sozinha quando a
+   * janela do turno passa. */
   checkIn: (therapistId: string, shift?: Shift) => Promise<Therapist>;
-  checkOut: (therapistId: string) => Promise<Therapist>;
 }
 
 export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
@@ -84,11 +86,5 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     return result.therapist;
   }
 
-  async function checkOut(therapistId: string) {
-    const result = await terapeutaDaVezPanelService.checkOut(therapistId);
-    setState(result.state);
-    return result.therapist;
-  }
-
-  return { state, loading, error, now, call, decline, start, finish, checkIn, checkOut };
+  return { state, loading, error, now, call, decline, start, finish, checkIn };
 }

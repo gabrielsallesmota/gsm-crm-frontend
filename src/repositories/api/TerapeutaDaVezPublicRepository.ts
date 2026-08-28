@@ -71,18 +71,13 @@ export class TerapeutaDaVezPublicRepository {
     return toAttendanceAction(dto);
   }
 
+  /** "Iniciar turno" — sem endpoint de Saída (questão trabalhista:
+   * terapeutas são PJ). A presença termina sozinha quando a janela do
+   * turno passa; não existe ação manual de encerrar. */
   async checkIn(therapistId: string, shift?: Shift): Promise<TherapistAction> {
     const dto = await publicRequest<TherapistActionDto>(
       `${BASE}/therapists/${therapistId}/check-in`,
       { method: "POST", body: JSON.stringify({ shift: shift ?? null }) },
-    );
-    return toTherapistAction(dto);
-  }
-
-  async checkOut(therapistId: string): Promise<TherapistAction> {
-    const dto = await publicRequest<TherapistActionDto>(
-      `${BASE}/therapists/${therapistId}/check-out`,
-      { method: "POST" },
     );
     return toTherapistAction(dto);
   }
