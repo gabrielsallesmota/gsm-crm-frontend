@@ -48,7 +48,9 @@ function formatPhone(raw: string): string {
 }
 
 function queueMetaText(entry: QueueEntry): string {
-  if (entry.status === "reception") return `Na recepção · ${entry.clientName ?? ""}`;
+  // `clientName` só existe a partir da escolha do espaço (digitado ali,
+  // nunca antes) — na recepção ainda não tem nome nenhum pra mostrar.
+  if (entry.status === "reception") return "Na recepção · escolhendo procedimento";
   if (entry.status === "therapy") return `Em terapia · ${entry.clientName ?? ""} · ${entry.spaceNames.join(" + ")}`;
   return `${entry.shiftLabel} · ${entry.shiftRange}`;
 }
@@ -101,17 +103,15 @@ export function TerapeutaDaVezPage() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
   }, []);
 
-  // ---- Chamar terapeuta -----------------------------------------------------
-  const [callTarget, setCallTarget] = useState<QueueEntry | null>(null);
-  const [callForm, setCallForm] = useState({ clientName: "", phone: "" });
-  const callOk = callForm.clientName.trim().length > 2 && onlyDigits(callForm.phone).length >= 10;
-
-  async function confirmCall() {
-    if (!callTarget || !callOk) return;
+  // ---- Chamar terapeuta -------------------------------------------------------
+  // Sem tela de cliente/telefone — pedido do usuário: chama direto e já
+  // abre o wizard no passo de procedimento. O nome do paciente é digitado
+  // só mais adiante, junto com a escolha do espaço (ver `wizardClientName`).
+  async function chooseProcedure(entry: QueueEntry) {
     try {
-      await call(callTarget.therapistId, callForm.clientName.trim(), callForm.phone);
-      showToast(`${callTarget.name} foi chamado(a) para atender ${callForm.clientName.trim()} na recepção.`);
-      setCallTarget(null);
+      await call(entry.therapistId);
+      const updated = state?.queue.find((q) => q.therapistId === entry.therapistId) ?? entry;
+      openWizard(updated);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Não foi possível chamar o terapeuta.");
     }
@@ -135,6 +135,10 @@ export function TerapeutaDaVezPage() {
         clientName: waitlistForm.clientName.trim(),
         phone: waitlistForm.phone,
         procedureId: waitlistForm.procedureId,
+        // Veio do wizard (terapeuta já chamado, sem espaço livre) — o
+        // backend recusa esse atendimento pendente junto, liberando o
+        // terapeuta pra fila normal de novo.
+        ...(waitlistTarget.attendanceId ? { attendanceId: waitlistTarget.attendanceId } : {}),
       });
       showToast(`${waitlistTarget.name} reservado(a) para ${waitlistForm.clientName.trim()}.`);
       setWaitlistTarget(null);
@@ -170,12 +174,16 @@ export function TerapeutaDaVezPage() {
   // `chosenProcedure.spaceRequirements` — não é mais "N espaços quaisquer
   // desse tipo", é "o espaço do trecho 1", "o espaço do trecho 2" etc.
   const [chosenSpaceIds, setChosenSpaceIds] = useState<(string | null)[]>([]);
+  // Nome do paciente, digitado junto com a escolha do espaço — texto
+  // livre, nunca vira cliente cadastrado (pedido do usuário).
+  const [wizardClientName, setWizardClientName] = useState("");
 
   function openWizard(entry: QueueEntry) {
     setWizardEntry(entry);
     setWizardStep("procedure");
     setChosenProcedureId(null);
     setChosenSpaceIds([]);
+    setWizardClientName("");
   }
 
   function closeWizard() {
@@ -193,25 +201,18 @@ export function TerapeutaDaVezPage() {
     }
   }
 
-  // "Colocar na fila de espera" direto do passo 3 (escolher espaço) — nome
-  // e telefone já estão no atendimento em recepção, não precisa perguntar
-  // de novo. O atendimento pendente é recusado junto (backend), liberando o
-  // terapeuta pra fila normal.
-  async function waitlistFromWizard() {
+  // "Colocar na fila de espera" direto do passo de escolher espaço — a
+  // chamada não pede mais telefone, então abre o modal de reserva padrão
+  // (mesmo usado pro botão avulso "Fila de espera" numa linha ociosa) já
+  // com nome/procedimento preenchidos, só faltando o telefone. O
+  // atendimento pendente é recusado junto quando a reserva é confirmada
+  // (`confirmWaitlist`, via `attendanceId`), liberando o terapeuta pra
+  // fila normal.
+  function openWaitlistFromWizard() {
     if (!wizardEntry || !chosenProcedureId) return;
-    try {
-      await createWaitlistEntry({
-        therapistId: wizardEntry.therapistId,
-        clientName: wizardEntry.clientName ?? "",
-        phone: wizardEntry.clientPhone ?? "",
-        procedureId: chosenProcedureId,
-        ...(wizardEntry.attendanceId ? { attendanceId: wizardEntry.attendanceId } : {}),
-      });
-      showToast(`${wizardEntry.name} reservado(a) para ${wizardEntry.clientName}.`);
-      closeWizard();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Não foi possível criar a reserva.");
-    }
+    setWaitlistTarget(wizardEntry);
+    setWaitlistForm({ clientName: wizardClientName.trim(), phone: "", procedureId: chosenProcedureId });
+    closeWizard();
   }
 
   // Botão pequeno "Liberar" ao lado de um espaço em higienização — pula o
@@ -252,11 +253,17 @@ export function TerapeutaDaVezPage() {
 
   const spaceReady =
     chosenSpaceIds.length > 0 && chosenSpaceIds.every((id) => id !== null);
+  const clientNameReady = wizardClientName.trim().length > 2;
 
   async function confirmStart() {
-    if (!wizardEntry?.attendanceId || !chosenProcedureId || !spaceReady) return;
+    if (!wizardEntry?.attendanceId || !chosenProcedureId || !spaceReady || !clientNameReady) return;
     try {
-      await start(wizardEntry.attendanceId, chosenProcedureId, chosenSpaceIds as string[]);
+      await start(
+        wizardEntry.attendanceId,
+        chosenProcedureId,
+        chosenSpaceIds as string[],
+        wizardClientName.trim(),
+      );
       showToast(`Terapia iniciada — liberação prevista às ${formatHM(new Date(Date.now() + (chosenProcedure?.durationMinutes ?? 0) * 60000).toISOString())}.`);
       closeWizard();
     } catch (err) {
@@ -362,7 +369,7 @@ export function TerapeutaDaVezPage() {
       <ShiftStrip chips={shiftChips} />
 
       <div className={styles.body}>
-        <HeroPanel nextIdle={nextIdle} onCall={(entry) => { setCallTarget(entry); setCallForm({ clientName: "", phone: "" }); }} />
+        <HeroPanel nextIdle={nextIdle} onCall={(entry) => void chooseProcedure(entry)} />
 
         <section className={styles.queueSection}>
           <div className={styles.queueHeader}>
@@ -386,8 +393,8 @@ export function TerapeutaDaVezPage() {
                 <div className={styles.queueAction}>
                   {entry.status === "idle" && (
                     <>
-                      <button type="button" className={styles.smallBtn} onClick={() => { setCallTarget(entry); setCallForm({ clientName: "", phone: "" }); }}>
-                        Chamar
+                      <button type="button" className={styles.smallBtn} onClick={() => void chooseProcedure(entry)}>
+                        Escolher procedimento
                       </button>
                       {state.waitlist.some((w) => w.therapistId === entry.therapistId) ? (
                         <span className={styles.queueMeta}>reservado</span>
@@ -439,17 +446,6 @@ export function TerapeutaDaVezPage() {
 
       {toastMsg && <div className={styles.toast}>{toastMsg}</div>}
 
-      {callTarget && (
-        <CallModal
-          entry={callTarget}
-          form={callForm}
-          setForm={setCallForm}
-          ok={callOk}
-          onCancel={() => setCallTarget(null)}
-          onConfirm={() => void confirmCall()}
-        />
-      )}
-
       {waitlistTarget && (
         <WaitlistModal
           entry={waitlistTarget}
@@ -475,11 +471,14 @@ export function TerapeutaDaVezPage() {
           chosenSpaceIds={chosenSpaceIds}
           pickSpaceForRequirement={pickSpaceForRequirement}
           spaceReady={spaceReady}
+          clientName={wizardClientName}
+          setClientName={setWizardClientName}
+          clientNameReady={clientNameReady}
           spaces={state.spaces}
           now={now}
           onClose={closeWizard}
           onDecline={() => void declineWizard()}
-          onWaitlist={() => void waitlistFromWizard()}
+          onWaitlist={openWaitlistFromWizard}
           onConfirmStart={() => void confirmStart()}
         />
       )}
@@ -613,7 +612,7 @@ function HeroPanel({ nextIdle, onCall }: { nextIdle: QueueEntry | null; onCall: 
             </div>
           </div>
           <button type="button" className={styles.heroBtn} onClick={() => onCall(nextIdle)}>
-            Chamar terapeuta
+            Escolher procedimento
           </button>
         </>
       ) : (
@@ -841,70 +840,6 @@ function WaitlistSection({
   );
 }
 
-// ---- Modal: chamar terapeuta -----------------------------------------------------
-
-function CallModal({
-  entry,
-  form,
-  setForm,
-  ok,
-  onCancel,
-  onConfirm,
-}: {
-  entry: QueueEntry;
-  form: { clientName: string; phone: string };
-  setForm: (updater: (f: { clientName: string; phone: string }) => { clientName: string; phone: string }) => void;
-  ok: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div className={styles.overlay}>
-      <div className={styles.modal}>
-        <div>
-          <div className={styles.modalEyebrow}>ETAPA 1 DE 3 · CHAMAR TERAPEUTA</div>
-          <div className={styles.modalTitle}>{entry.name}</div>
-          <div className={styles.modalSub}>
-            {entry.shiftLabel} · {entry.shiftRange} · {entry.points} pontos
-          </div>
-        </div>
-        <div className={styles.modalDivider} />
-        <div className={styles.field}>
-          <span className={styles.fieldLabel}>NOME DO CLIENTE</span>
-          <input
-            className={styles.fieldInput}
-            placeholder="Digite o nome completo"
-            value={form.clientName}
-            onChange={(e) => setForm((f) => ({ ...f, clientName: e.target.value }))}
-          />
-        </div>
-        <div className={styles.field}>
-          <span className={styles.fieldLabel}>TELEFONE</span>
-          <input
-            className={styles.fieldInput}
-            placeholder="(00) 00000-0000"
-            inputMode="tel"
-            value={form.phone}
-            onChange={(e) => setForm((f) => ({ ...f, phone: formatPhone(e.target.value) }))}
-          />
-        </div>
-        <div className={styles.heroHint}>
-          A chamada não ocupa maca, cadeira ou poltrona. O terapeuta conversa com o cliente na recepção; o
-          espaço é definido depois, se houver venda.
-        </div>
-        <div className={styles.modalActions}>
-          <button type="button" className={styles.ghostBtn} onClick={onCancel} style={{ flex: 1 }}>
-            Cancelar
-          </button>
-          <button type="button" className={styles.smallBtn} disabled={!ok} onClick={onConfirm} style={{ flex: 2, padding: "14px 12px" }}>
-            Confirmar chamada
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ---- Modal: fila de espera (reserva de terapeuta específico) ----------------------
 
 function WaitlistModal({
@@ -1125,6 +1060,9 @@ function WizardModal({
   chosenSpaceIds,
   pickSpaceForRequirement,
   spaceReady,
+  clientName,
+  setClientName,
+  clientNameReady,
   spaces,
   now,
   onClose,
@@ -1143,6 +1081,11 @@ function WizardModal({
   chosenSpaceIds: (string | null)[];
   pickSpaceForRequirement: (index: number, spaceId: string) => void;
   spaceReady: boolean;
+  /** Nome do paciente — digitado junto com a escolha do espaço, nunca
+   * vira cliente cadastrado. */
+  clientName: string;
+  setClientName: (v: string) => void;
+  clientNameReady: boolean;
   spaces: SpacePanelView[];
   now: Date;
   onClose: () => void;
@@ -1158,9 +1101,7 @@ function WizardModal({
         {step === "procedure" && (
           <>
             <div>
-              <div className={styles.modalEyebrow}>
-                ETAPA 2 DE 3 · {entry.clientName} COM {entry.name}
-              </div>
+              <div className={styles.modalEyebrow}>ETAPA 1 DE 3 · COM {entry.name}</div>
               <div className={styles.modalTitle}>Qual procedimento o cliente deseja realizar?</div>
             </div>
             <div className={styles.procedureGrid}>
@@ -1220,11 +1161,20 @@ function WizardModal({
         {step === "space" && chosenProcedure && (
           <>
             <div>
-              <div className={styles.modalEyebrow}>ETAPA 3 DE 3 · ESCOLHER ESPAÇO</div>
+              <div className={styles.modalEyebrow}>ETAPA 2 DE 3 · ESCOLHER ESPAÇO</div>
               <div className={styles.modalTitle}>
                 {chosenProcedure.name} · {chosenProcedure.durationLabel}
               </div>
               <div className={styles.modalSub}>{chosenProcedure.typeLabel}</div>
+            </div>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>NOME DO PACIENTE</span>
+              <input
+                className={styles.fieldInput}
+                placeholder="Digite o nome completo"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+              />
             </div>
             {chosenProcedure.spaceRequirements.map((req, i) => (
               <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1272,8 +1222,8 @@ function WizardModal({
               spaceOptionsByRequirement[0]?.every((s) => s.state !== "free") && (
                 <div className={styles.heroHint} style={{ borderColor: "#c9a44c" }}>
                   Nenhuma opção livre agora pro trecho 1 — em vez de esperar aqui, dá pra colocar
-                  {" "}{entry.clientName} na fila de espera desse terapeuta: o painel avisa sozinho
-                  quando liberar.
+                  {" "}{clientName.trim() || "o cliente"} na fila de espera desse terapeuta: o painel
+                  avisa sozinho quando liberar.
                 </div>
               )}
             <div className={styles.modalActions}>
@@ -1295,7 +1245,7 @@ function WizardModal({
                 type="button"
                 className={styles.smallBtn}
                 style={{ flex: 2, padding: "14px 12px" }}
-                disabled={!spaceReady}
+                disabled={!spaceReady || !clientNameReady}
                 onClick={() => setStep("confirm")}
               >
                 Continuar
@@ -1307,11 +1257,11 @@ function WizardModal({
         {step === "confirm" && chosenProcedure && (
           <>
             <div>
-              <div className={styles.modalEyebrow}>CONFIRMAR ATENDIMENTO</div>
+              <div className={styles.modalEyebrow}>ETAPA 3 DE 3 · CONFIRMAR ATENDIMENTO</div>
               <div className={styles.modalTitle}>Iniciar terapia agora?</div>
             </div>
             <div className={styles.summaryGrid}>
-              <SummaryField label="CLIENTE" value={entry.clientName ?? "—"} />
+              <SummaryField label="CLIENTE" value={clientName.trim() || "—"} />
               <SummaryField label="TERAPEUTA" value={entry.name} />
               <SummaryField label="PROCEDIMENTO" value={chosenProcedure.name} />
               <SummaryField

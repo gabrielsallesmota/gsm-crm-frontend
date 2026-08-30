@@ -235,8 +235,8 @@ export interface PanelStateDto {
 
 export interface AttendanceDto {
   id: string;
-  client_name: string;
-  client_phone: string;
+  client_name: string | null;
+  client_phone: string | null;
   therapist_name: string;
   procedure_name: string | null;
   space_names: string[];

@@ -290,8 +290,12 @@ export interface PanelState {
 
 export interface AttendanceRecord {
   id: string;
-  clientName: string;
-  clientPhone: string;
+  /** `null` até o passo de escolher espaço — a chamada não pede mais
+   * nome/telefone do cliente (`clientPhone` nunca mais é preenchido: o
+   * telefone só existe na fila de espera, que continua tendo o próprio
+   * cadastro). */
+  clientName: string | null;
+  clientPhone: string | null;
   therapistName: string;
   procedureName: string | null;
   spaceNames: string[];
@@ -384,4 +388,22 @@ export const IMPORTABLE_PROCEDURE_FIELDS: { key: keyof ProcedureImportRowInput; 
   { key: "spaceMinutes", label: "Minutos do espaço" },
   { key: "category", label: "Categoria" },
   { key: "active", label: "Ativo" },
+];
+
+/** `therapistCode` (não `therapistId`) porque a planilha não tem UUID — o
+ * backend resolve por código OU nome já cadastrado (a escala real da loja
+ * só tem o primeiro nome de cada pessoa, sem código). `date` sempre ISO
+ * (yyyy-mm-dd) na hora de enviar; o modal normaliza formatos comuns de
+ * planilha (dd/mm/aaaa) antes disso. Sem "duplicate"/"update": uma linha
+ * repetida (mesmo terapeuta/dia/turno) só é ignorada. */
+export interface ScheduleImportRowInput {
+  therapistCode: string;
+  date: string;
+  shift: Shift;
+}
+
+export const IMPORTABLE_SCHEDULE_FIELDS: { key: keyof ScheduleImportRowInput; label: string }[] = [
+  { key: "therapistCode", label: "Código ou nome do terapeuta" },
+  { key: "date", label: "Data" },
+  { key: "shift", label: "Turno (manhã/intermediário/tarde-noturno)" },
 ];

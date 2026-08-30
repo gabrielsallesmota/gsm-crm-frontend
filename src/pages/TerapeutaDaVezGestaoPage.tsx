@@ -4,6 +4,7 @@ import { EmptyState } from "../components/common/EmptyState";
 import { Modal } from "../components/common/Modal";
 import { ToastHost } from "../components/common/ToastHost";
 import { ProcedureImportModal } from "../components/operations/ProcedureImportModal";
+import { ScheduleImportModal } from "../components/operations/ScheduleImportModal";
 import { TherapistImportModal } from "../components/operations/TherapistImportModal";
 import { useAsyncResource } from "../hooks/useAsyncResource";
 import { useAttendanceHistory } from "../hooks/useAttendanceHistory";
@@ -451,6 +452,7 @@ function ScheduleTab() {
   const [formDate, setFormDate] = useState(() => todayIso());
   const [formShifts, setFormShifts] = useState<Shift[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   // "De/para" de data — repetir o mesmo cadastro por vários dias em vez de
   // um por um (ex.: "segunda a sexta" = intervalo com sáb/dom desmarcados).
@@ -628,7 +630,14 @@ function ScheduleTab() {
         >
           Adicionar
         </Button>
+        <Button variant="ghost" onClick={() => setImportOpen(true)}>
+          Importar CSV
+        </Button>
       </div>
+
+      {importOpen && (
+        <ScheduleImportModal onClose={() => setImportOpen(false)} onImported={reload} />
+      )}
 
       <div className={styles.filters}>
         <select

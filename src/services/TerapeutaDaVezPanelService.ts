@@ -15,16 +15,21 @@ export class TerapeutaDaVezPanelService {
     return terapeutaDaVezPublicRepository.getState();
   }
 
-  call(therapistId: string, clientName: string, phone: string): Promise<AttendanceAction> {
-    return terapeutaDaVezPublicRepository.call(therapistId, clientName, phone);
+  call(therapistId: string): Promise<AttendanceAction> {
+    return terapeutaDaVezPublicRepository.call(therapistId);
   }
 
   decline(attendanceId: string): Promise<AttendanceAction> {
     return terapeutaDaVezPublicRepository.decline(attendanceId);
   }
 
-  start(attendanceId: string, procedureId: string, spaceIds: string[]): Promise<AttendanceAction> {
-    return terapeutaDaVezPublicRepository.start(attendanceId, procedureId, spaceIds);
+  start(
+    attendanceId: string,
+    procedureId: string,
+    spaceIds: string[],
+    clientName: string,
+  ): Promise<AttendanceAction> {
+    return terapeutaDaVezPublicRepository.start(attendanceId, procedureId, spaceIds, clientName);
   }
 
   finish(attendanceId: string, awardPoints: boolean): Promise<AttendanceAction> {

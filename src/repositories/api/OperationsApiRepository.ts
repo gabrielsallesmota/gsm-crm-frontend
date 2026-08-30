@@ -42,6 +42,7 @@ import type {
   Procedure,
   ProcedureImportRowInput,
   ScheduleEntry,
+  ScheduleImportRowInput,
   ShiftHoursEntry,
   SpaceAdmin,
   Therapist,
@@ -321,6 +322,17 @@ export class OperationsApiRepository {
 
   deleteScheduleEntry(id: string): Promise<void> {
     return operationsRequest<void>(`${BASE}/schedule/${id}`, { method: "DELETE" });
+  }
+
+  /** Sem `dedupeStrategy`: uma linha de escala repetida (mesmo terapeuta/
+   * dia/turno) não tem campo nenhum pra atualizar, só é ignorada. */
+  bulkImportSchedule(rows: ScheduleImportRowInput[]): Promise<ImportSummary> {
+    return operationsRequest<ImportSummaryDto>(`${BASE}/schedule/bulk-import`, {
+      method: "POST",
+      body: JSON.stringify({
+        rows: rows.map((r) => ({ therapist_code: r.therapistCode, date: r.date, shift: r.shift })),
+      }),
+    }).then(toImportSummary);
   }
 
   async listHistory(filter: HistoryFilter): Promise<HistoryPage> {

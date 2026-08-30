@@ -25,9 +25,14 @@ export interface TerapeutaDaVezPanel {
    * X min"/"libera às" sem precisar re-buscar o painel a cada tick (só o
    * `state` em si vem do polling de `POLL_MS` em `POLL_MS`). */
   now: Date;
-  call: (therapistId: string, clientName: string, phone: string) => Promise<AttendanceRecord>;
+  call: (therapistId: string) => Promise<AttendanceRecord>;
   decline: (attendanceId: string) => Promise<AttendanceRecord>;
-  start: (attendanceId: string, procedureId: string, spaceIds: string[]) => Promise<AttendanceRecord>;
+  start: (
+    attendanceId: string,
+    procedureId: string,
+    spaceIds: string[],
+    clientName: string,
+  ) => Promise<AttendanceRecord>;
   finish: (attendanceId: string, awardPoints: boolean) => Promise<AttendanceRecord>;
   /** "Iniciar turno" — sem `checkOut`: não existe Saída manual (questão
    * trabalhista, terapeutas são PJ). A presença termina sozinha quando a
@@ -120,8 +125,8 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     };
   }, [poll]);
 
-  async function call(therapistId: string, clientName: string, phone: string) {
-    const result = await terapeutaDaVezPanelService.call(therapistId, clientName, phone);
+  async function call(therapistId: string) {
+    const result = await terapeutaDaVezPanelService.call(therapistId);
     setState(result.state);
     return result.attendance;
   }
@@ -132,8 +137,18 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     return result.attendance;
   }
 
-  async function start(attendanceId: string, procedureId: string, spaceIds: string[]) {
-    const result = await terapeutaDaVezPanelService.start(attendanceId, procedureId, spaceIds);
+  async function start(
+    attendanceId: string,
+    procedureId: string,
+    spaceIds: string[],
+    clientName: string,
+  ) {
+    const result = await terapeutaDaVezPanelService.start(
+      attendanceId,
+      procedureId,
+      spaceIds,
+      clientName,
+    );
     setState(result.state);
     return result.attendance;
   }

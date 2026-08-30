@@ -49,10 +49,13 @@ export class TerapeutaDaVezPublicRepository {
     return toPanelState(dto);
   }
 
-  async call(therapistId: string, clientName: string, phone: string): Promise<AttendanceAction> {
+  /** Sem nome/telefone do cliente — pedido do usuário: a chamada não pede
+   * mais essa informação, o nome é digitado depois junto com o espaço
+   * (ver `start`). */
+  async call(therapistId: string): Promise<AttendanceAction> {
     const dto = await publicRequest<AttendanceActionDto>(`${BASE}/call`, {
       method: "POST",
-      body: JSON.stringify({ therapist_id: therapistId, client_name: clientName, phone }),
+      body: JSON.stringify({ therapist_id: therapistId }),
     });
     return toAttendanceAction(dto);
   }
@@ -64,10 +67,17 @@ export class TerapeutaDaVezPublicRepository {
     return toAttendanceAction(dto);
   }
 
-  async start(attendanceId: string, procedureId: string, spaceIds: string[]): Promise<AttendanceAction> {
+  /** `clientName` — nome do paciente, digitado junto com a escolha do
+   * espaço (nunca vira cliente cadastrado, ver `types/operations.ts`). */
+  async start(
+    attendanceId: string,
+    procedureId: string,
+    spaceIds: string[],
+    clientName: string,
+  ): Promise<AttendanceAction> {
     const dto = await publicRequest<AttendanceActionDto>(`${BASE}/attendances/${attendanceId}/start`, {
       method: "POST",
-      body: JSON.stringify({ procedure_id: procedureId, space_ids: spaceIds }),
+      body: JSON.stringify({ procedure_id: procedureId, space_ids: spaceIds, client_name: clientName }),
     });
     return toAttendanceAction(dto);
   }
