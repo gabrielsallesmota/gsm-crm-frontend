@@ -2,24 +2,46 @@ import { ApiError } from "../../types/common";
 import { BASE_URL } from "./ApiClient";
 import {
   toAttendanceAction,
+  toHistoryPage,
   toPanelState,
+  toScheduleEntry,
   toTherapistAction,
   toWaitlistAction,
   type AttendanceActionDto,
+  type HistoryPageDto,
   type PanelStateDto,
+  type ScheduleEntryDto,
   type TherapistActionDto,
   type WaitlistActionDto,
 } from "./operationsMapping";
 import type {
   AttendanceAction,
+  CreateScheduleEntryInput,
   CreateWaitlistEntryInput,
+  HistoryFilter,
+  HistoryPage,
   PanelState,
+  PaymentAllocationInput,
+  ScheduleEntry,
   Shift,
+  SubstituteScheduleEntryTherapistInput,
   TherapistAction,
+  UpdateScheduleEntryHoursInput,
   WaitlistAction,
 } from "../../types/operations";
 
 const BASE = "/api/v1/public/terapeuta-da-vez";
+
+function historyFilterParams(filter: HistoryFilter): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filter.therapistId) params.set("therapist_id", filter.therapistId);
+  if (filter.procedureId) params.set("procedure_id", filter.procedureId);
+  if (filter.clientSearch) params.set("client_search", filter.clientSearch);
+  if (filter.phase) params.set("phase", filter.phase);
+  if (filter.dateFrom) params.set("date_from", filter.dateFrom);
+  if (filter.dateTo) params.set("date_to", filter.dateTo);
+  return params;
+}
 
 async function readErrorDetail(resp: Response): Promise<string> {
   try {
@@ -41,6 +63,13 @@ async function publicRequest<T>(path: string, options: RequestInit = {}): Promis
   if (!resp.ok) throw new ApiError(resp.status, await readErrorDetail(resp));
   if (resp.status === 204) return undefined as T;
   return (await resp.json()) as T;
+}
+
+/** Variante que devolve texto cru (CSV de export), não JSON. */
+async function publicRequestText(path: string): Promise<string> {
+  const resp = await fetch(`${BASE_URL}${path}`);
+  if (!resp.ok) throw new ApiError(resp.status, await readErrorDetail(resp));
+  return resp.text();
 }
 
 export class TerapeutaDaVezPublicRepository {
@@ -82,10 +111,17 @@ export class TerapeutaDaVezPublicRepository {
     return toAttendanceAction(dto);
   }
 
-  async finish(attendanceId: string, awardPoints: boolean): Promise<AttendanceAction> {
+  async finish(
+    attendanceId: string,
+    awardPoints: boolean,
+    payments: PaymentAllocationInput[] = [],
+  ): Promise<AttendanceAction> {
     const dto = await publicRequest<AttendanceActionDto>(`${BASE}/attendances/${attendanceId}/finish`, {
       method: "POST",
-      body: JSON.stringify({ award_points: awardPoints }),
+      body: JSON.stringify({
+        award_points: awardPoints,
+        payments: payments.map((p) => ({ method: p.method, amount: p.amount })),
+      }),
     });
     return toAttendanceAction(dto);
   }
@@ -139,6 +175,68 @@ export class TerapeutaDaVezPublicRepository {
       method: "POST",
     });
     return toPanelState(dto);
+  }
+
+  /** Escala — editável direto do painel público (sem senha), mesma postura
+   * do resto das ações do quiosque. `dateFrom`/`dateTo` inclusive. */
+  async listSchedule(dateFrom: string, dateTo: string): Promise<ScheduleEntry[]> {
+    const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+    const items = await publicRequest<ScheduleEntryDto[]>(`${BASE}/schedule?${params.toString()}`);
+    return items.map(toScheduleEntry);
+  }
+
+  async createScheduleEntry(input: CreateScheduleEntryInput): Promise<ScheduleEntry> {
+    const dto = await publicRequest<ScheduleEntryDto>(`${BASE}/schedule`, {
+      method: "POST",
+      body: JSON.stringify({ therapist_id: input.therapistId, date: input.date, shift: input.shift }),
+    });
+    return toScheduleEntry(dto);
+  }
+
+  async deleteScheduleEntry(entryId: string): Promise<void> {
+    await publicRequest<void>(`${BASE}/schedule/${entryId}`, { method: "DELETE" });
+  }
+
+  /** Horário excepcional de uma linha — ambos `null` volta pro padrão do
+   * turno (estreita só a janela de presença, nunca alarga). */
+  async updateScheduleEntryHours(
+    entryId: string,
+    input: UpdateScheduleEntryHoursInput,
+  ): Promise<ScheduleEntry> {
+    const dto = await publicRequest<ScheduleEntryDto>(`${BASE}/schedule/${entryId}/hours`, {
+      method: "PATCH",
+      body: JSON.stringify({ opens_at: input.opensAt, closes_at: input.closesAt }),
+    });
+    return toScheduleEntry(dto);
+  }
+
+  /** Substituir quem está escalado — UPDATE na mesma linha (`id`
+   * preservado), sempre gravado na trilha de auditoria. */
+  async substituteScheduleEntryTherapist(
+    entryId: string,
+    input: SubstituteScheduleEntryTherapistInput,
+  ): Promise<ScheduleEntry> {
+    const dto = await publicRequest<ScheduleEntryDto>(`${BASE}/schedule/${entryId}/substitute`, {
+      method: "POST",
+      body: JSON.stringify({ new_therapist_id: input.newTherapistId, reason: input.reason ?? null }),
+    });
+    return toScheduleEntry(dto);
+  }
+
+  /** Histórico — também sem senha (consulta do dia direto do painel),
+   * mesmos dados/filtros do histórico da gestão, SEM edição de pontos/
+   * pagamentos (isso continua exclusivo de `/gestao`). */
+  async listHistory(filter: HistoryFilter): Promise<HistoryPage> {
+    const params = historyFilterParams(filter);
+    params.set("page", String(filter.page ?? 1));
+    params.set("page_size", String(filter.pageSize ?? 200));
+    const dto = await publicRequest<HistoryPageDto>(`${BASE}/attendances?${params.toString()}`);
+    return toHistoryPage(dto);
+  }
+
+  exportHistory(filter: HistoryFilter): Promise<string> {
+    const params = historyFilterParams(filter);
+    return publicRequestText(`${BASE}/attendances/export?${params.toString()}`);
   }
 }
 

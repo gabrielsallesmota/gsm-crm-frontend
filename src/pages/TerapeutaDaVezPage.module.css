@@ -128,6 +128,36 @@
   color: #a9ccc6;
 }
 
+/* ---- Navegação em abas ----------------------------------------------------- */
+
+.tabStrip {
+  flex: none;
+  background: #012a2a;
+  display: flex;
+  gap: 4px;
+  padding: 0 clamp(14px, 2vw, 28px);
+}
+
+.tab {
+  border: none;
+  background: transparent;
+  color: #8fb5ae;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 16px 10px;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+
+.tab:hover {
+  color: #f5f1e3;
+}
+
+.tabActive {
+  color: #f5f1e3;
+  border-bottom-color: #c9a44c;
+}
+
 /* ---- Faixa de turnos ------------------------------------------------------ */
 
 .shiftStrip {
@@ -283,7 +313,7 @@
 
 .queueRow {
   display: grid;
-  grid-template-columns: 40px 1fr auto auto;
+  grid-template-columns: 40px 1fr auto auto auto;
   gap: 10px;
   align-items: center;
   padding: 12px 10px;
@@ -333,6 +363,92 @@
 .queueAction {
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+/* Um selo só por linha (texto + cor, nunca só cor) — funde o que antes eram
+   dois lugares diferentes (status da fila + seção separada de reserva). */
+.statusBadge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  justify-self: end;
+}
+
+/* ---- Estado vazio / atendimentos em andamento ------------------------------- */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: clamp(28px, 6vh, 64px) 16px;
+  text-align: center;
+  color: #5a5a5a;
+}
+
+.emptyStateTitle {
+  font-weight: 700;
+  font-size: 15px;
+  color: #012a2a;
+}
+
+.emptyStateHint {
+  font-size: 12.5px;
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+.tabPlaceholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px;
+  text-align: center;
+}
+
+.inProgressSection {
+  flex: none;
+  background: #f0f0e6;
+  border-top: 1px solid #d9d9d9;
+  padding: clamp(10px, 1.4vw, 18px) clamp(14px, 2vw, 28px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inProgressTitle {
+  font-weight: 700;
+  font-size: 13px;
+  color: #012a2a;
+}
+
+.inProgressGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.inProgressCard {
+  background: #fff;
+  border-left: 3px solid #1e8a86;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inProgressRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   gap: 8px;
 }
 
@@ -508,20 +624,19 @@
   gap: 6px;
 }
 
-/* Uma linha só sempre — os cards encolhem juntos (flex 1 1 0 + min-width:0)
-   em vez de quebrar pra segunda linha; `overflow-x: auto` é só uma rede de
-   segurança pra telas absurdamente estreitas, não o comportamento normal. */
+/* Cards quebram pra próxima linha quando não cabem mais numa largura
+   legível — nunca espremem o nome do espaço até truncar (pedido do
+   usuário: "não sacrificar compreensão para caber mais cards"). */
 .spacesGrid {
   display: flex;
-  flex-wrap: nowrap;
-  gap: clamp(4px, 0.8vw, 10px);
-  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: clamp(6px, 0.8vw, 10px);
 }
 
 .spaceCard {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: clamp(6px, 0.9vw, 12px) clamp(8px, 1vw, 14px);
+  flex: 1 1 128px;
+  min-width: 108px;
+  padding: clamp(8px, 0.9vw, 12px) clamp(10px, 1vw, 14px);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -530,23 +645,20 @@
 
 .spaceCardTop {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
 .spaceCardName {
   font-weight: 700;
-  font-size: clamp(9.5px, 1vw, 13px);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
+  font-size: clamp(11px, 1vw, 13.5px);
+  line-height: 1.25;
+  overflow-wrap: break-word;
 }
 
 .spaceCardStatus {
-  font-size: clamp(7.5px, 0.68vw, 9.5px);
+  font-size: clamp(8.5px, 0.7vw, 9.5px);
   letter-spacing: 0.8px;
   white-space: nowrap;
   flex: none;
@@ -666,6 +778,22 @@
   background: #dfdaca;
 }
 
+.modalHint {
+  border-left: 2px solid #c9a44c;
+  padding-left: 13px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #5a5a5a;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #012a2a;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -691,6 +819,61 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* ---- Forma de pagamento (finalizar atendimento) ------------------------------ */
+
+.paymentRows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.paymentRow {
+  display: grid;
+  grid-template-columns: 1fr 110px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.paymentRemove {
+  border: 1px solid #d9d9d9;
+  background: transparent;
+  color: #5a5a5a;
+  font-size: 11px;
+  padding: 8px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.paymentAddBtn {
+  align-self: flex-start;
+  border: 1px dashed #c9a44c;
+  background: transparent;
+  color: #9a7426;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.paymentSummary,
+.paymentSummaryOk {
+  font-size: 13px;
+  padding: 10px 12px;
+  border-left: 3px solid;
+}
+
+.paymentSummary {
+  color: #9a4a26;
+  background: #f7ead9;
+  border-color: #c9a44c;
+}
+
+.paymentSummaryOk {
+  color: #0b4f4c;
+  background: #e2efe9;
+  border-color: #1e8a86;
 }
 
 .procedureGrid {
@@ -777,4 +960,159 @@
 .summaryDark {
   background: #012a2a;
   color: #f5f1e3;
+}
+
+/* ---- Aba Escala — grade semanal -------------------------------------------- */
+
+.escalaTab {
+  flex: 1;
+  overflow: auto;
+  padding: clamp(14px, 2vw, 28px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.escalaToolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.escalaWeekLabel {
+  font-weight: 700;
+  font-size: 14px;
+  color: #012a2a;
+}
+
+.escalaError {
+  color: #9a4a26;
+  background: #f7ead9;
+  border-left: 3px solid #c9a44c;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.escalaLoading {
+  color: #5a5a5a;
+  font-size: 13px;
+}
+
+/* Wrapper próprio pro scroll horizontal (telas estreitas) — não pode ser o
+   próprio `.escalaGrid` nem viver direto dentro de `.escalaTab` (flex
+   column): um item flex com overflow != visible tem "automatic minimum
+   size" igual a 0, então o flexbox pode espremê-lo abaixo da altura real do
+   conteúdo, cortando linhas e sobrepondo a próxima (o bug do "botão
+   comido"). `flex-shrink: 0` trava a altura natural. */
+.escalaGridWrap {
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.escalaGrid {
+  display: grid;
+  grid-template-columns: 96px repeat(7, minmax(148px, 1fr));
+  gap: 6px;
+  align-items: start;
+}
+
+.escalaGridHeaderCell {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #5a5a5a;
+  padding: 6px 4px;
+}
+
+.escalaGridShiftCell {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0b4f4c;
+  background: #eee7d2;
+  padding: 8px;
+}
+
+.escalaCell {
+  background: #ffffff;
+  border: 1px solid #e5decb;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 76px;
+}
+
+.escalaChip {
+  border: none;
+  text-align: left;
+  background: #eee7d2;
+  color: #012a2a;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.escalaChip:hover {
+  background: #e2d9bd;
+}
+
+.escalaChipHours {
+  color: #9a7426;
+  font-weight: 600;
+}
+
+.escalaChipSub {
+  color: #0b4f4c;
+  font-weight: 600;
+}
+
+.escalaAddBtn {
+  align-self: flex-start;
+  border: 1px dashed #c9a44c;
+  background: transparent;
+  color: #9a7426;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+/* ---- Aba Histórico ---------------------------------------------------------- */
+
+.rowMeta {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #5a5a5a;
+  margin-bottom: 4px;
+}
+
+.historyTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.historyTable th {
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  color: #5a5a5a;
+  padding: 8px 10px;
+  border-bottom: 2px solid #dfdaca;
+  white-space: nowrap;
+}
+
+.historyTable td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #ebe6d6;
+  color: #012a2a;
+  white-space: nowrap;
+}
+
+.historyTable tbody tr:hover {
+  background: #f0ece0;
 }

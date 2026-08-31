@@ -39,6 +39,7 @@ import type {
   HistoryPage,
   ImportSummary,
   OperationsClient,
+  PaymentAllocationInput,
   Procedure,
   ProcedureImportRowInput,
   ScheduleEntry,
@@ -106,6 +107,7 @@ function procedureBody(input: CreateProcedureInput | UpdateProcedureInput) {
     name: input.name,
     points: input.points,
     price_label: input.priceLabel,
+    price: input.price,
     space_requirements: input.spaceRequirements?.map((r) => ({ type: r.type, minutes: r.minutes })),
     category: input.category,
     active: input.active,
@@ -350,6 +352,17 @@ export class OperationsApiRepository {
     const dto = await operationsRequest<AttendanceDto>(`${BASE}/attendances/${id}/points`, {
       method: "PATCH",
       body: JSON.stringify({ points_awarded: pointsAwarded }),
+    });
+    return toAttendance(dto);
+  }
+
+  async updateAttendancePayments(
+    id: string,
+    payments: PaymentAllocationInput[],
+  ): Promise<AttendanceRecord> {
+    const dto = await operationsRequest<AttendanceDto>(`${BASE}/attendances/${id}/payments`, {
+      method: "PATCH",
+      body: JSON.stringify({ payments: payments.map((p) => ({ method: p.method, amount: p.amount })) }),
     });
     return toAttendance(dto);
   }

@@ -3,6 +3,7 @@ import type {
   AttendanceAction,
   CreateWaitlistEntryInput,
   PanelState,
+  PaymentAllocationInput,
   Shift,
   TherapistAction,
   WaitlistAction,
@@ -32,8 +33,12 @@ export class TerapeutaDaVezPanelService {
     return terapeutaDaVezPublicRepository.start(attendanceId, procedureId, spaceIds, clientName);
   }
 
-  finish(attendanceId: string, awardPoints: boolean): Promise<AttendanceAction> {
-    return terapeutaDaVezPublicRepository.finish(attendanceId, awardPoints);
+  finish(
+    attendanceId: string,
+    awardPoints: boolean,
+    payments: PaymentAllocationInput[] = [],
+  ): Promise<AttendanceAction> {
+    return terapeutaDaVezPublicRepository.finish(attendanceId, awardPoints, payments);
   }
 
   checkIn(therapistId: string, shift?: Shift): Promise<TherapistAction> {

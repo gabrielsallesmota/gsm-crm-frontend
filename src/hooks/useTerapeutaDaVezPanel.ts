@@ -4,6 +4,7 @@ import type {
   AttendanceRecord,
   CreateWaitlistEntryInput,
   PanelState,
+  PaymentAllocationInput,
   Shift,
   Therapist,
   WaitlistEntry,
@@ -33,7 +34,11 @@ export interface TerapeutaDaVezPanel {
     spaceIds: string[],
     clientName: string,
   ) => Promise<AttendanceRecord>;
-  finish: (attendanceId: string, awardPoints: boolean) => Promise<AttendanceRecord>;
+  finish: (
+    attendanceId: string,
+    awardPoints: boolean,
+    payments?: PaymentAllocationInput[],
+  ) => Promise<AttendanceRecord>;
   /** "Iniciar turno" — sem `checkOut`: não existe Saída manual (questão
    * trabalhista, terapeutas são PJ). A presença termina sozinha quando a
    * janela do turno passa. */
@@ -153,8 +158,12 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     return result.attendance;
   }
 
-  async function finish(attendanceId: string, awardPoints: boolean) {
-    const result = await terapeutaDaVezPanelService.finish(attendanceId, awardPoints);
+  async function finish(
+    attendanceId: string,
+    awardPoints: boolean,
+    payments: PaymentAllocationInput[] = [],
+  ) {
+    const result = await terapeutaDaVezPanelService.finish(attendanceId, awardPoints, payments);
     setState(result.state);
     return result.attendance;
   }

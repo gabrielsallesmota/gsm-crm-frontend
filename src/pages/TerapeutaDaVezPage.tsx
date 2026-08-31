@@ -1,15 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTerapeutaDaVezPanel } from "../hooks/useTerapeutaDaVezPanel";
-import type {
-  AbsentTherapist,
-  PanelState,
-  ProcedureOption,
-  QueueEntry,
-  Shift,
-  SpacePanelView,
-  WaitlistEntry,
+import { terapeutaDaVezPublicRepository } from "../repositories/api/TerapeutaDaVezPublicRepository";
+import {
+  PAYMENT_METHOD_OPTIONS,
+  type AbsentTherapist,
+  type AttendanceRecord,
+  type HistoryPage,
+  type PanelState,
+  type PaymentAllocationInput,
+  type PaymentMethod,
+  type ProcedureOption,
+  type QueueEntry,
+  type ScheduleEntry,
+  type Shift,
+  type SpacePanelView,
+  type WaitlistEntry,
 } from "../types/operations";
 import styles from "./TerapeutaDaVezPage.module.css";
+
+type Tab = "operacao" | "escala" | "historico";
+const TAB_LABEL: Record<Tab, string> = { operacao: "Operação", escala: "Escala", historico: "Histórico" };
 
 const SHIFT_ORDER: Shift[] = ["manha", "inter", "noturno"];
 const SHIFT_DOT: Record<Shift, string> = { manha: "#1E8A86", inter: "#C9A44C", noturno: "#0B4F4C" };
@@ -50,9 +60,44 @@ function formatPhone(raw: string): string {
 function queueMetaText(entry: QueueEntry): string {
   // `clientName` só existe a partir da escolha do espaço (digitado ali,
   // nunca antes) — na recepção ainda não tem nome nenhum pra mostrar.
-  if (entry.status === "reception") return "Na recepção · escolhendo procedimento";
+  if (entry.status === "reception") return "Aguardando espaço · escolhendo procedimento";
   if (entry.status === "therapy") return `Em terapia · ${entry.clientName ?? ""} · ${entry.spaceNames.join(" + ")}`;
   return `${entry.shiftLabel} · ${entry.shiftRange}`;
+}
+
+// Um status só por linha — funde o que antes eram dois lugares (status da
+// fila + seção separada de fila de espera) num único selo, texto + cor
+// (nunca só cor, pedido do usuário). "RESERVADO" cobre quem está livre mas
+// tem uma reserva de terapeuta específico ativa (`state.waitlist`).
+type RowStatus = "livre" | "reservado" | "aguardando_espaco" | "atendendo";
+
+const ROW_STATUS_LABEL: Record<RowStatus, string> = {
+  livre: "LIVRE",
+  reservado: "RESERVADO",
+  aguardando_espaco: "AGUARDANDO ESPAÇO",
+  atendendo: "ATENDENDO",
+};
+
+const ROW_STATUS_COLOR: Record<RowStatus, string> = {
+  livre: "#5A5A5A",
+  reservado: "#C9A44C",
+  aguardando_espaco: "#9A7426",
+  atendendo: "#1E8A86",
+};
+
+function rowStatus(entry: QueueEntry, waitlistEntry: WaitlistEntry | undefined): RowStatus {
+  if (entry.status === "therapy") return "atendendo";
+  if (entry.status === "reception") return "aguardando_espaco";
+  return waitlistEntry ? "reservado" : "livre";
+}
+
+function StatusBadge({ status }: { status: RowStatus }) {
+  const color = ROW_STATUS_COLOR[status];
+  return (
+    <span className={styles.statusBadge} style={{ color, background: `${color}22` }}>
+      {ROW_STATUS_LABEL[status]}
+    </span>
+  );
 }
 
 interface ShiftChip {
@@ -93,6 +138,10 @@ export function TerapeutaDaVezPage() {
   } = useTerapeutaDaVezPanel();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ---- Navegação em abas — Operação é a home, sem sincronizar com a URL
+  // (fica tudo na mesma tela, sem recarregar nada ao trocar).
+  const [activeTab, setActiveTab] = useState<Tab>("operacao");
 
   function showToast(msg: string) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -279,11 +328,18 @@ export function TerapeutaDaVezPage() {
   const EARLY_FINISH_GRACE_MINUTES = 10;
 
   const [pointsConfirmTarget, setPointsConfirmTarget] = useState<QueueEntry | null>(null);
+  // Forma de pagamento só é perguntada quando o atendimento tem valor
+  // (procedimentos cadastrados antes desta funcionalidade ficam sem preço
+  // até alguém preencher na gestão — nesse caso finaliza direto, como
+  // sempre funcionou).
+  const [paymentTarget, setPaymentTarget] = useState<{ entry: QueueEntry; awardPoints: boolean } | null>(
+    null,
+  );
 
-  async function doFinish(entry: QueueEntry, awardPoints: boolean) {
+  async function doFinish(entry: QueueEntry, awardPoints: boolean, payments: PaymentAllocationInput[] = []) {
     if (!entry.attendanceId) return;
     try {
-      await finish(entry.attendanceId, awardPoints);
+      await finish(entry.attendanceId, awardPoints, payments);
       showToast(
         awardPoints
           ? `${entry.name}: atendimento finalizado. Fila recalculada.`
@@ -293,7 +349,16 @@ export function TerapeutaDaVezPage() {
       showToast(err instanceof Error ? err.message : "Não foi possível finalizar o atendimento.");
     } finally {
       setPointsConfirmTarget(null);
+      setPaymentTarget(null);
     }
+  }
+
+  function proceedToFinish(entry: QueueEntry, awardPoints: boolean) {
+    if (entry.price !== null && entry.price > 0) {
+      setPaymentTarget({ entry, awardPoints });
+      return;
+    }
+    void doFinish(entry, awardPoints, []);
   }
 
   function finishTherapy(entry: QueueEntry) {
@@ -303,7 +368,7 @@ export function TerapeutaDaVezPage() {
       setPointsConfirmTarget(entry);
       return;
     }
-    void doFinish(entry, true);
+    proceedToFinish(entry, true);
   }
 
   // ---- Iniciar turno -------------------------------------------------------
@@ -362,87 +427,121 @@ export function TerapeutaDaVezPage() {
 
   const nextIdle = state.queue.find((e) => e.status === "idle") ?? null;
   const shiftChips = buildShiftChips(state.queue);
+  const waitlistByTherapist = new Map(state.waitlist.map((w) => [w.therapistId, w]));
+  const therapyEntries = state.queue.filter((e) => e.status === "therapy");
+  const waitingToStart = state.absent.filter((t) => t.availableShifts.length > 0);
+  const nobodyStartedYet = state.queue.length === 0;
 
   return (
     <div className={styles.page}>
       <Header now={now} />
-      <ShiftStrip chips={shiftChips} />
+      <TabStrip active={activeTab} onChange={setActiveTab} />
+      {activeTab === "operacao" && <ShiftStrip chips={shiftChips} />}
 
-      <div className={styles.body}>
-        <HeroPanel nextIdle={nextIdle} onCall={(entry) => void chooseProcedure(entry)} />
+      {activeTab === "operacao" && (
+        <>
+          <div className={styles.body}>
+            <HeroPanel nextIdle={nextIdle} onCall={(entry) => void chooseProcedure(entry)} />
 
-        <section className={styles.queueSection}>
-          <div className={styles.queueHeader}>
-            <div>
-              <div className={styles.queueTitle}>Fila de atendimento</div>
-              <div className={styles.queueSubtitle}>Ordenada pela menor pontuação entre quem está na jornada</div>
-            </div>
-            <div className={styles.queueSubtitle}>
-              Trilha: {state.pointsMin}–{state.pointsMax} pts
-            </div>
-          </div>
-          <div className={styles.queueList}>
-            {state.queue.map((entry) => (
-              <div key={entry.therapistId} className={`${styles.queueRow} ${entry.status !== "idle" ? styles.queueRowTurn : ""}`}>
-                <div className={styles.queuePos}>{entry.position ?? "—"}</div>
-                <div className={styles.queueInfo}>
-                  <span className={styles.queueName}>{entry.name}</span>
-                  <span className={styles.queueMeta}>{queueMetaText(entry)}</span>
+            <section className={styles.queueSection}>
+              <div className={styles.queueHeader}>
+                <div>
+                  <div className={styles.queueTitle}>Fila de atendimento</div>
+                  <div className={styles.queueSubtitle}>Ordenada pela menor pontuação entre quem está na jornada</div>
                 </div>
-                <div className={styles.queuePoints}>{entry.points}</div>
-                <div className={styles.queueAction}>
-                  {entry.status === "idle" && (
-                    <>
-                      <button type="button" className={styles.smallBtn} onClick={() => void chooseProcedure(entry)}>
-                        Escolher procedimento
-                      </button>
-                      {state.waitlist.some((w) => w.therapistId === entry.therapistId) ? (
-                        <span className={styles.queueMeta}>reservado</span>
-                      ) : (
-                        <button
-                          type="button"
-                          className={styles.ghostBtn}
-                          onClick={() => {
-                            setWaitlistTarget(entry);
-                            setWaitlistForm({ clientName: "", phone: "", procedureId: "" });
-                          }}
-                        >
-                          Fila de espera
-                        </button>
-                      )}
-                    </>
-                  )}
-                  {entry.status === "reception" && (
-                    <button type="button" className={styles.smallBtn} onClick={() => openWizard(entry)}>
-                      Definir procedimento
-                    </button>
-                  )}
-                  {entry.status === "therapy" && (
-                    <>
-                      <span className={styles.queueMeta}>restam {remainingMinutes(entry.plannedEndAt, now)} min</span>
-                      <button type="button" className={styles.smallBtn} onClick={() => finishTherapy(entry)}>
-                        Finalizar
-                      </button>
-                    </>
-                  )}
+                <div className={styles.queueSubtitle}>
+                  Trilha: {state.pointsMin}–{state.pointsMax} pts
                 </div>
               </div>
-            ))}
-            {state.waitlist.length > 0 && (
-              <WaitlistSection
-                entries={state.waitlist}
-                now={now}
-                onConfirm={(e) => void handleConfirmWaitlistEntry(e)}
-                onCancel={(e) => void handleCancelWaitlistEntry(e)}
-              />
-            )}
+              <div className={styles.queueList}>
+                {nobodyStartedYet && (
+                  <EmptyState
+                    title="Nenhum terapeuta iniciou o turno ainda."
+                    hint="Os terapeutas escalados aparecerão aqui depois de tocar em “Iniciar turno”."
+                  />
+                )}
+                {state.queue.map((entry) => {
+                  const waitlistEntry = waitlistByTherapist.get(entry.therapistId);
+                  const status = rowStatus(entry, waitlistEntry);
+                  return (
+                    <div key={entry.therapistId} className={`${styles.queueRow} ${entry.status !== "idle" ? styles.queueRowTurn : ""}`}>
+                      <div className={styles.queuePos}>{entry.position ?? "—"}</div>
+                      <div className={styles.queueInfo}>
+                        <span className={styles.queueName}>{entry.name}</span>
+                        <span className={styles.queueMeta}>
+                          {status === "reservado" && waitlistEntry
+                            ? `${waitlistEntry.clientName} · ${waitlistEntry.procedureName}`
+                            : queueMetaText(entry)}
+                        </span>
+                      </div>
+                      <div className={styles.queuePoints}>{entry.points}</div>
+                      <StatusBadge status={status} />
+                      <div className={styles.queueAction}>
+                        {status === "livre" && (
+                          <>
+                            <button type="button" className={styles.smallBtn} onClick={() => void chooseProcedure(entry)}>
+                              Escolher procedimento
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.ghostBtn}
+                              onClick={() => {
+                                setWaitlistTarget(entry);
+                                setWaitlistForm({ clientName: "", phone: "", procedureId: "" });
+                              }}
+                            >
+                              Fila de espera
+                            </button>
+                          </>
+                        )}
+                        {status === "reservado" && waitlistEntry && (
+                          <>
+                            <span className={styles.queueMeta}>{waitlistStatusLabel(waitlistEntry, now)}</span>
+                            <button
+                              type="button"
+                              className={styles.smallBtn}
+                              disabled={!waitlistEntry.ready}
+                              title={
+                                waitlistEntry.ready
+                                  ? "Iniciar o atendimento deste cliente com este terapeuta"
+                                  : "Ainda não está livre — só dá pra confirmar quando ficar pronto"
+                              }
+                              onClick={() => void handleConfirmWaitlistEntry(waitlistEntry)}
+                            >
+                              Confirmar
+                            </button>
+                            <button type="button" className={styles.ghostBtn} onClick={() => void handleCancelWaitlistEntry(waitlistEntry)}>
+                              Cancelar
+                            </button>
+                          </>
+                        )}
+                        {status === "aguardando_espaco" && (
+                          <button type="button" className={styles.smallBtn} onClick={() => openWizard(entry)}>
+                            Definir procedimento
+                          </button>
+                        )}
+                        {status === "atendendo" && (
+                          <button type="button" className={styles.smallBtn} onClick={() => finishTherapy(entry)}>
+                            Finalizar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <Sidebar state={state} waiting={waitingToStart} onCheckIn={requestCheckIn} />
           </div>
-        </section>
 
-        <Sidebar state={state} onCheckIn={requestCheckIn} />
-      </div>
+          <InProgressSection entries={therapyEntries} now={now} onFinish={finishTherapy} />
+          <SpacesSection spaces={state.spaces} now={now} onReleaseCleaning={handleReleaseCleaning} />
+        </>
+      )}
 
-      <SpacesSection spaces={state.spaces} now={now} onReleaseCleaning={handleReleaseCleaning} />
+      {activeTab === "escala" && <EscalaTab state={state} showToast={showToast} />}
+      {activeTab === "historico" && <HistoricoTab />}
 
       {toastMsg && <div className={styles.toast}>{toastMsg}</div>}
 
@@ -495,7 +594,18 @@ export function TerapeutaDaVezPage() {
         <PointsConfirmModal
           entry={pointsConfirmTarget}
           onCancel={() => setPointsConfirmTarget(null)}
-          onAnswer={(awardPoints) => void doFinish(pointsConfirmTarget, awardPoints)}
+          onAnswer={(awardPoints) => {
+            setPointsConfirmTarget(null);
+            proceedToFinish(pointsConfirmTarget, awardPoints);
+          }}
+        />
+      )}
+
+      {paymentTarget && (
+        <PaymentModal
+          entry={paymentTarget.entry}
+          onCancel={() => setPaymentTarget(null)}
+          onConfirm={(payments) => void doFinish(paymentTarget.entry, paymentTarget.awardPoints, payments)}
         />
       )}
     </div>
@@ -565,6 +675,793 @@ function Header({ now }: { now: Date }) {
   );
 }
 
+// ---- Navegação em abas --------------------------------------------------------
+
+const TAB_ORDER: Tab[] = ["operacao", "escala", "historico"];
+
+function TabStrip({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
+  return (
+    <div className={styles.tabStrip}>
+      {TAB_ORDER.map((t) => (
+        <button
+          key={t}
+          type="button"
+          className={`${styles.tab} ${active === t ? styles.tabActive : ""}`}
+          onClick={() => onChange(t)}
+        >
+          {TAB_LABEL[t]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ---- Estado vazio / atendimentos em andamento ----------------------------------
+
+function EmptyState({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className={styles.emptyState}>
+      <span className={styles.emptyStateTitle}>{title}</span>
+      <span className={styles.emptyStateHint}>{hint}</span>
+    </div>
+  );
+}
+
+function InProgressSection({
+  entries,
+  now,
+  onFinish,
+}: {
+  entries: QueueEntry[];
+  now: Date;
+  onFinish: (entry: QueueEntry) => void;
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <section className={styles.inProgressSection}>
+      <span className={styles.inProgressTitle}>Atendimentos em andamento</span>
+      <div className={styles.inProgressGrid}>
+        {entries.map((e) => (
+          <div key={e.therapistId} className={styles.inProgressCard}>
+            <div className={styles.inProgressRow}>
+              <span className={styles.queueName}>{e.clientName ?? "Cliente"}</span>
+              <span style={{ color: "#C9A44C", fontWeight: 700 }}>
+                restam {remainingMinutes(e.plannedEndAt, now)} min
+              </span>
+            </div>
+            <span className={styles.queueMeta}>
+              {e.name} · {e.procedureName} · {e.spaceNames.join(" + ")} · libera às {formatHM(e.plannedEndAt)}
+            </span>
+            <button type="button" className={styles.smallBtn} style={{ alignSelf: "flex-start" }} onClick={() => onFinish(e)}>
+              Finalizar
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---- Escala / Histórico (abas novas) --------------------------------------------
+
+// ---- Aba Escala — grade semanal editável ------------------------------------------
+
+const WEEKDAY_SHORT = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+
+function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function mondayOf(d: Date): Date {
+  const copy = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = copy.getDay(); // 0=domingo … 6=sábado
+  copy.setDate(copy.getDate() + (day === 0 ? -6 : 1 - day));
+  return copy;
+}
+
+function addDays(d: Date, n: number): Date {
+  const copy = new Date(d);
+  copy.setDate(copy.getDate() + n);
+  return copy;
+}
+
+function minutesToHHMM(min: number): string {
+  return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+}
+
+function hhmmToMinutes(v: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(v.trim());
+  const hh = match?.[1];
+  const mm = match?.[2];
+  if (!hh || !mm) return null;
+  const h = Number(hh);
+  const m = Number(mm);
+  if (h > 23 || m > 59) return null;
+  return h * 60 + m;
+}
+
+interface ActiveTherapistOption {
+  id: string;
+  name: string;
+}
+
+/** Escala editável direto do painel público — sem senha, mesma postura do
+ * resto do painel (pedido do usuário). Grade semanal Manhã/Interturno/
+ * Noturno × Seg–Dom, parecida com a planilha que a recepção já usava. */
+function EscalaTab({ state, showToast }: { state: PanelState; showToast: (msg: string) => void }) {
+  const [weekStart, setWeekStart] = useState<Date>(() => mondayOf(new Date()));
+  const [entries, setEntries] = useState<ScheduleEntry[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<{
+    date: string;
+    shift: Shift;
+    entry: ScheduleEntry | null;
+    /** Quem já está escalado nesse dia/turno (a própria linha em edição
+     * inclusa) — usado pra tirar da lista de seleção quem não tem
+     * disponibilidade, em vez de deixar escolher e só barrar depois com um
+     * erro do backend. */
+    busyIds: string[];
+  } | null>(null);
+
+  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const dateFrom = isoDate(weekStart);
+  const dateTo = isoDate(weekEnd);
+
+  async function reload() {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const items = await terapeutaDaVezPublicRepository.listSchedule(dateFrom, dateTo);
+      setEntries(items);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Não foi possível carregar a escala.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void reload();
+    // Refaz só quando a semana visível muda — `reload` é recriada a cada
+    // render, mas depende apenas de `dateFrom`/`dateTo`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo]);
+
+  // Universo de terapeutas ativos pro seletor — não existe endpoint de
+  // listagem no painel público, então junta quem está na fila agora com
+  // quem está ausente hoje (`state.queue` + `state.absent` cobre todo
+  // terapeuta ativo, presente ou não neste instante).
+  const activeTherapists: ActiveTherapistOption[] = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const q of state.queue) byId.set(q.therapistId, q.name);
+    for (const t of state.absent) byId.set(t.id, t.name);
+    return [...byId.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [state]);
+
+  const byCell = useMemo(() => {
+    const map = new Map<string, ScheduleEntry[]>();
+    for (const e of entries ?? []) {
+      const key = `${e.date}|${e.shift}`;
+      const list = map.get(key) ?? [];
+      list.push(e);
+      map.set(key, list);
+    }
+    return map;
+  }, [entries]);
+
+  const todayIso = isoDate(new Date());
+
+  return (
+    <div className={styles.escalaTab}>
+      <div className={styles.escalaToolbar}>
+        <button type="button" className={styles.ghostBtn} onClick={() => setWeekStart((d) => addDays(d, -7))}>
+          ← Semana anterior
+        </button>
+        <span className={styles.escalaWeekLabel}>
+          {weekStart.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} –{" "}
+          {weekEnd.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+        </span>
+        <button type="button" className={styles.ghostBtn} onClick={() => setWeekStart(mondayOf(new Date()))}>
+          Hoje
+        </button>
+        <button type="button" className={styles.ghostBtn} onClick={() => setWeekStart((d) => addDays(d, 7))}>
+          Próxima semana →
+        </button>
+      </div>
+
+      {loadError && <div className={styles.escalaError}>{loadError}</div>}
+      {loading && !entries && <div className={styles.escalaLoading}>Carregando escala…</div>}
+
+      {entries && (
+        <div className={styles.escalaGridWrap}>
+          <div className={styles.escalaGrid}>
+            <div className={styles.escalaGridHeaderCell} />
+            {weekDays.map((d, i) => (
+              <div
+                key={i}
+                className={styles.escalaGridHeaderCell}
+                style={isoDate(d) === todayIso ? { color: "#0b4f4c" } : undefined}
+              >
+                {WEEKDAY_SHORT[i]} · {d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+              </div>
+            ))}
+
+            {SHIFT_ORDER.map((shift) => (
+              <Fragment key={shift}>
+                <div className={styles.escalaGridShiftCell}>{SHIFT_LABEL_FULL[shift]}</div>
+                {weekDays.map((d, i) => {
+                  const dateIso = isoDate(d);
+                  const cellEntries = byCell.get(`${dateIso}|${shift}`) ?? [];
+                  return (
+                    <div key={i} className={styles.escalaCell}>
+                      {cellEntries.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          className={styles.escalaChip}
+                          onClick={() =>
+                            setEditTarget({
+                              date: dateIso,
+                              shift,
+                              entry,
+                              busyIds: cellEntries.map((e) => e.therapistId),
+                            })
+                          }
+                        >
+                          {entry.therapistName}
+                          {entry.customHoursLabel && (
+                            <span className={styles.escalaChipHours}> · {entry.customHoursLabel}</span>
+                          )}
+                          {entry.isSubstitution && <span className={styles.escalaChipSub}> ↔ subst.</span>}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className={styles.escalaAddBtn}
+                        onClick={() =>
+                          setEditTarget({
+                            date: dateIso,
+                            shift,
+                            entry: null,
+                            busyIds: cellEntries.map((e) => e.therapistId),
+                          })
+                        }
+                      >
+                        + Adicionar
+                      </button>
+                    </div>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <ScheduleCellModal
+          date={editTarget.date}
+          shift={editTarget.shift}
+          entry={editTarget.entry}
+          therapists={activeTherapists}
+          busyIds={editTarget.busyIds}
+          onClose={() => setEditTarget(null)}
+          onChanged={(msg) => {
+            showToast(msg);
+            setEditTarget(null);
+            void reload();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Um modal só, reaproveitado pra adicionar (sem `entry`), substituir,
+ * definir horário excepcional e remover — evita espalhar em vários popovers
+ * pequenos difíceis de posicionar numa grade. */
+function ScheduleCellModal({
+  date,
+  shift,
+  entry,
+  therapists,
+  busyIds,
+  onClose,
+  onChanged,
+}: {
+  date: string;
+  shift: Shift;
+  entry: ScheduleEntry | null;
+  therapists: ActiveTherapistOption[];
+  /** Quem já está escalado nesse dia/turno — some da lista de seleção
+   * (adicionar ou substituir), em vez de deixar escolher e só barrar
+   * depois com o erro do backend. */
+  busyIds: string[];
+  onClose: () => void;
+  onChanged: (msg: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [mode, setMode] = useState<"menu" | "substitute" | "hours">("menu");
+
+  const [newTherapistId, setNewTherapistId] = useState("");
+  // Pra adicionar: ninguém que já esteja nesse dia/turno. Pra substituir:
+  // o mesmo, mais a própria pessoa que já está na linha.
+  const availableToAdd = therapists.filter((t) => !busyIds.includes(t.id));
+  const availableToSubstitute = therapists.filter(
+    (t) => !busyIds.includes(t.id) && t.id !== entry?.therapistId,
+  );
+
+  const [substituteId, setSubstituteId] = useState("");
+  const [reason, setReason] = useState("");
+
+  const [useCustomHours, setUseCustomHours] = useState(entry?.customOpensAt != null);
+  const [opensAt, setOpensAt] = useState(entry?.customOpensAt != null ? minutesToHHMM(entry.customOpensAt) : "");
+  const [closesAt, setClosesAt] = useState(
+    entry?.customClosesAt != null ? minutesToHHMM(entry.customClosesAt) : "",
+  );
+
+  async function handleAdd() {
+    if (!newTherapistId) return;
+    setBusy(true);
+    setErrorMsg(null);
+    try {
+      await terapeutaDaVezPublicRepository.createScheduleEntry({ therapistId: newTherapistId, date, shift });
+      onChanged("Escala adicionada.");
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Não foi possível adicionar à escala.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSubstitute() {
+    if (!entry || !substituteId) return;
+    setBusy(true);
+    setErrorMsg(null);
+    try {
+      const trimmedReason = reason.trim();
+      await terapeutaDaVezPublicRepository.substituteScheduleEntryTherapist(entry.id, {
+        newTherapistId: substituteId,
+        ...(trimmedReason ? { reason: trimmedReason } : {}),
+      });
+      onChanged("Substituição registrada.");
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Não foi possível substituir o terapeuta.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSaveHours() {
+    if (!entry) return;
+    let opens: number | null = null;
+    let closes: number | null = null;
+    if (useCustomHours) {
+      opens = hhmmToMinutes(opensAt);
+      closes = hhmmToMinutes(closesAt);
+      if (opens === null || closes === null || opens >= closes) {
+        setErrorMsg("Informe início e fim válidos, com o início antes do fim.");
+        return;
+      }
+    }
+    setBusy(true);
+    setErrorMsg(null);
+    try {
+      await terapeutaDaVezPublicRepository.updateScheduleEntryHours(entry.id, { opensAt: opens, closesAt: closes });
+      onChanged(useCustomHours ? "Horário excepcional salvo." : "Horário padrão do turno restaurado.");
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Não foi possível salvar o horário.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemove() {
+    if (!entry) return;
+    if (!confirm(`Remover ${entry.therapistName} da escala de ${SHIFT_LABEL_FULL[shift]} nesse dia?`)) return;
+    setBusy(true);
+    setErrorMsg(null);
+    try {
+      await terapeutaDaVezPublicRepository.deleteScheduleEntry(entry.id);
+      onChanged("Escala removida.");
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Não foi possível remover a escala.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+  });
+
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
+        <div>
+          <div className={styles.modalEyebrow}>ESCALA · {SHIFT_LABEL_FULL[shift].toUpperCase()}</div>
+          <div className={styles.modalTitle}>{entry ? entry.therapistName : "Adicionar terapeuta"}</div>
+          <div className={styles.modalSub} style={{ textTransform: "capitalize" }}>
+            {dateLabel}
+          </div>
+        </div>
+        <div className={styles.modalDivider} />
+
+        {errorMsg && <div className={styles.escalaError}>{errorMsg}</div>}
+
+        {!entry && (
+          <>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>TERAPEUTA</span>
+              <select
+                className={styles.fieldInput}
+                value={newTherapistId}
+                onChange={(e) => setNewTherapistId(e.target.value)}
+              >
+                <option value="">Selecione…</option>
+                {availableToAdd.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {availableToAdd.length === 0 && (
+                <span className={styles.rowMeta}>
+                  Todo mundo com disponibilidade já está escalado(a) nesse dia/turno.
+                </span>
+              )}
+            </div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.ghostBtn} onClick={onClose} style={{ flex: 1 }}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={styles.smallBtn}
+                disabled={busy || !newTherapistId}
+                onClick={() => void handleAdd()}
+                style={{ flex: 2, padding: "14px 12px" }}
+              >
+                Adicionar
+              </button>
+            </div>
+          </>
+        )}
+
+        {entry && mode === "menu" && (
+          <>
+            {entry.isSubstitution && entry.substitutedTherapistName && (
+              <div className={styles.modalHint}>
+                Substituindo quem estava originalmente escalado(a): {entry.substitutedTherapistName}.
+              </div>
+            )}
+            {entry.customHoursLabel && (
+              <div className={styles.modalHint}>Horário excepcional nesse dia: {entry.customHoursLabel}.</div>
+            )}
+            <div className={styles.modalActions} style={{ flexDirection: "column" }}>
+              <button
+                type="button"
+                className={styles.smallBtn}
+                style={{ padding: "14px 12px" }}
+                onClick={() => setMode("substitute")}
+              >
+                Substituir terapeuta
+              </button>
+              <button
+                type="button"
+                className={styles.smallBtn}
+                style={{ padding: "14px 12px" }}
+                onClick={() => setMode("hours")}
+              >
+                Horário excepcional
+              </button>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                style={{ padding: "14px 12px", borderColor: "#c0453a", color: "#c0453a" }}
+                disabled={busy}
+                onClick={() => void handleRemove()}
+              >
+                Remover da escala
+              </button>
+            </div>
+            <button type="button" className={styles.ghostBtn} onClick={onClose}>
+              Fechar
+            </button>
+          </>
+        )}
+
+        {entry && mode === "substitute" && (
+          <>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>NOVO TERAPEUTA</span>
+              <select
+                className={styles.fieldInput}
+                value={substituteId}
+                onChange={(e) => setSubstituteId(e.target.value)}
+              >
+                <option value="">Selecione…</option>
+                {availableToSubstitute.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {availableToSubstitute.length === 0 && (
+                <span className={styles.rowMeta}>
+                  Ninguém disponível pra esse dia/turno — todos os outros terapeutas já estão escalados
+                  aqui.
+                </span>
+              )}
+            </div>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>MOTIVO (OPCIONAL)</span>
+              <input
+                className={styles.fieldInput}
+                placeholder="Ex.: folga, troca combinada…"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            </div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.ghostBtn} onClick={() => setMode("menu")} style={{ flex: 1 }}>
+                Voltar
+              </button>
+              <button
+                type="button"
+                className={styles.smallBtn}
+                disabled={busy || !substituteId}
+                onClick={() => void handleSubstitute()}
+                style={{ flex: 2, padding: "14px 12px" }}
+              >
+                Confirmar substituição
+              </button>
+            </div>
+          </>
+        )}
+
+        {entry && mode === "hours" && (
+          <>
+            <label className={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                checked={!useCustomHours}
+                onChange={(e) => setUseCustomHours(!e.target.checked)}
+              />
+              Usar horário padrão do turno
+            </label>
+            {useCustomHours && (
+              <div className={styles.modalActions}>
+                <div className={styles.field} style={{ flex: 1 }}>
+                  <span className={styles.fieldLabel}>INÍCIO</span>
+                  <input
+                    className={styles.fieldInput}
+                    placeholder="16:00"
+                    value={opensAt}
+                    onChange={(e) => setOpensAt(e.target.value)}
+                  />
+                </div>
+                <div className={styles.field} style={{ flex: 1 }}>
+                  <span className={styles.fieldLabel}>FIM</span>
+                  <input
+                    className={styles.fieldInput}
+                    placeholder="18:00"
+                    value={closesAt}
+                    onChange={(e) => setClosesAt(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.ghostBtn} onClick={() => setMode("menu")} style={{ flex: 1 }}>
+                Voltar
+              </button>
+              <button
+                type="button"
+                className={styles.smallBtn}
+                disabled={busy}
+                onClick={() => void handleSaveHours()}
+                style={{ flex: 2, padding: "14px 12px" }}
+              >
+                Salvar horário
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---- Aba Histórico — consulta do dia, sem senha -----------------------------------
+
+const PHASE_LABELS: Record<string, string> = {
+  finished: "Finalizado",
+  declined: "Recusado",
+  reception: "Recepção",
+  therapy: "Terapia",
+};
+
+function formatDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function paymentsLabel(record: AttendanceRecord): string {
+  if (record.payments.length === 0) return "—";
+  // Nunca "misto" — cada forma aparece explícita, mesmo quando dividido
+  // entre mais de uma (pedido do usuário).
+  return record.payments.map((p) => `${p.methodLabel} R$ ${formatMoney(p.amount)}`).join(" · ");
+}
+
+function HistoricoTab() {
+  const [day, setDay] = useState(() => isoDate(new Date()));
+  const [page, setPage] = useState<HistoryPage | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  async function reload() {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const result = await terapeutaDaVezPublicRepository.listHistory({
+        dateFrom: day,
+        dateTo: day,
+        pageSize: 200,
+      });
+      setPage(result);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Não foi possível carregar o histórico.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day]);
+
+  async function handleExport() {
+    try {
+      const csv = await terapeutaDaVezPublicRepository.exportHistory({ dateFrom: day, dateTo: day });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `terapeuta-da-vez-historico-${day}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Não foi possível exportar o histórico.");
+    }
+  }
+
+  const items = page?.items ?? [];
+  const finishedItems = items.filter((i) => i.phase === "finished");
+  const totalValue = finishedItems.reduce((acc, i) => acc + (i.price ?? 0), 0);
+  const summaryByMethod = useMemo(() => {
+    const totals = new Map<PaymentMethod, { label: string; total: number }>();
+    for (const item of finishedItems) {
+      for (const p of item.payments) {
+        const current = totals.get(p.method) ?? { label: p.methodLabel, total: 0 };
+        current.total += p.amount;
+        totals.set(p.method, current);
+      }
+    }
+    return [...totals.values()];
+  }, [finishedItems]);
+
+  const dayLabel = new Date(`${day}T00:00:00`).toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+  });
+  const todayIso = isoDate(new Date());
+
+  return (
+    <div className={styles.escalaTab}>
+      <div className={styles.escalaToolbar}>
+        <button
+          type="button"
+          className={styles.ghostBtn}
+          onClick={() => setDay((d) => isoDate(addDays(new Date(`${d}T00:00:00`), -1)))}
+        >
+          ← Dia anterior
+        </button>
+        <span className={styles.escalaWeekLabel} style={{ textTransform: "capitalize" }}>
+          {dayLabel}
+        </span>
+        {day !== todayIso && (
+          <button type="button" className={styles.ghostBtn} onClick={() => setDay(todayIso)}>
+            Hoje
+          </button>
+        )}
+        <button
+          type="button"
+          className={styles.ghostBtn}
+          onClick={() => setDay((d) => isoDate(addDays(new Date(`${d}T00:00:00`), 1)))}
+        >
+          Próximo dia →
+        </button>
+        <button type="button" className={styles.smallBtn} style={{ marginLeft: "auto" }} onClick={() => void handleExport()}>
+          Exportar CSV
+        </button>
+      </div>
+
+      {loadError && <div className={styles.escalaError}>{loadError}</div>}
+      {loading && !page && <div className={styles.escalaLoading}>Carregando histórico…</div>}
+
+      {page && (
+        <>
+          <div className={styles.summaryGrid}>
+            <div>
+              <div className={styles.rowMeta}>ATENDIMENTOS FINALIZADOS</div>
+              <div className={styles.heroPoints} style={{ color: "#012a2a" }}>
+                {finishedItems.length}
+              </div>
+            </div>
+            <div>
+              <div className={styles.rowMeta}>VALOR TOTAL DO DIA</div>
+              <div className={styles.heroPoints} style={{ color: "#012a2a" }}>
+                R$ {formatMoney(totalValue)}
+              </div>
+            </div>
+            {summaryByMethod.map((entry) => (
+              <div key={entry.label}>
+                <div className={styles.rowMeta}>{entry.label.toUpperCase()}</div>
+                <div className={styles.heroPoints} style={{ color: "#012a2a", fontSize: 20 }}>
+                  R$ {formatMoney(entry.total)}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {items.length === 0 ? (
+            <EmptyState title="Nada por aqui ainda" hint="Nenhum atendimento registrado nesse dia." />
+          ) : (
+            <div style={{ overflowX: "auto", flexShrink: 0 }}>
+              <table className={styles.historyTable}>
+                <thead>
+                  <tr>
+                    <th>Hora</th>
+                    <th>Paciente</th>
+                    <th>Terapeuta</th>
+                    <th>Procedimento</th>
+                    <th>Valor</th>
+                    <th>Pagamento</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id}>
+                      <td>{formatDateTime(item.finishedAt ?? item.calledAt)}</td>
+                      <td>{item.clientName ?? "—"}</td>
+                      <td>{item.therapistName}</td>
+                      <td>{item.procedureName ?? "—"}</td>
+                      <td>{item.price !== null ? `R$ ${formatMoney(item.price)}` : "—"}</td>
+                      <td>{paymentsLabel(item)}</td>
+                      <td>{PHASE_LABELS[item.phase] ?? item.phase}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function ShiftStrip({ chips }: { chips: ShiftChip[] }) {
   return (
     <div className={styles.shiftStrip}>
@@ -628,50 +1525,30 @@ function HeroPanel({ nextIdle, onCall }: { nextIdle: QueueEntry | null; onCall: 
 
 const SHIFT_LABEL_FULL: Record<Shift, string> = { manha: "Manhã", inter: "Interturno", noturno: "Noturno" };
 
-function Sidebar({ state, onCheckIn }: { state: PanelState; onCheckIn: (t: AbsentTherapist) => void }) {
+function Sidebar({
+  state,
+  waiting,
+  onCheckIn,
+}: {
+  state: PanelState;
+  waiting: AbsentTherapist[];
+  onCheckIn: (t: AbsentTherapist) => void;
+}) {
   return (
     <aside className={styles.sidebar}>
-      <div className={styles.sidebarBlock}>
-        <span className={styles.sidebarTitle}>Ausentes</span>
-        {state.absent.length === 0 && (
-          <div className={styles.sidebarLine}>Todos os terapeutas escalados já iniciaram o turno.</div>
-        )}
-        {state.absent.map((t) => (
-          <div key={t.id} className={styles.sidebarLine} style={{ alignItems: "center" }}>
-            <span>{t.name}</span>
-            {t.availableShifts.length > 0 ? (
+      {waiting.length > 0 && (
+        <div className={styles.sidebarBlock}>
+          <span className={styles.sidebarTitle}>Aguardando início</span>
+          {waiting.map((t) => (
+            <div key={t.id} className={styles.sidebarLine} style={{ alignItems: "center" }}>
+              <span>{t.name}</span>
               <button type="button" className={styles.smallBtn} onClick={() => onCheckIn(t)}>
                 Iniciar turno
               </button>
-            ) : (
-              <span style={{ fontSize: 10.5 }}>Sem turno escalado agora</span>
-            )}
-          </div>
-        ))}
-      </div>
-      <div className={styles.sidebarBlock}>
-        <span className={styles.sidebarTitle}>Pontuação por procedimento</span>
-        {state.lastEntry && (
-          <>
-            <div className={styles.sidebarLine}>
-              <span>Último procedimento</span>
-              <span>{state.lastEntry.label}</span>
             </div>
-            <div className={styles.sidebarLine}>
-              <span>Pontos</span>
-              <span>{state.lastEntry.points}</span>
-            </div>
-          </>
-        )}
-        {!state.lastEntry && <div className={styles.sidebarLine}>Nenhum atendimento finalizado ainda hoje.</div>}
-        <div style={{ height: 1, background: "#DFDACA" }} />
-        {state.recentHistory.map((h, i) => (
-          <div key={i} className={styles.sidebarLine}>
-            <span>{h.label}</span>
-            <span>{h.points}</span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       <div className={styles.sidebarBlock} style={{ flex: 1, overflowY: "auto" }}>
         <span className={styles.sidebarTitle}>Avisos da operação</span>
         {state.alerts.map((a, i) => (
@@ -783,61 +1660,6 @@ function waitlistStatusLabel(e: WaitlistEntry, now: Date): string {
   if (e.conflict) return "PODE ATRASAR";
   const minutes = remainingMinutes(e.availableAt, now);
   return minutes === null ? "AGUARDANDO" : `LIBERA EM ${minutes} MIN`;
-}
-
-function WaitlistSection({
-  entries,
-  now,
-  onConfirm,
-  onCancel,
-}: {
-  entries: WaitlistEntry[];
-  now: Date;
-  onConfirm: (entry: WaitlistEntry) => void;
-  onCancel: (entry: WaitlistEntry) => void;
-}) {
-  return (
-    <section className={styles.waitlistSection}>
-      <span className={styles.waitlistTitle}>Fila de espera</span>
-      {entries.map((e) => {
-        const color = e.ready ? "#1E8A86" : e.conflict ? "#c0392b" : "#C9A44C";
-        return (
-          <div key={e.id} className={styles.waitlistRow}>
-            <div className={styles.waitlistInfo}>
-              <span className={styles.queueName}>
-                {e.clientName} · {e.therapistName}
-              </span>
-              <span className={styles.queueMeta}>{e.procedureName}</span>
-            </div>
-            <span
-              className={styles.waitlistStatus}
-              style={{ background: `${color}22`, color }}
-            >
-              {waitlistStatusLabel(e, now)}
-            </span>
-            <div className={styles.queueAction}>
-              <button
-                type="button"
-                className={styles.smallBtn}
-                disabled={!e.ready}
-                title={
-                  e.ready
-                    ? "Iniciar o atendimento deste cliente com este terapeuta"
-                    : "Ainda não está livre — só dá pra confirmar quando o status virar \"pronto pra confirmar\""
-                }
-                onClick={() => onConfirm(e)}
-              >
-                Confirmar
-              </button>
-              <button type="button" className={styles.ghostBtn} onClick={() => onCancel(e)}>
-                Cancelar
-              </button>
-            </div>
-          </div>
-        );
-      })}
-    </section>
-  );
 }
 
 // ---- Modal: fila de espera (reserva de terapeuta específico) ----------------------
@@ -1016,6 +1838,134 @@ function PointsConfirmModal({
             onClick={() => onAnswer(true)}
           >
             Sim, contabilizar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Modal: forma de pagamento ao finalizar ----------------------------------------
+
+function formatMoney(v: number): string {
+  return v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function parseMoneyInput(raw: string): number {
+  const n = Number(raw.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
+interface PaymentRow {
+  method: PaymentMethod;
+  amount: string;
+}
+
+/** Registro operacional de como o cliente pagou — pra bater com o Graces
+ * depois, nunca um controle fiscal. Suporta pagamento dividido entre mais de
+ * uma forma; a soma precisa fechar exatamente com o valor do atendimento. */
+function PaymentModal({
+  entry,
+  onCancel,
+  onConfirm,
+}: {
+  entry: QueueEntry;
+  onCancel: () => void;
+  onConfirm: (payments: PaymentAllocationInput[]) => void;
+}) {
+  const total = entry.price ?? 0;
+  const [rows, setRows] = useState<PaymentRow[]>([{ method: "pix", amount: formatMoney(total) }]);
+
+  function updateRow(index: number, patch: Partial<PaymentRow>) {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  function addRow() {
+    const used = new Set(rows.map((r) => r.method));
+    const next = PAYMENT_METHOD_OPTIONS.find((o) => !used.has(o.value))?.value ?? "pix";
+    setRows((prev) => [...prev, { method: next, amount: "" }]);
+  }
+
+  function removeRow(index: number) {
+    setRows((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  const sum = rows.reduce((acc, r) => acc + parseMoneyInput(r.amount), 0);
+  const diff = Math.round((total - sum) * 100) / 100;
+  const allFilled = rows.length > 0 && rows.every((r) => parseMoneyInput(r.amount) > 0);
+  const matches = allFilled && Math.abs(diff) < 0.005;
+
+  function confirm() {
+    if (!matches) return;
+    onConfirm(rows.map((r) => ({ method: r.method, amount: parseMoneyInput(r.amount) })));
+  }
+
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
+        <div>
+          <div className={styles.modalEyebrow}>FINALIZAR ATENDIMENTO</div>
+          <div className={styles.modalTitle}>{entry.name}</div>
+          <div className={styles.modalSub}>
+            {entry.clientName ?? "Cliente"} · Valor do atendimento: R$ {formatMoney(total)}
+          </div>
+        </div>
+        <div className={styles.modalDivider} />
+
+        <div className={styles.paymentRows}>
+          {rows.map((row, i) => (
+            <div key={i} className={styles.paymentRow}>
+              <select
+                className={styles.fieldInput}
+                value={row.method}
+                onChange={(e) => updateRow(i, { method: e.target.value as PaymentMethod })}
+              >
+                {PAYMENT_METHOD_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className={styles.fieldInput}
+                inputMode="decimal"
+                placeholder="0,00"
+                value={row.amount}
+                onChange={(e) => updateRow(i, { amount: e.target.value })}
+              />
+              {rows.length > 1 && (
+                <button type="button" className={styles.paymentRemove} onClick={() => removeRow(i)}>
+                  Remover
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <button type="button" className={styles.paymentAddBtn} onClick={addRow}>
+          + Adicionar forma de pagamento
+        </button>
+
+        <div className={matches ? styles.paymentSummaryOk : styles.paymentSummary}>
+          {diff === 0
+            ? `Os pagamentos informados somam R$ ${formatMoney(sum)}.`
+            : diff > 0
+              ? `Os pagamentos informados somam R$ ${formatMoney(sum)}. Ainda faltam R$ ${formatMoney(diff)}.`
+              : `Os pagamentos informados somam R$ ${formatMoney(sum)}. Isso é R$ ${formatMoney(Math.abs(diff))} a mais que o valor do atendimento.`}
+        </div>
+
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.ghostBtn} onClick={onCancel} style={{ flex: 1 }}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className={styles.smallBtn}
+            disabled={!matches}
+            onClick={confirm}
+            style={{ flex: 2, padding: "14px 12px" }}
+          >
+            Finalizar atendimento
           </button>
         </div>
       </div>

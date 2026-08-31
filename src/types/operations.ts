@@ -9,6 +9,37 @@ export type QueueStatus = "idle" | "reception" | "therapy";
 export type SpaceState = "free" | "occupied" | "cleaning";
 export type AttendancePhase = "reception" | "therapy" | "finished" | "declined";
 
+/** Controle OPERACIONAL da recepção pra bater com o ERP Graces depois —
+ * não é um conceito fiscal/contábil. `carteiraBemEstar`/`creditoConta` são
+ * só valores de enum por enquanto, sem integração real ainda. */
+export type PaymentMethod = "pix" | "dinheiro" | "credito" | "debito" | "carteira_bem_estar" | "credito_conta";
+
+export const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] = [
+  { value: "pix", label: "PIX" },
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "credito", label: "Cartão de crédito" },
+  { value: "debito", label: "Cartão de débito" },
+  { value: "carteira_bem_estar", label: "Carteira Bem-Estar" },
+  { value: "credito_conta", label: "Crédito Conta" },
+];
+
+export interface PaymentAllocation {
+  method: PaymentMethod;
+  methodLabel: string;
+  amount: number;
+}
+
+export interface PaymentAllocationInput {
+  method: PaymentMethod;
+  amount: number;
+}
+
+export interface PaymentSummaryEntry {
+  method: PaymentMethod;
+  methodLabel: string;
+  total: number;
+}
+
 /** Sem turno/pontos fixos: turno é escolhido a cada Entrada e pontos são
  * sempre derivados do histórico de hoje (`pointsManhaToday`/`pointsNoturnoToday`). */
 export interface Therapist {
@@ -67,12 +98,32 @@ export interface ScheduleEntry {
   date: string;
   shift: Shift;
   shiftLabel: string;
+  /** Horário excepcional só dessa linha (minutos desde meia-noite) — estreita
+   * a janela padrão do turno, nunca alarga. `null`/`null` = janela padrão. */
+  customOpensAt: number | null;
+  customClosesAt: number | null;
+  /** Rótulo pronto pra exibir, ex. "16:00–18:00", ou `null` sem exceção. */
+  customHoursLabel: string | null;
+  /** `true` quando essa linha já foi trocada de terapeuta ao menos uma vez
+   * (o `id` é preservado — troca é sempre UPDATE, nunca apaga+recria). */
+  isSubstitution: boolean;
+  substitutedTherapistName: string | null;
 }
 
 export interface CreateScheduleEntryInput {
   therapistId: string;
   date: string;
   shift: Shift;
+}
+
+export interface UpdateScheduleEntryHoursInput {
+  opensAt: number | null;
+  closesAt: number | null;
+}
+
+export interface SubstituteScheduleEntryTherapistInput {
+  newTherapistId: string;
+  reason?: string;
 }
 
 export interface TherapistDailyPoints {
@@ -129,6 +180,9 @@ export interface Procedure {
   durationLabel: string;
   points: number;
   priceLabel: string;
+  /** Valor numérico de verdade — `priceLabel` continua sendo só texto de
+   * exibição. Usado pra validar a soma das formas de pagamento. */
+  price: number;
   spaceRequirements: SpaceRequirement[];
   typeLabel: string;
   category: string;
@@ -142,6 +196,7 @@ export interface CreateProcedureInput {
   name: string;
   points: number;
   priceLabel?: string;
+  price?: number;
   spaceRequirements: SpaceRequirementInput[];
   category?: string;
   active?: boolean;
@@ -196,6 +251,9 @@ export interface QueueEntry {
   calledAt: string | null;
   startAt: string | null;
   plannedEndAt: string | null;
+  /** Valor do procedimento escolhido — só existe a partir do "Iniciar
+   * terapia" (snapshot do preço do procedimento). */
+  price: number | null;
 }
 
 export interface SpacePanelView {
@@ -228,6 +286,7 @@ export interface ProcedureOption {
   durationLabel: string;
   points: number;
   priceLabel: string;
+  price: number;
   spaceRequirements: SpaceRequirement[];
   typeLabel: string;
   category: string;
@@ -286,6 +345,9 @@ export interface PanelState {
   storeOpen: boolean;
   nextOpenAt: string | null;
   waitlist: WaitlistEntry[];
+  /** Resumo "valores registrados" do dia, por forma de pagamento — só
+   * conferência operacional com o Graces, não é faturamento contábil. */
+  paymentsToday: PaymentSummaryEntry[];
 }
 
 export interface AttendanceRecord {
@@ -305,6 +367,8 @@ export interface AttendanceRecord {
   startAt: string | null;
   plannedEndAt: string | null;
   finishedAt: string | null;
+  price: number | null;
+  payments: PaymentAllocation[];
 }
 
 export interface AttendanceAction {

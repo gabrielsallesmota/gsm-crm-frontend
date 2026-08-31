@@ -16,6 +16,8 @@ import type {
   OperationsClient,
   PanelAlert,
   PanelState,
+  PaymentAllocation,
+  PaymentSummaryEntry,
   Procedure,
   ProcedureOption,
   QueueEntry,
@@ -70,6 +72,11 @@ export interface ScheduleEntryDto {
   date: string;
   shift: string;
   shift_label: string;
+  custom_opens_at: number | null;
+  custom_closes_at: number | null;
+  custom_hours_label: string | null;
+  is_substitution: boolean;
+  substituted_therapist_name: string | null;
 }
 
 export interface TherapistDailyPointsDto {
@@ -114,6 +121,8 @@ export interface ProcedureDto {
   duration_label: string;
   points: number;
   price_label: string;
+  // Decimal do backend chega como string (Pydantic v2) — nunca float.
+  price: string;
   space_requirements: SpaceRequirementDto[];
   type_label: string;
   category: string;
@@ -160,6 +169,7 @@ export interface QueueEntryDto {
   called_at: string | null;
   start_at: string | null;
   planned_end_at: string | null;
+  price: string | null;
 }
 
 export interface SpaceDto {
@@ -189,9 +199,22 @@ export interface ProcedureOptionDto {
   duration_label: string;
   points: number;
   price_label: string;
+  price: string;
   space_requirements: SpaceRequirementDto[];
   type_label: string;
   category: string;
+}
+
+export interface PaymentAllocationDto {
+  method: string;
+  method_label: string;
+  amount: string;
+}
+
+export interface PaymentSummaryEntryDto {
+  method: string;
+  method_label: string;
+  total: string;
 }
 
 export interface HistoryEntryDto {
@@ -231,6 +254,7 @@ export interface PanelStateDto {
   store_open: boolean;
   next_open_at: string | null;
   waitlist: WaitlistEntryDto[];
+  payments_today: PaymentSummaryEntryDto[];
 }
 
 export interface AttendanceDto {
@@ -246,6 +270,8 @@ export interface AttendanceDto {
   start_at: string | null;
   planned_end_at: string | null;
   finished_at: string | null;
+  price: string | null;
+  payments: PaymentAllocationDto[];
 }
 
 export interface AttendanceActionDto {
@@ -342,6 +368,11 @@ export function toScheduleEntry(dto: ScheduleEntryDto): ScheduleEntry {
     date: dto.date,
     shift: dto.shift as ScheduleEntry["shift"],
     shiftLabel: dto.shift_label,
+    customOpensAt: dto.custom_opens_at,
+    customClosesAt: dto.custom_closes_at,
+    customHoursLabel: dto.custom_hours_label,
+    isSubstitution: dto.is_substitution,
+    substitutedTherapistName: dto.substituted_therapist_name,
   };
 }
 
@@ -392,6 +423,7 @@ export function toProcedure(dto: ProcedureDto): Procedure {
     durationLabel: dto.duration_label,
     points: dto.points,
     priceLabel: dto.price_label,
+    price: Number(dto.price),
     spaceRequirements: dto.space_requirements.map(toSpaceRequirement),
     typeLabel: dto.type_label,
     category: dto.category,
@@ -444,6 +476,7 @@ function toQueueEntry(dto: QueueEntryDto): QueueEntry {
     calledAt: dto.called_at,
     startAt: dto.start_at,
     plannedEndAt: dto.planned_end_at,
+    price: dto.price === null ? null : Number(dto.price),
   };
 }
 
@@ -475,9 +508,26 @@ function toProcedureOption(dto: ProcedureOptionDto): ProcedureOption {
     durationLabel: dto.duration_label,
     points: dto.points,
     priceLabel: dto.price_label,
+    price: Number(dto.price),
     spaceRequirements: dto.space_requirements.map(toSpaceRequirement),
     typeLabel: dto.type_label,
     category: dto.category,
+  };
+}
+
+function toPaymentAllocation(dto: PaymentAllocationDto): PaymentAllocation {
+  return {
+    method: dto.method as PaymentAllocation["method"],
+    methodLabel: dto.method_label,
+    amount: Number(dto.amount),
+  };
+}
+
+function toPaymentSummaryEntry(dto: PaymentSummaryEntryDto): PaymentSummaryEntry {
+  return {
+    method: dto.method as PaymentSummaryEntry["method"],
+    methodLabel: dto.method_label,
+    total: Number(dto.total),
   };
 }
 
@@ -524,6 +574,7 @@ export function toPanelState(dto: PanelStateDto): PanelState {
     storeOpen: dto.store_open,
     nextOpenAt: dto.next_open_at,
     waitlist: dto.waitlist.map(toWaitlistEntry),
+    paymentsToday: dto.payments_today.map(toPaymentSummaryEntry),
   };
 }
 
@@ -541,6 +592,8 @@ export function toAttendance(dto: AttendanceDto): AttendanceRecord {
     startAt: dto.start_at,
     plannedEndAt: dto.planned_end_at,
     finishedAt: dto.finished_at,
+    price: dto.price === null ? null : Number(dto.price),
+    payments: dto.payments.map(toPaymentAllocation),
   };
 }
 
