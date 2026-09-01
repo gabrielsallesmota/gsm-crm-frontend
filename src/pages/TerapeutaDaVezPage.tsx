@@ -311,8 +311,20 @@ export function TerapeutaDaVezPage() {
 
   async function confirmStart() {
     if (starting) return;
-    if (!wizardEntry?.attendanceId || !chosenProcedureId || !spaceReady || !clientNameReady) {
-      showToast("Escolha o procedimento, o espaço e o nome do cliente antes de iniciar.");
+    // Clique duplicado depois que um clique anterior já fechou o wizard
+    // (sucesso ou cancelamento) — ignora em silêncio, não é um erro de
+    // verdade pro usuário ver.
+    if (!wizardEntry) return;
+    if (!wizardEntry.attendanceId || !chosenProcedureId || !spaceReady || !clientNameReady) {
+      // Mensagem específica por campo — se isso ainda aparecer depois de
+      // preenchido tudo, o texto já diz sozinho qual condição realmente
+      // falhou, em vez de um aviso genérico que não ajuda a diagnosticar.
+      const missing: string[] = [];
+      if (!wizardEntry.attendanceId) missing.push("sessão do atendimento expirou — feche e chame de novo");
+      if (!chosenProcedureId) missing.push("procedimento");
+      if (!spaceReady) missing.push("espaço de cada trecho");
+      if (!clientNameReady) missing.push("nome do cliente (mín. 3 letras)");
+      showToast(`Antes de iniciar, falta: ${missing.join(", ")}.`);
       return;
     }
     setStarting(true);
