@@ -212,6 +212,7 @@ export class OperationsApiRepository {
           name: r.name,
           points: r.points ?? 0,
           price_label: r.priceLabel ?? "",
+          price: r.price ?? 0,
           space_type: r.spaceType ?? "maca",
           space_minutes: r.spaceMinutes ?? 30,
           category: r.category ?? "",

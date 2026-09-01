@@ -441,6 +441,7 @@ export interface ProcedureImportRowInput {
   name: string;
   points?: number;
   priceLabel?: string;
+  price?: number;
   spaceType?: SpaceType;
   spaceMinutes?: number;
   category?: string;

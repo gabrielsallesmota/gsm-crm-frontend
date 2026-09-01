@@ -126,18 +126,13 @@ function formatPriceInput(raw: string): string {
 }
 
 /** Mesma máscara "dígitos = centavos" de `formatPriceInput`, mas devolve o
- * número de verdade (não um texto de exibição) — usado no campo `price`
- * (`Decimal` no backend), que valida a soma das formas de pagamento na
- * finalização. Diferente de `priceLabel`, que é só texto livre exibido no
- * painel. */
+ * número de verdade (não um texto de exibição) — o campo "Preço" do form é
+ * só um (o rótulo exibido), e `price` (`Decimal` no backend, valida a soma
+ * das formas de pagamento na finalização) é sempre derivado dele. Dois
+ * campos manuais pro mesmo valor não fazia sentido (pedido do usuário). */
 function parsePriceInputToNumber(raw: string): number {
   const digits = raw.replace(/\D/g, "");
   return digits ? Number(digits) / 100 : 0;
-}
-
-function formatPriceValue(value: number | undefined): string {
-  if (!value) return "";
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 /**
@@ -1024,17 +1019,15 @@ function ProcedureFormFields({
         />
         <input
           className={styles.input}
-          placeholder="Rótulo de preço (texto exibido, ex.: R$ 0,00)"
+          placeholder="Preço (ex.: R$ 260,00 — R$ 0,00 vale como gratuito)"
           inputMode="numeric"
           value={form.priceLabel}
-          onChange={(e) => setForm((f) => ({ ...f, priceLabel: formatPriceInput(e.target.value) }))}
-        />
-        <input
-          className={styles.input}
-          placeholder="Preço (R$ 0,00) — usado pra pedir a forma de pagamento ao finalizar"
-          inputMode="numeric"
-          value={formatPriceValue(form.price)}
-          onChange={(e) => setForm((f) => ({ ...f, price: parsePriceInputToNumber(e.target.value) }))}
+          onChange={(e) =>
+            setForm((f) => {
+              const priceLabel = formatPriceInput(e.target.value);
+              return { ...f, priceLabel, price: parsePriceInputToNumber(priceLabel) };
+            })
+          }
         />
         <input
           className={styles.input}

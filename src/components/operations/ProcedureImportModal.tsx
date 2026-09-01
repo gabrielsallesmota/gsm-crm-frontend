@@ -28,6 +28,15 @@ function parseBoolean(raw: string): boolean {
   return !["false", "0", "nao", "não", "inativo", "n"].includes(v);
 }
 
+/** "R$ 260,00", "260,00" ou "260" — sempre extrai só os dígitos e trata
+ * como reais/centavos (mesma convenção do campo Preço na gestão). Uma só
+ * coluna "Preço" na planilha alimenta tanto o rótulo de exibição quanto o
+ * valor numérico de verdade — não faz sentido pedir os dois. */
+function parsePriceToNumber(raw: string): number {
+  const digits = raw.replace(/\D/g, "");
+  return digits ? Number(digits) / 100 : 0;
+}
+
 function buildRow(headers: string[], mapping: string[], values: string[]): ProcedureImportRowInput | null {
   const row: Partial<ProcedureImportRowInput> = {};
   headers.forEach((_, colIndex) => {
@@ -44,6 +53,11 @@ function buildRow(headers: string[], mapping: string[], values: string[]): Proce
       const normalized = raw.trim().toLowerCase();
       if (!SPACE_TYPES.includes(normalized as SpaceType)) return; // valor inválido — ignora em vez de quebrar o lote
       row.spaceType = normalized as SpaceType;
+      return;
+    }
+    if (key === "priceLabel") {
+      row.priceLabel = raw;
+      row.price = parsePriceToNumber(raw);
       return;
     }
     if (NUMBER_FIELDS.has(key)) {
