@@ -723,7 +723,11 @@
   padding: 14px 22px;
   border-left: 3px solid #c9a44c;
   font-size: 14px;
-  z-index: 60;
+  /* Acima do `.overlay` (80) — a maioria das ações (chamar, iniciar,
+     finalizar) roda com um modal aberto, e um erro precisa aparecer mesmo
+     assim. Antes ficava atrás do modal, invisível: dava a impressão de que
+     o clique "não fazia nada". */
+  z-index: 90;
   max-width: min(90vw, 560px);
 }
 
