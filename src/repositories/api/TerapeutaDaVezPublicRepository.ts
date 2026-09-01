@@ -1,6 +1,7 @@
 import { ApiError } from "../../types/common";
 import { BASE_URL } from "./ApiClient";
 import {
+  toAttendance,
   toAttendanceAction,
   toHistoryPage,
   toPanelState,
@@ -8,6 +9,7 @@ import {
   toTherapistAction,
   toWaitlistAction,
   type AttendanceActionDto,
+  type AttendanceDto,
   type HistoryPageDto,
   type PanelStateDto,
   type ScheduleEntryDto,
@@ -16,6 +18,7 @@ import {
 } from "./operationsMapping";
 import type {
   AttendanceAction,
+  AttendanceRecord,
   CreateScheduleEntryInput,
   CreateWaitlistEntryInput,
   HistoryFilter,
@@ -237,6 +240,20 @@ export class TerapeutaDaVezPublicRepository {
   exportHistory(filter: HistoryFilter): Promise<string> {
     const params = historyFilterParams(filter);
     return publicRequestText(`${BASE}/attendances/export?${params.toString()}`);
+  }
+
+  /** Registrar (ou corrigir) a forma de pagamento de um atendimento já
+   * finalizado — como a recepção resolve um "pagamento pendente" direto do
+   * Histórico, sem senha. */
+  async updateAttendancePayments(
+    attendanceId: string,
+    payments: PaymentAllocationInput[],
+  ): Promise<AttendanceRecord> {
+    const dto = await publicRequest<AttendanceDto>(`${BASE}/attendances/${attendanceId}/payments`, {
+      method: "PATCH",
+      body: JSON.stringify({ payments: payments.map((p) => ({ method: p.method, amount: p.amount })) }),
+    });
+    return toAttendance(dto);
   }
 }
 

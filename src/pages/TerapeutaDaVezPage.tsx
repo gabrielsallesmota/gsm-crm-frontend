@@ -231,6 +231,7 @@ export function TerapeutaDaVezPage() {
     setWizardEntry(entry);
     setWizardStep("procedure");
     setChosenProcedureId(null);
+    setStarting(false);
     setChosenSpaceIds([]);
     setWizardClientName("");
   }
@@ -303,9 +304,18 @@ export function TerapeutaDaVezPage() {
   const spaceReady =
     chosenSpaceIds.length > 0 && chosenSpaceIds.every((id) => id !== null);
   const clientNameReady = wizardClientName.trim().length > 2;
+  // Trava duplo clique e cobre o botão "Iniciar terapia" (etapa 3, sem
+  // `disabled` nenhum antes) — um clique nele com o estado por algum motivo
+  // incompleto simplesmente não fazia nada, sem toast nem erro no console.
+  const [starting, setStarting] = useState(false);
 
   async function confirmStart() {
-    if (!wizardEntry?.attendanceId || !chosenProcedureId || !spaceReady || !clientNameReady) return;
+    if (starting) return;
+    if (!wizardEntry?.attendanceId || !chosenProcedureId || !spaceReady || !clientNameReady) {
+      showToast("Escolha o procedimento, o espaço e o nome do cliente antes de iniciar.");
+      return;
+    }
+    setStarting(true);
     try {
       await start(
         wizardEntry.attendanceId,
@@ -317,6 +327,8 @@ export function TerapeutaDaVezPage() {
       closeWizard();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Não foi possível iniciar a terapia.");
+    } finally {
+      setStarting(false);
     }
   }
 
@@ -541,7 +553,7 @@ export function TerapeutaDaVezPage() {
       )}
 
       {activeTab === "escala" && <EscalaTab state={state} showToast={showToast} />}
-      {activeTab === "historico" && <HistoricoTab />}
+      {activeTab === "historico" && <HistoricoTab showToast={showToast} />}
 
       {toastMsg && <div className={styles.toast}>{toastMsg}</div>}
 
@@ -573,6 +585,7 @@ export function TerapeutaDaVezPage() {
           clientName={wizardClientName}
           setClientName={setWizardClientName}
           clientNameReady={clientNameReady}
+          starting={starting}
           spaces={state.spaces}
           now={now}
           onClose={closeWizard}
@@ -1301,11 +1314,12 @@ function paymentsLabel(record: AttendanceRecord): string {
   return record.payments.map((p) => `${p.methodLabel} R$ ${formatMoney(p.amount)}`).join(" · ");
 }
 
-function HistoricoTab() {
+function HistoricoTab({ showToast }: { showToast: (msg: string) => void }) {
   const [day, setDay] = useState(() => isoDate(new Date()));
   const [page, setPage] = useState<HistoryPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [registerTarget, setRegisterTarget] = useState<AttendanceRecord | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -1347,6 +1361,7 @@ function HistoricoTab() {
   const items = page?.items ?? [];
   const finishedItems = items.filter((i) => i.phase === "finished");
   const totalValue = finishedItems.reduce((acc, i) => acc + (i.price ?? 0), 0);
+  const pendingCount = finishedItems.filter((i) => i.paymentPending).length;
   const summaryByMethod = useMemo(() => {
     const totals = new Map<PaymentMethod, { label: string; total: number }>();
     for (const item of finishedItems) {
@@ -1414,6 +1429,14 @@ function HistoricoTab() {
                 R$ {formatMoney(totalValue)}
               </div>
             </div>
+            {pendingCount > 0 && (
+              <div>
+                <div className={styles.rowMeta}>PAGAMENTOS PENDENTES</div>
+                <div className={styles.heroPoints} style={{ color: "#9a4a26", fontSize: 20 }}>
+                  {pendingCount}
+                </div>
+              </div>
+            )}
             {summaryByMethod.map((entry) => (
               <div key={entry.label}>
                 <div className={styles.rowMeta}>{entry.label.toUpperCase()}</div>
@@ -1448,7 +1471,20 @@ function HistoricoTab() {
                       <td>{item.therapistName}</td>
                       <td>{item.procedureName ?? "—"}</td>
                       <td>{item.price !== null ? `R$ ${formatMoney(item.price)}` : "—"}</td>
-                      <td>{paymentsLabel(item)}</td>
+                      <td>
+                        {item.paymentPending ? (
+                          <button
+                            type="button"
+                            className={styles.paymentPendingBadge}
+                            onClick={() => setRegisterTarget(item)}
+                            style={{ cursor: "pointer", border: "1px solid #c9a44c" }}
+                          >
+                            PENDENTE · registrar
+                          </button>
+                        ) : (
+                          paymentsLabel(item)
+                        )}
+                      </td>
                       <td>{PHASE_LABELS[item.phase] ?? item.phase}</td>
                     </tr>
                   ))}
@@ -1458,6 +1494,152 @@ function HistoricoTab() {
           )}
         </>
       )}
+
+      {registerTarget && (
+        <RegisterPaymentModal
+          record={registerTarget}
+          onClose={() => setRegisterTarget(null)}
+          onRegistered={(msg) => {
+            setRegisterTarget(null);
+            showToast(msg);
+            void reload();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Registrar (ou corrigir) a forma de pagamento de uma linha do Histórico —
+ * mesma mecânica de split/soma exata do `PaymentModal` da finalização, só
+ * que operando sobre um `AttendanceRecord` já finalizado em vez de uma
+ * `QueueEntry` em terapia. */
+function RegisterPaymentModal({
+  record,
+  onClose,
+  onRegistered,
+}: {
+  record: AttendanceRecord;
+  onClose: () => void;
+  onRegistered: (msg: string) => void;
+}) {
+  const total = record.price ?? 0;
+  const [rows, setRows] = useState<PaymentRow[]>(
+    record.payments.length > 0
+      ? record.payments.map((p) => ({ method: p.method, amount: formatMoney(p.amount) }))
+      : [{ method: "pix", amount: formatMoney(total) }],
+  );
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  function updateRow(index: number, patch: Partial<PaymentRow>) {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  function addRow() {
+    const used = new Set(rows.map((r) => r.method));
+    const next = PAYMENT_METHOD_OPTIONS.find((o) => !used.has(o.value))?.value ?? "pix";
+    setRows((prev) => [...prev, { method: next, amount: "" }]);
+  }
+
+  function removeRow(index: number) {
+    setRows((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  const sum = rows.reduce((acc, r) => acc + parseMoneyInput(r.amount), 0);
+  const diff = Math.round((total - sum) * 100) / 100;
+  const allFilled = rows.length > 0 && rows.every((r) => parseMoneyInput(r.amount) > 0);
+  const matches = allFilled && Math.abs(diff) < 0.005;
+
+  async function save() {
+    if (!matches) return;
+    setSaving(true);
+    setErrorMsg(null);
+    try {
+      await terapeutaDaVezPublicRepository.updateAttendancePayments(
+        record.id,
+        rows.map((r) => ({ method: r.method, amount: parseMoneyInput(r.amount) })),
+      );
+      onRegistered(`Pagamento de ${record.clientName ?? record.therapistName} registrado.`);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Não foi possível registrar o pagamento.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
+        <div>
+          <div className={styles.modalEyebrow}>REGISTRAR PAGAMENTO</div>
+          <div className={styles.modalTitle}>{record.clientName ?? "Cliente"}</div>
+          <div className={styles.modalSub}>
+            {record.therapistName} · {record.procedureName ?? "Procedimento"} · Valor: R${" "}
+            {formatMoney(total)}
+          </div>
+        </div>
+        <div className={styles.modalDivider} />
+
+        {errorMsg && <div className={styles.escalaError}>{errorMsg}</div>}
+
+        <div className={styles.paymentRows}>
+          {rows.map((row, i) => (
+            <div key={i} className={styles.paymentRow}>
+              <select
+                className={styles.fieldInput}
+                value={row.method}
+                onChange={(e) => updateRow(i, { method: e.target.value as PaymentMethod })}
+              >
+                {PAYMENT_METHOD_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className={styles.fieldInput}
+                inputMode="decimal"
+                placeholder="0,00"
+                value={row.amount}
+                onChange={(e) => updateRow(i, { amount: e.target.value })}
+              />
+              {rows.length > 1 && (
+                <button type="button" className={styles.paymentRemove} onClick={() => removeRow(i)}>
+                  Remover
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <button type="button" className={styles.paymentAddBtn} onClick={addRow}>
+          + Adicionar forma de pagamento
+        </button>
+
+        <div className={matches ? styles.paymentSummaryOk : styles.paymentSummary}>
+          {diff === 0
+            ? `Os pagamentos informados somam R$ ${formatMoney(sum)}.`
+            : diff > 0
+              ? `Os pagamentos informados somam R$ ${formatMoney(sum)}. Ainda faltam R$ ${formatMoney(diff)}.`
+              : `Os pagamentos informados somam R$ ${formatMoney(sum)}. Isso é R$ ${formatMoney(Math.abs(diff))} a mais que o valor do atendimento.`}
+        </div>
+
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.ghostBtn} onClick={onClose} style={{ flex: 1 }}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className={styles.smallBtn}
+            disabled={!matches || saving}
+            onClick={() => void save()}
+            style={{ flex: 2, padding: "14px 12px" }}
+          >
+            {saving ? "Salvando…" : "Registrar pagamento"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1900,6 +2082,14 @@ function PaymentModal({
     onConfirm(rows.map((r) => ({ method: r.method, amount: parseMoneyInput(r.amount) })));
   }
 
+  // "Registrar depois" — finaliza sem forma de pagamento nenhuma. O
+  // atendimento fica marcado como pagamento pendente (nunca bloqueado por
+  // isso) e some da fila do mesmo jeito; a recepção completa quando puder,
+  // pelo Histórico (ver `paymentPending`).
+  function skipForNow() {
+    onConfirm([]);
+  }
+
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
@@ -1968,6 +2158,9 @@ function PaymentModal({
             Finalizar atendimento
           </button>
         </div>
+        <button type="button" className={styles.paymentSkipBtn} onClick={skipForNow}>
+          Não sei agora — registrar pagamento depois
+        </button>
       </div>
     </div>
   );
@@ -2013,6 +2206,7 @@ function WizardModal({
   clientName,
   setClientName,
   clientNameReady,
+  starting,
   spaces,
   now,
   onClose,
@@ -2036,6 +2230,10 @@ function WizardModal({
   clientName: string;
   setClientName: (v: string) => void;
   clientNameReady: boolean;
+  /** Trava o botão "Iniciar terapia" durante o envio — evita duplo clique e
+   * (junto do `disabled`) garante que o clique nunca fique sem nenhum
+   * retorno visível. */
+  starting: boolean;
   spaces: SpacePanelView[];
   now: Date;
   onClose: () => void;
@@ -2232,8 +2430,14 @@ function WizardModal({
               <button type="button" className={styles.ghostBtn} onClick={() => setStep("space")} style={{ flex: 1 }}>
                 Voltar
               </button>
-              <button type="button" className={styles.smallBtn} style={{ flex: 2, padding: "14px 12px" }} onClick={onConfirmStart}>
-                Iniciar terapia
+              <button
+                type="button"
+                className={styles.smallBtn}
+                style={{ flex: 2, padding: "14px 12px" }}
+                disabled={starting}
+                onClick={onConfirmStart}
+              >
+                {starting ? "Iniciando…" : "Iniciar terapia"}
               </button>
             </div>
           </>

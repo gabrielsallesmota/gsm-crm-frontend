@@ -369,6 +369,10 @@ export interface AttendanceRecord {
   finishedAt: string | null;
   price: number | null;
   payments: PaymentAllocation[];
+  /** Finalizado, com valor a cobrar, mas sem forma de pagamento registrada
+   * ainda (a recepção terminou sem informar na hora) — sempre derivado do
+   * backend, nunca um campo que se digita. */
+  paymentPending: boolean;
 }
 
 export interface AttendanceAction {

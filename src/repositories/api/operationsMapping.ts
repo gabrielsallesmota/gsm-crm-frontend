@@ -272,6 +272,7 @@ export interface AttendanceDto {
   finished_at: string | null;
   price: string | null;
   payments: PaymentAllocationDto[];
+  payment_pending: boolean;
 }
 
 export interface AttendanceActionDto {
@@ -594,6 +595,7 @@ export function toAttendance(dto: AttendanceDto): AttendanceRecord {
     finishedAt: dto.finished_at,
     price: dto.price === null ? null : Number(dto.price),
     payments: dto.payments.map(toPaymentAllocation),
+    paymentPending: dto.payment_pending,
   };
 }
 
