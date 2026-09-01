@@ -158,9 +158,16 @@ export function TerapeutaDaVezPage() {
   // só mais adiante, junto com a escolha do espaço (ver `wizardClientName`).
   async function chooseProcedure(entry: QueueEntry) {
     try {
-      await call(entry.therapistId);
-      const updated = state?.queue.find((q) => q.therapistId === entry.therapistId) ?? entry;
-      openWizard(updated);
+      // `call` já devolve o atendimento recém-criado (com `id`) — usar isso
+      // direto, em vez de procurar em `state.queue` logo em seguida. `state`
+      // aqui é a variável já capturada nesta função (o valor de quando ela
+      // foi criada, no render anterior); o `setState` que `call` faz por
+      // dentro não "atualiza" essa variável retroativamente, então a busca
+      // sempre batia no `state` de ANTES da chamada — o wizard abria com
+      // `attendanceId: null`, e só quebrava lá na frente, no fim do wizard,
+      // com a mensagem de "sessão expirou" (bug real, achado em produção).
+      const attendance = await call(entry.therapistId);
+      openWizard({ ...entry, status: "reception", attendanceId: attendance.id });
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Não foi possível chamar o terapeuta.");
     }
