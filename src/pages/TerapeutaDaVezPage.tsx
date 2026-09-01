@@ -2262,6 +2262,26 @@ function WizardModal({
 }) {
   const plannedEnd = chosenProcedure ? new Date(now.getTime() + chosenProcedure.durationMinutes * 60000) : null;
 
+  // Busca por código ou nome — filtra em tempo real conforme digita, sem
+  // precisar rolar as categorias todas pra achar um procedimento
+  // específico. Categoria some inteira se nenhum item dela bater.
+  const [procedureSearch, setProcedureSearch] = useState("");
+  const normalizedSearch = procedureSearch.trim().toLowerCase();
+  const filteredProcedureGroups: Record<string, ProcedureOption[]> = normalizedSearch
+    ? Object.fromEntries(
+        Object.entries(procedureGroups)
+          .map(([category, items]) => [
+            category,
+            items.filter(
+              (p) =>
+                p.name.toLowerCase().includes(normalizedSearch) ||
+                p.code.toLowerCase().includes(normalizedSearch),
+            ),
+          ])
+          .filter(([, items]) => (items as ProcedureOption[]).length > 0),
+      )
+    : procedureGroups;
+
   return (
     <div className={styles.overlay}>
       <div className={`${styles.modal} ${step === "procedure" ? styles.modalWide : ""}`}>
@@ -2271,8 +2291,18 @@ function WizardModal({
               <div className={styles.modalEyebrow}>ETAPA 1 DE 3 · COM {entry.name}</div>
               <div className={styles.modalTitle}>Qual procedimento o cliente deseja realizar?</div>
             </div>
+            <input
+              className={styles.fieldInput}
+              placeholder="Buscar por código ou nome…"
+              autoFocus
+              value={procedureSearch}
+              onChange={(e) => setProcedureSearch(e.target.value)}
+            />
+            {normalizedSearch && Object.keys(filteredProcedureGroups).length === 0 && (
+              <span className={styles.rowMeta}>Nenhum procedimento encontrado.</span>
+            )}
             <div className={styles.procedureGrid}>
-              {Object.entries(procedureGroups).map(([category, items]) => (
+              {Object.entries(filteredProcedureGroups).map(([category, items]) => (
                 <div key={category} style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
                   <span style={{ fontSize: 10, letterSpacing: 1.6, color: "#9A7426" }}>{category}</span>
                   <div className={styles.procedureGrid} style={{ maxHeight: "none" }}>
