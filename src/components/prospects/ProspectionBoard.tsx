@@ -16,6 +16,7 @@ import { prospectsService } from "../../services/ProspectsService";
 import { ApiError } from "../../types/common";
 import { PRIORITY, PROSPECT_ORIGIN, WHATSAPP_STATUS } from "../../constants/prospectEnums";
 import type { Period } from "../../utils/periods";
+import { computeStageTargetDate } from "../../utils/prospectCadence";
 import type {
   CreateProspectInput,
   MessageTemplate,
@@ -106,7 +107,17 @@ export function ProspectionBoard({ period }: { period: Period }) {
     const current = prospects.find((p) => p.id === prospectId);
     if (!current || current.stageId === targetStageId) return; // solto na própria coluna — nada a fazer
     const targetStage = stages?.find((s) => s.id === targetStageId);
-    if (targetStage?.asksTargetDate) {
+    // Se a cadência automática já cobre o caminho até `targetStageId` (todo
+    // estágio no meio tem `followupBusinessDays` configurado — ver
+    // `computeStageTargetDate`), o backend vai calcular a data sozinho e
+    // ignorar qualquer coisa que a gente mande aqui (`MoveProspectUseCase`
+    // dá prioridade à cadência) — não faz sentido perguntar nesse caso.
+    const autoComputed = computeStageTargetDate(
+      stages ?? [],
+      targetStageId,
+      current.initialContactDate,
+    );
+    if (targetStage?.asksTargetDate && autoComputed === null) {
       setPendingMove({ prospectId, stageId: targetStageId, stageName: targetStage.name });
       return;
     }

@@ -50,6 +50,7 @@ interface ProspectDto {
   page_objective: PageObjective | null;
   priority: ProspectPriority;
   origin: ProspectOrigin;
+  initial_contact_date: string | null;
   target_date: string | null;
   created_at: string;
   updated_at: string;
@@ -64,6 +65,7 @@ interface ProspectStageDto {
   is_won: boolean;
   is_lost: boolean;
   asks_target_date: boolean;
+  followup_business_days: number | null;
 }
 
 function toProspect(dto: ProspectDto): Prospect {
@@ -91,6 +93,7 @@ function toProspect(dto: ProspectDto): Prospect {
     pageObjective: dto.page_objective,
     priority: dto.priority,
     origin: dto.origin,
+    initialContactDate: dto.initial_contact_date,
     targetDate: dto.target_date,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
@@ -109,6 +112,7 @@ function toProspectStage(dto: ProspectStageDto): ProspectStage {
     isWon: dto.is_won,
     isLost: dto.is_lost,
     asksTargetDate: dto.asks_target_date,
+    followupBusinessDays: dto.followup_business_days,
   };
 }
 
@@ -134,6 +138,7 @@ function createBody(input: CreateProspectInput | UpdateProspectInput) {
     page_objective: input.pageObjective,
     priority: input.priority,
     origin: input.origin,
+    initial_contact_date: input.initialContactDate,
     target_date: input.targetDate,
     force: input.force ?? false,
   };
@@ -160,6 +165,7 @@ function importRowBody(row: ImportRowInput) {
     page_objective: row.pageObjective,
     priority: row.priority,
     origin: row.origin,
+    initial_contact_date: row.initialContactDate,
   };
 }
 
@@ -286,6 +292,7 @@ export class ProspectsApiRepository implements ProspectsRepository {
           is_won: input.isWon ?? false,
           is_lost: input.isLost ?? false,
           asks_target_date: input.asksTargetDate ?? false,
+          followup_business_days: input.followupBusinessDays ?? null,
         }),
       }),
     );
@@ -301,6 +308,8 @@ export class ProspectsApiRepository implements ProspectsRepository {
           is_won: input.isWon,
           is_lost: input.isLost,
           asks_target_date: input.asksTargetDate,
+          followup_business_days: input.followupBusinessDays,
+          clear_followup_business_days: input.clearFollowupBusinessDays ?? false,
         }),
       }),
     );

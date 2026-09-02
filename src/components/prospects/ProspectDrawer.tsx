@@ -101,6 +101,7 @@ export function ProspectDrawer({
         priority: form.priority,
         origin: form.origin,
         force,
+        ...(form.initialContactDate ? { initialContactDate: form.initialContactDate } : {}),
         ...(form.targetDate ? { targetDate: form.targetDate } : {}),
         ...(form.googleRating ? { googleRating: Number(form.googleRating) } : {}),
         ...(form.googleReviewsCount ? { googleReviewsCount: Number(form.googleReviewsCount) } : {}),
@@ -372,6 +373,14 @@ export function ProspectDrawer({
               onChange={(v) => setForm((f) => ({ ...f, priority: v as FormState["priority"] }))}
             />
             <Field
+              label="Primeiro contato (P0)"
+              editing={editing}
+              value={form.initialContactDate}
+              display={formatTargetDate(prospect.initialContactDate)}
+              onChange={(v) => setForm((f) => ({ ...f, initialContactDate: v }))}
+              type="date"
+            />
+            <Field
               label="Data alvo (follow-up)"
               editing={editing}
               value={form.targetDate}
@@ -589,6 +598,7 @@ function fromProspect(prospect: Prospect) {
     pageObjective: prospect.pageObjective ?? "",
     priority: prospect.priority,
     origin: prospect.origin,
+    initialContactDate: prospect.initialContactDate ?? "",
     targetDate: prospect.targetDate ?? "",
   };
 }

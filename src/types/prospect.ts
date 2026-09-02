@@ -32,8 +32,15 @@ export interface ProspectStage {
   isWon: boolean;
   isLost: boolean;
   // Mover um prospect pra este estágio deve pedir uma data alvo de
-  // follow-up? Ver `Prospect.targetDate` e `ProspectionBoard.tsx`.
+  // follow-up? Ver `Prospect.targetDate` e `ProspectionBoard.tsx`. Ignorado
+  // quando `followupBusinessDays` está configurado (esse tem prioridade).
   asksTargetDate: boolean;
+  // Cadência automática: dias ÚTEIS (seg-sex, sem feriados nacionais BR)
+  // depois do estágio ANTERIOR (por `order`) até a data alvo deste
+  // estágio. `null` = sem cadência automática aqui (mantém `asksTargetDate`).
+  // Irrelevante no primeiro estágio da pipeline — esse É a âncora
+  // (`Prospect.initialContactDate`). Configurado em "Estágios" → editar.
+  followupBusinessDays: number | null;
 }
 
 /** Anotação datada de alguém sobre o prospect — histórico append-only,
@@ -78,9 +85,14 @@ export interface Prospect {
   pageObjective: PageObjective | null;
   priority: ProspectPriority;
   origin: ProspectOrigin;
-  // Próxima data de follow-up ("YYYY-MM-DD") — normalmente definida ao
-  // mover pra um estágio com `ProspectStage.asksTargetDate`, mas editável a
-  // qualquer momento (ver `ProspectDrawer`). `null` = sem data marcada.
+  // Data do primeiro contato (P0, "YYYY-MM-DD") — âncora da cadência
+  // automática, definida na criação/import. Ver `Prospect.targetDate` e
+  // `ProspectStage.followupBusinessDays`.
+  initialContactDate: string | null;
+  // Próxima data de follow-up ("YYYY-MM-DD") do estágio ATUAL. Quando a
+  // cadência automática cobre o caminho até o estágio atual, já vem
+  // calculada sozinha a partir de `initialContactDate` — só é perguntada
+  // manualmente ao mover (`ProspectStage.asksTargetDate`) quando não cobre.
   targetDate: string | null;
   createdAt: string;
   updatedAt: string;
@@ -128,6 +140,9 @@ export interface CreateProspectInput {
   pageObjective?: PageObjective;
   priority?: ProspectPriority;
   origin?: ProspectOrigin;
+  // P0 — data do primeiro contato. Não informado = hoje (ver backend
+  // `CreateProspectUseCase`).
+  initialContactDate?: string;
   targetDate?: string;
   force?: boolean;
 }
@@ -135,11 +150,19 @@ export interface CreateProspectInput {
 export type UpdateProspectInput = Partial<CreateProspectInput>;
 
 export type CreateProspectStageInput = Pick<ProspectStage, "name" | "color"> &
-  Partial<Pick<ProspectStage, "isWon" | "isLost" | "asksTargetDate">>;
+  Partial<Pick<ProspectStage, "isWon" | "isLost" | "asksTargetDate" | "followupBusinessDays">>;
 
 export type UpdateProspectStageInput = Partial<
-  Pick<ProspectStage, "name" | "color" | "isWon" | "isLost" | "asksTargetDate">
->;
+  Pick<
+    ProspectStage,
+    "name" | "color" | "isWon" | "isLost" | "asksTargetDate" | "followupBusinessDays"
+  >
+> & {
+  // Ver backend `UpdateProspectStageCommand.clear_followup_business_days` —
+  // `followupBusinessDays: null`/omitido sozinho significa "não mudar";
+  // apagar a cadência de volta pra "sem cadência" exige este sinalizador.
+  clearFollowupBusinessDays?: boolean;
+};
 
 export interface ProspectDuplicateCheck {
   exists: boolean;
@@ -166,6 +189,9 @@ export interface ImportRowInput {
   pageObjective?: PageObjective;
   priority?: ProspectPriority;
   origin?: ProspectOrigin;
+  // P0 — data do primeiro contato dessa linha ("YYYY-MM-DD"). Não mapeado
+  // = hoje no momento do import (ver backend `BulkImportProspectsUseCase`).
+  initialContactDate?: string;
 }
 
 export interface ImportRowResult {
@@ -206,6 +232,7 @@ export const IMPORTABLE_PROSPECT_FIELDS: { key: keyof ImportRowInput; label: str
   { key: "pageObjective", label: "Objetivo da página" },
   { key: "priority", label: "Prioridade" },
   { key: "origin", label: "Origem" },
+  { key: "initialContactDate", label: "Data do primeiro contato (P0)" },
 ];
 
 export interface ProspectPriorityBreakdown {

@@ -26,13 +26,19 @@ export function ManageStagesModal({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { create, delete: deleteStage } = useProspectStageActions();
+  const { create, update, delete: deleteStage } = useProspectStageActions();
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [color, setColor] = useState<string>(COLOR_PRESETS[0] ?? "#4aa3ff");
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
+  // Rascunho local do input de cadência por estágio (string, não number —
+  // precisa aceitar campo vazio enquanto o usuário digita) — só grava no
+  // backend ao sair do campo (ver `handleSaveCadence`), pra não disparar um
+  // PATCH a cada tecla.
+  const [cadenceDraft, setCadenceDraft] = useState<Record<string, string>>({});
+  const [savingCadenceId, setSavingCadenceId] = useState<string | null>(null);
 
   async function handleCreate() {
     if (!name.trim()) return;
@@ -45,6 +51,49 @@ export function ManageStagesModal({
       toast(err instanceof Error ? err.message : "Não foi possível criar o estágio");
     } finally {
       setCreating(false);
+    }
+  }
+
+  function cadenceValue(stage: ProspectStage): string {
+    if (stage.id in cadenceDraft) return cadenceDraft[stage.id] ?? "";
+    return stage.followupBusinessDays != null ? String(stage.followupBusinessDays) : "";
+  }
+
+  async function handleSaveCadence(stage: ProspectStage) {
+    const raw = cadenceValue(stage).trim();
+    const current = stage.followupBusinessDays;
+    // Sem mudança de verdade (mesmo valor, ou os dois representam "sem
+    // cadência") — não vale um PATCH.
+    if ((raw === "" && current == null) || (raw !== "" && Number(raw) === current)) {
+      setCadenceDraft((d) => {
+        const next = { ...d };
+        delete next[stage.id];
+        return next;
+      });
+      return;
+    }
+    setSavingCadenceId(stage.id);
+    try {
+      if (raw === "") {
+        await update(stage.id, { clearFollowupBusinessDays: true });
+      } else {
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          toast("Informe um número de dias úteis válido (0 ou mais)");
+          return;
+        }
+        await update(stage.id, { followupBusinessDays: Math.round(parsed) });
+      }
+      setCadenceDraft((d) => {
+        const next = { ...d };
+        delete next[stage.id];
+        return next;
+      });
+      onChanged();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível salvar a cadência do estágio");
+    } finally {
+      setSavingCadenceId(null);
     }
   }
 
@@ -70,7 +119,10 @@ export function ManageStagesModal({
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <h2 className={styles.modalTitle}>Estágios da prospecção</h2>
         <p className={styles.modalSubtitle}>
-          Só é possível excluir um estágio vazio — mova os prospects antes.
+          Só é possível excluir um estágio vazio — mova os prospects antes. "Dias úteis" define a
+          cadência automática: quantos dias úteis (seg-sex, sem feriados nacionais) depois do
+          estágio ANTERIOR a data alvo deste deve cair — deixe em branco pra continuar perguntando a
+          data manualmente ao mover pra ele.
         </p>
 
         <div className={styles.list}>
@@ -79,6 +131,21 @@ export function ManageStagesModal({
               <div className={styles.row}>
                 <span className={styles.dot} style={{ background: stage.color }} />
                 <span className={styles.name}>{stage.name}</span>
+                <input
+                  className={styles.input}
+                  style={{ width: 64 }}
+                  type="number"
+                  min={0}
+                  placeholder="Manual"
+                  title="Dias úteis após o estágio anterior — em branco = pergunta a data ao mover"
+                  value={cadenceValue(stage)}
+                  disabled={savingCadenceId === stage.id}
+                  onChange={(e) =>
+                    setCadenceDraft((d) => ({ ...d, [stage.id]: e.target.value }))
+                  }
+                  onBlur={() => void handleSaveCadence(stage)}
+                  aria-label={`Dias úteis de cadência para ${stage.name}`}
+                />
                 <button
                   className={styles.deleteBtn}
                   type="button"
