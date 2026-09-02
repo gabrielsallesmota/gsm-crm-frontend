@@ -172,6 +172,10 @@ export interface CreateProspectInput {
   origin?: ProspectOrigin;
   offeredService?: string;
   noWhatsapp?: boolean;
+  // Editável direto (não só ao mover pra um estágio perdido) — pensado pro
+  // caso de já ter mudado de estágio sem passar pelo prompt do board (ex.:
+  // pelo seletor de estágio do próprio drawer). Ver `ProspectDrawer.tsx`.
+  lossReasonId?: string;
   message1?: string;
   message2?: string;
   message3?: string;

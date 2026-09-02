@@ -160,6 +160,7 @@ function createBody(input: CreateProspectInput | UpdateProspectInput) {
     origin: input.origin,
     offered_service: input.offeredService,
     no_whatsapp: input.noWhatsapp,
+    loss_reason_id: input.lossReasonId,
     message_1: input.message1,
     message_2: input.message2,
     message_3: input.message3,

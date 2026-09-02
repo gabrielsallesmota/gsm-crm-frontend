@@ -111,6 +111,7 @@ export function ProspectDrawer({
         offeredService: form.offeredService,
         noWhatsapp: form.noWhatsapp,
         force,
+        ...(form.lossReasonId ? { lossReasonId: form.lossReasonId } : {}),
         ...(form.message1 ? { message1: form.message1 } : {}),
         ...(form.message2 ? { message2: form.message2 } : {}),
         ...(form.message3 ? { message3: form.message3 } : {}),
@@ -417,13 +418,18 @@ export function ProspectDrawer({
               onChange={(v) => setForm((f) => ({ ...f, targetDate: v }))}
               type="date"
             />
-            {prospect.lossReasonId && (
-              <div className={styles.field}>
-                <div className={styles.fieldLabel}>Motivo da perda</div>
-                <div className={styles.fieldValue}>
-                  {lossReasons.find((r) => r.id === prospect.lossReasonId)?.name ?? "—"}
-                </div>
-              </div>
+            {(stage?.isLost || prospect.lossReasonId) && (
+              <SelectField
+                label="Motivo da perda"
+                editing={editing}
+                value={form.lossReasonId}
+                display={lossReasons.find((r) => r.id === prospect.lossReasonId)?.name ?? "—"}
+                options={[
+                  { value: "", label: "— (nenhum selecionado)" },
+                  ...lossReasons.map((r) => ({ value: r.id, label: r.name })),
+                ]}
+                onChange={(v) => setForm((f) => ({ ...f, lossReasonId: v }))}
+              />
             )}
           </div>
           <div className={`${styles.field} ${styles.fieldFull}`} style={{ marginTop: 10 }}>
@@ -679,6 +685,7 @@ function fromProspect(prospect: Prospect) {
     origin: prospect.origin,
     offeredService: prospect.offeredService,
     noWhatsapp: prospect.noWhatsapp,
+    lossReasonId: prospect.lossReasonId ?? "",
     message1: prospect.message1,
     message2: prospect.message2,
     message3: prospect.message3,
