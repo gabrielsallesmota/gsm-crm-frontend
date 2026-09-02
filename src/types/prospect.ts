@@ -24,6 +24,11 @@ export type ProspectOrigin = "google_maps" | "indicacao" | "instagram" | "site" 
 
 export type DedupeStrategy = "skip" | "update" | "duplicate";
 
+/** Qual dos 4 campos de mensagem livre do PRÓPRIO prospect
+ * (`Prospect.message1`..`message4`) um estágio usa no botão de WhatsApp em
+ * vez do template padrão — ver `ProspectStage.messageField`. */
+export type ProspectMessageField = "message_1" | "message_2" | "message_3" | "message_4";
+
 export interface ProspectStage {
   id: string;
   name: string;
@@ -41,6 +46,10 @@ export interface ProspectStage {
   // Irrelevante no primeiro estágio da pipeline — esse É a âncora
   // (`Prospect.initialContactDate`). Configurado em "Estágios" → editar.
   followupBusinessDays: number | null;
+  // Qual `Prospect.messageN` este estágio usa no botão de WhatsApp em vez
+  // do template padrão — `null` = comportamento antigo (template por
+  // estágio/área, ver `utils/messageTemplates.ts::resolveProspectMessage`).
+  messageField: ProspectMessageField | null;
 }
 
 /** Anotação datada de alguém sobre o prospect — histórico append-only,
@@ -85,6 +94,14 @@ export interface Prospect {
   pageObjective: PageObjective | null;
   priority: ProspectPriority;
   origin: ProspectOrigin;
+  // Mensagens específicas DESTE prospect — ver `ProspectStage.messageField`
+  // e `IMPORTABLE_PROSPECT_FIELDS` (vêm do CSV de import ou digitadas à
+  // mão). `""` = sem texto nesse campo (mesma convenção do resto dos
+  // campos de texto opcionais aqui).
+  message1: string;
+  message2: string;
+  message3: string;
+  message4: string;
   // Data do primeiro contato (P0, "YYYY-MM-DD") — âncora da cadência
   // automática, definida na criação/import. Ver `Prospect.targetDate` e
   // `ProspectStage.followupBusinessDays`.
@@ -140,6 +157,10 @@ export interface CreateProspectInput {
   pageObjective?: PageObjective;
   priority?: ProspectPriority;
   origin?: ProspectOrigin;
+  message1?: string;
+  message2?: string;
+  message3?: string;
+  message4?: string;
   // P0 — data do primeiro contato. Não informado = hoje (ver backend
   // `CreateProspectUseCase`).
   initialContactDate?: string;
@@ -150,18 +171,32 @@ export interface CreateProspectInput {
 export type UpdateProspectInput = Partial<CreateProspectInput>;
 
 export type CreateProspectStageInput = Pick<ProspectStage, "name" | "color"> &
-  Partial<Pick<ProspectStage, "isWon" | "isLost" | "asksTargetDate" | "followupBusinessDays">>;
+  Partial<
+    Pick<
+      ProspectStage,
+      "isWon" | "isLost" | "asksTargetDate" | "followupBusinessDays" | "messageField"
+    >
+  >;
 
 export type UpdateProspectStageInput = Partial<
   Pick<
     ProspectStage,
-    "name" | "color" | "isWon" | "isLost" | "asksTargetDate" | "followupBusinessDays"
+    | "name"
+    | "color"
+    | "isWon"
+    | "isLost"
+    | "asksTargetDate"
+    | "followupBusinessDays"
+    | "messageField"
   >
 > & {
   // Ver backend `UpdateProspectStageCommand.clear_followup_business_days` —
   // `followupBusinessDays: null`/omitido sozinho significa "não mudar";
   // apagar a cadência de volta pra "sem cadência" exige este sinalizador.
   clearFollowupBusinessDays?: boolean;
+  // Mesmo racional acima, aplicado a `messageField` (ver
+  // `UpdateProspectStageCommand.clear_message_field`).
+  clearMessageField?: boolean;
 };
 
 export interface ProspectDuplicateCheck {
@@ -189,6 +224,10 @@ export interface ImportRowInput {
   pageObjective?: PageObjective;
   priority?: ProspectPriority;
   origin?: ProspectOrigin;
+  message1?: string;
+  message2?: string;
+  message3?: string;
+  message4?: string;
   // P0 — data do primeiro contato dessa linha ("YYYY-MM-DD"). Não mapeado
   // = hoje no momento do import (ver backend `BulkImportProspectsUseCase`).
   initialContactDate?: string;
@@ -233,6 +272,10 @@ export const IMPORTABLE_PROSPECT_FIELDS: { key: keyof ImportRowInput; label: str
   { key: "priority", label: "Prioridade" },
   { key: "origin", label: "Origem" },
   { key: "initialContactDate", label: "Data do primeiro contato (P0)" },
+  { key: "message1", label: "Mensagem 1" },
+  { key: "message2", label: "Mensagem 2" },
+  { key: "message3", label: "Mensagem 3" },
+  { key: "message4", label: "Mensagem 4" },
 ];
 
 export interface ProspectPriorityBreakdown {

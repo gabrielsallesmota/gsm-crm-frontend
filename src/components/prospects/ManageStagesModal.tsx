@@ -3,7 +3,7 @@ import { Button } from "../common/Button";
 import { useProspectStageActions } from "../../hooks/useProspectStageActions";
 import { useToast } from "../../hooks/useToast";
 import { ApiError } from "../../types/common";
-import type { ProspectStage } from "../../types/prospect";
+import type { ProspectMessageField, ProspectStage } from "../../types/prospect";
 import styles from "./ManageStagesModal.module.css";
 
 const COLOR_PRESETS = [
@@ -57,6 +57,19 @@ export function ManageStagesModal({
   function cadenceValue(stage: ProspectStage): string {
     if (stage.id in cadenceDraft) return cadenceDraft[stage.id] ?? "";
     return stage.followupBusinessDays != null ? String(stage.followupBusinessDays) : "";
+  }
+
+  async function handleChangeMessageField(stage: ProspectStage, value: string) {
+    try {
+      if (value === "") {
+        await update(stage.id, { clearMessageField: true });
+      } else {
+        await update(stage.id, { messageField: value as ProspectMessageField });
+      }
+      onChanged();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível salvar a mensagem do estágio");
+    }
   }
 
   async function handleSaveCadence(stage: ProspectStage) {
@@ -122,7 +135,9 @@ export function ManageStagesModal({
           Só é possível excluir um estágio vazio — mova os prospects antes. "Dias úteis" define a
           cadência automática: quantos dias úteis (seg-sex, sem feriados nacionais) depois do
           estágio ANTERIOR a data alvo deste deve cair — deixe em branco pra continuar perguntando a
-          data manualmente ao mover pra ele.
+          data manualmente ao mover pra ele. "Mensagem" escolhe qual campo de mensagem do PRÓPRIO
+          prospect (ex.: vindo do CSV) esse estágio usa no botão de WhatsApp, em vez do template
+          padrão por área.
         </p>
 
         <div className={styles.list}>
@@ -146,6 +161,20 @@ export function ManageStagesModal({
                   onBlur={() => void handleSaveCadence(stage)}
                   aria-label={`Dias úteis de cadência para ${stage.name}`}
                 />
+                <select
+                  className={styles.input}
+                  style={{ width: 130 }}
+                  value={stage.messageField ?? ""}
+                  onChange={(e) => void handleChangeMessageField(stage, e.target.value)}
+                  aria-label={`Campo de mensagem usado por ${stage.name}`}
+                  title="Qual mensagem do prospect este estágio usa no WhatsApp"
+                >
+                  <option value="">Template padrão</option>
+                  <option value="message_1">Mensagem 1</option>
+                  <option value="message_2">Mensagem 2</option>
+                  <option value="message_3">Mensagem 3</option>
+                  <option value="message_4">Mensagem 4</option>
+                </select>
                 <button
                   className={styles.deleteBtn}
                   type="button"

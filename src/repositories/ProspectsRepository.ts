@@ -32,6 +32,11 @@ export interface ProspectsRepository {
     dedupeStrategy: DedupeStrategy,
   ): Promise<ImportSummary>;
   exportCsv(): Promise<string>;
+  // Empurrão único de `initial_contact_date`/`target_date` pra prospects
+  // cadastrados antes da cadência automática existir — ver
+  // `BackfillProspectCadenceUseCase` no backend. Devolve quantos foram
+  // atualizados.
+  backfillCadence(): Promise<number>;
 
   listStages(): Promise<ProspectStage[]>;
   createStage(input: CreateProspectStageInput): Promise<ProspectStage>;

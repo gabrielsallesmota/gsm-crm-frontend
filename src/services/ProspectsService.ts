@@ -68,6 +68,10 @@ export class ProspectsService {
     return repo.exportCsv();
   }
 
+  backfillCadence(): Promise<number> {
+    return repo.backfillCadence();
+  }
+
   listStages(): Promise<ProspectStage[]> {
     return repo.listStages();
   }

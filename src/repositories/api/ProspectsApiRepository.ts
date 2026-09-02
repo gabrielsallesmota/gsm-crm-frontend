@@ -13,6 +13,7 @@ import type {
   ProspectDashboardMetrics,
   ProspectDuplicateCheck,
   ProspectListFilter,
+  ProspectMessageField,
   ProspectOrigin,
   ProspectPriority,
   ProspectStage,
@@ -50,6 +51,10 @@ interface ProspectDto {
   page_objective: PageObjective | null;
   priority: ProspectPriority;
   origin: ProspectOrigin;
+  message_1: string | null;
+  message_2: string | null;
+  message_3: string | null;
+  message_4: string | null;
   initial_contact_date: string | null;
   target_date: string | null;
   created_at: string;
@@ -66,6 +71,7 @@ interface ProspectStageDto {
   is_lost: boolean;
   asks_target_date: boolean;
   followup_business_days: number | null;
+  message_field: ProspectMessageField | null;
 }
 
 function toProspect(dto: ProspectDto): Prospect {
@@ -93,6 +99,10 @@ function toProspect(dto: ProspectDto): Prospect {
     pageObjective: dto.page_objective,
     priority: dto.priority,
     origin: dto.origin,
+    message1: dto.message_1 ?? "",
+    message2: dto.message_2 ?? "",
+    message3: dto.message_3 ?? "",
+    message4: dto.message_4 ?? "",
     initialContactDate: dto.initial_contact_date,
     targetDate: dto.target_date,
     createdAt: dto.created_at,
@@ -113,6 +123,7 @@ function toProspectStage(dto: ProspectStageDto): ProspectStage {
     isLost: dto.is_lost,
     asksTargetDate: dto.asks_target_date,
     followupBusinessDays: dto.followup_business_days,
+    messageField: dto.message_field,
   };
 }
 
@@ -138,6 +149,10 @@ function createBody(input: CreateProspectInput | UpdateProspectInput) {
     page_objective: input.pageObjective,
     priority: input.priority,
     origin: input.origin,
+    message_1: input.message1,
+    message_2: input.message2,
+    message_3: input.message3,
+    message_4: input.message4,
     initial_contact_date: input.initialContactDate,
     target_date: input.targetDate,
     force: input.force ?? false,
@@ -165,6 +180,10 @@ function importRowBody(row: ImportRowInput) {
     page_objective: row.pageObjective,
     priority: row.priority,
     origin: row.origin,
+    message_1: row.message1,
+    message_2: row.message2,
+    message_3: row.message3,
+    message_4: row.message4,
     initial_contact_date: row.initialContactDate,
   };
 }
@@ -277,6 +296,13 @@ export class ProspectsApiRepository implements ProspectsRepository {
     return apiRequestText("/api/v1/prospects/export");
   }
 
+  async backfillCadence(): Promise<number> {
+    const dto = await apiRequest<{ updated: number }>("/api/v1/prospects/backfill-cadence", {
+      method: "POST",
+    });
+    return dto.updated;
+  }
+
   async listStages(): Promise<ProspectStage[]> {
     const dto = await apiRequest<ProspectStageDto[]>("/api/v1/prospect-stages");
     return dto.map(toProspectStage);
@@ -293,6 +319,7 @@ export class ProspectsApiRepository implements ProspectsRepository {
           is_lost: input.isLost ?? false,
           asks_target_date: input.asksTargetDate ?? false,
           followup_business_days: input.followupBusinessDays ?? null,
+          message_field: input.messageField ?? null,
         }),
       }),
     );
@@ -310,6 +337,8 @@ export class ProspectsApiRepository implements ProspectsRepository {
           asks_target_date: input.asksTargetDate,
           followup_business_days: input.followupBusinessDays,
           clear_followup_business_days: input.clearFollowupBusinessDays ?? false,
+          message_field: input.messageField,
+          clear_message_field: input.clearMessageField ?? false,
         }),
       }),
     );

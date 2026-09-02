@@ -22,6 +22,7 @@ import type {
   MessageTemplate,
   Prospect,
   ProspectOrigin,
+  ProspectStage,
 } from "../../types/prospect";
 import styles from "./ProspectionBoard.module.css";
 
@@ -46,6 +47,18 @@ function isOverdue(targetDateIso: string): boolean {
   return targetDateIso < new Date().toISOString().slice(0, 10);
 }
 
+function isToday(targetDateIso: string): boolean {
+  return targetDateIso === new Date().toISOString().slice(0, 10);
+}
+
+/** Âncora efetiva da cadência pro prospect: `initialContactDate` quando
+ * existe, senão a data de criação (P0 implícito pra quem foi cadastrado
+ * antes dessa feature existir — ver `MoveProspectUseCase` no backend,
+ * mesma regra espelhada aqui pra decidir se pergunta a data no move). */
+function effectiveAnchor(prospect: Prospect): string {
+  return prospect.initialContactDate ?? prospect.createdAt.slice(0, 10);
+}
+
 /**
  * Seção "Ativo (prospecção)" dentro do Pipeline unificado — visão só de
  * super admin. Kanban próprio (estágios/dados de `prospects`, isolados do
@@ -59,7 +72,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
     notImplemented,
     reload: reloadStages,
   } = useProspectStages();
-  const { move } = useProspectActions();
+  const { move, backfillCadence } = useProspectActions();
   const { reorder: reorderStages } = useProspectStageActions();
   const { toast } = useToast();
   const { data: templates } = useMessageTemplates();
@@ -74,6 +87,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [managingStages, setManagingStages] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
   // Move pendente aguardando a data alvo (só quando o estágio de destino
   // pede — ver `stage.asksTargetDate`); some assim que confirma ou pula.
   const [pendingMove, setPendingMove] = useState<{
@@ -115,7 +129,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
     const autoComputed = computeStageTargetDate(
       stages ?? [],
       targetStageId,
-      current.initialContactDate,
+      effectiveAnchor(current),
     );
     if (targetStage?.asksTargetDate && autoComputed === null) {
       setPendingMove({ prospectId, stageId: targetStageId, stageName: targetStage.name });
@@ -134,6 +148,23 @@ export function ProspectionBoard({ period }: { period: Period }) {
       reload();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Não foi possível mover o prospect");
+    }
+  }
+
+  async function handleBackfillCadence() {
+    setBackfilling(true);
+    try {
+      const updated = await backfillCadence();
+      toast(
+        updated > 0
+          ? `${updated} prospect(s) com data recalculada`
+          : "Nenhum prospect precisava de recálculo",
+      );
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível recalcular as datas");
+    } finally {
+      setBackfilling(false);
     }
   }
 
@@ -196,6 +227,13 @@ export function ProspectionBoard({ period }: { period: Period }) {
         </div>
         <div className={styles.toolbar}>
           <Button onClick={() => setManagingStages(true)}>Estágios</Button>
+          <Button
+            onClick={() => void handleBackfillCadence()}
+            disabled={backfilling}
+            title="Preenche a data de follow-up de prospects que ainda não têm (cadastrados antes da cadência automática existir)"
+          >
+            {backfilling ? "Recalculando…" : "Recalcular datas"}
+          </Button>
           <Button onClick={() => setImporting(true)}>Importar CSV</Button>
           <Button onClick={handleExport}>Exportar CSV</Button>
           <Button variant="primary" onClick={() => setCreating(true)}>
@@ -239,6 +277,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
                     <ProspectCard
                       key={prospect.id}
                       prospect={prospect}
+                      stage={stage}
                       templates={templates ?? []}
                       onDragStart={() => setDragId(prospect.id)}
                       onClick={() => setSelectedId(prospect.id)}
@@ -370,11 +409,13 @@ function TargetDatePrompt({
 
 function ProspectCard({
   prospect,
+  stage,
   templates,
   onDragStart,
   onClick,
 }: {
   prospect: Prospect;
+  stage: ProspectStage;
   templates: MessageTemplate[];
   onDragStart: () => void;
   onClick: () => void;
@@ -392,12 +433,20 @@ function ProspectCard({
           <Badge label={priority.label} color={priority.color} bg={priority.bg} />
           {prospect.targetDate && (
             <span
-              className={
+              className={`${styles.targetDate} ${
                 isOverdue(prospect.targetDate)
-                  ? `${styles.targetDate} ${styles.targetDateOverdue}`
-                  : styles.targetDate
+                  ? styles.targetDateOverdue
+                  : isToday(prospect.targetDate)
+                    ? styles.targetDateToday
+                    : ""
+              }`}
+              title={
+                isOverdue(prospect.targetDate)
+                  ? `Follow-up atrasado — era pra ${formatShortDate(prospect.targetDate)}`
+                  : isToday(prospect.targetDate)
+                    ? "Follow-up é hoje"
+                    : `Follow-up marcado pra ${formatShortDate(prospect.targetDate)}`
               }
-              title={`Follow-up marcado pra ${formatShortDate(prospect.targetDate)}`}
             >
               📅 {formatShortDate(prospect.targetDate)}
             </span>
@@ -411,7 +460,7 @@ function ProspectCard({
         <span className={styles.cardMeta}>{prospect.phoneRaw || "sem telefone"}</span>
         <Badge label={whatsapp.label} color={whatsapp.color} bg={whatsapp.bg} />
       </div>
-      <WhatsappButton prospect={prospect} templates={templates} size="small" />
+      <WhatsappButton prospect={prospect} stage={stage} templates={templates} size="small" />
       {prospect.lastComment && (
         <div className={styles.cardComment} title={prospect.lastComment.text}>
           💬 {prospect.lastComment.text}

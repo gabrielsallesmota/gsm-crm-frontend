@@ -1,4 +1,4 @@
-import type { MessageTemplate, Prospect } from "../types/prospect";
+import type { MessageTemplate, Prospect, ProspectMessageField, ProspectStage } from "../types/prospect";
 
 // U+0300–U+036F = bloco Unicode "Combining Diacritical Marks" — é nele que
 // `String.prototype.normalize("NFKD")` decompõe acentos (ex.: "á" vira "a" +
@@ -48,11 +48,44 @@ const PLACEHOLDERS: { token: string; get: (p: Prospect) => string }[] = [
   { token: "{avaliacao_google}", get: (p) => (p.googleRating != null ? String(p.googleRating) : "") },
 ];
 
+/** Substitui os placeholders (`{empresa}`, `{nicho}`, ...) num texto
+ * qualquer — usado tanto por `renderMessage` (template padrão) quanto por
+ * `resolveProspectMessage` (mensagem própria do prospect, ver lá). */
+export function renderMessageText(text: string, prospect: Prospect): string {
+  return PLACEHOLDERS.reduce((acc, { token, get }) => acc.split(token).join(get(prospect) || ""), text);
+}
+
 export function renderMessage(template: MessageTemplate, prospect: Prospect): string {
-  return PLACEHOLDERS.reduce(
-    (text, { token, get }) => text.split(token).join(get(prospect) || ""),
-    template.message,
-  );
+  return renderMessageText(template.message, prospect);
+}
+
+const MESSAGE_FIELD_TO_PROSPECT_KEY: Record<ProspectMessageField, keyof Prospect> = {
+  message_1: "message1",
+  message_2: "message2",
+  message_3: "message3",
+  message_4: "message4",
+};
+
+/**
+ * Mensagem de WhatsApp pro prospect no estágio ATUAL, na ordem certa de
+ * prioridade: (1) se o estágio tem `messageField` configurado e o prospect
+ * tem texto nesse campo, usa ele — é o pedido do usuário de referenciar uma
+ * coluna específica do CSV por estágio, em vez do template compartilhado;
+ * (2) senão, cai no template padrão por (estágio, área) de sempre (ver
+ * `findMatchingTemplate`). `undefined` quando nenhum dos dois resolve — é
+ * esse retorno que decide se `WhatsappButton` aparece ou não.
+ */
+export function resolveProspectMessage(
+  prospect: Prospect,
+  stage: ProspectStage | undefined,
+  templates: MessageTemplate[],
+): string | undefined {
+  if (stage?.messageField) {
+    const raw = prospect[MESSAGE_FIELD_TO_PROSPECT_KEY[stage.messageField]];
+    if (typeof raw === "string" && raw.trim()) return renderMessageText(raw, prospect);
+  }
+  const template = findMatchingTemplate(prospect, templates);
+  return template ? renderMessage(template, prospect) : undefined;
 }
 
 /** `wa.me` espera só dígitos com DDI — é exatamente o que `phoneNormalized`

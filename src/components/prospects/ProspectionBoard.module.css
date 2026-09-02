@@ -130,6 +130,13 @@
   color: #ff6b6b;
 }
 
+/* Follow-up é HOJE — mesmo verde de "ativo"/sucesso usado em outros badges
+   do app (ver `constants/prospectEnums.ts`), pra destacar "é agora" sem
+   confundir com "atrasado" (vermelho, acima). */
+.targetDateToday {
+  color: #2ee66e;
+}
+
 .cardMeta {
   font-size: 11.5px;
   color: var(--muted);

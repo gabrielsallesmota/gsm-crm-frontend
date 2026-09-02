@@ -101,6 +101,10 @@ export function ProspectDrawer({
         priority: form.priority,
         origin: form.origin,
         force,
+        ...(form.message1 ? { message1: form.message1 } : {}),
+        ...(form.message2 ? { message2: form.message2 } : {}),
+        ...(form.message3 ? { message3: form.message3 } : {}),
+        ...(form.message4 ? { message4: form.message4 } : {}),
         ...(form.initialContactDate ? { initialContactDate: form.initialContactDate } : {}),
         ...(form.targetDate ? { targetDate: form.targetDate } : {}),
         ...(form.googleRating ? { googleRating: Number(form.googleRating) } : {}),
@@ -184,7 +188,7 @@ export function ProspectDrawer({
           )}
           <Badge label={`Prioridade ${priority.label}`} color={priority.color} bg={priority.bg} />
           <Badge label={origin.label} color={origin.color} bg={origin.bg} />
-          <WhatsappButton prospect={prospect} templates={templates} />
+          <WhatsappButton prospect={prospect} stage={stage} templates={templates} />
           {!editing && (
             <button className={styles.editToggle} onClick={startEdit} type="button">
               ✎ Editar
@@ -422,6 +426,31 @@ export function ProspectDrawer({
         </div>
 
         <div className={styles.section}>
+          <div className={styles.sectionTitle}>Mensagens do WhatsApp</div>
+          <p className={styles.notes} style={{ marginBottom: 8 }}>
+            Uma mensagem própria por campo — configure em "Estágios" qual campo cada estágio usa no
+            lugar do template padrão. Aceita os mesmos placeholders (
+            {"{empresa}, {nicho}, {servico_principal}, {cidade}, {bairro}, {avaliacao_google}"}).
+          </p>
+          {(["message1", "message2", "message3", "message4"] as const).map((key, i) => (
+            <div key={key} className={styles.field} style={{ marginBottom: 10 }}>
+              <div className={styles.fieldLabel}>Mensagem {i + 1}</div>
+              {editing ? (
+                <textarea
+                  className={styles.textarea}
+                  rows={2}
+                  value={form[key]}
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                  placeholder={`Texto da mensagem ${i + 1}…`}
+                />
+              ) : (
+                <p className={styles.notes}>{prospect[key] || "—"}</p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className={styles.section}>
           <div className={styles.sectionTitle}>Comentários</div>
           {commentsNotImplemented ? (
             <EmptyState
@@ -598,6 +627,10 @@ function fromProspect(prospect: Prospect) {
     pageObjective: prospect.pageObjective ?? "",
     priority: prospect.priority,
     origin: prospect.origin,
+    message1: prospect.message1,
+    message2: prospect.message2,
+    message3: prospect.message3,
+    message4: prospect.message4,
     initialContactDate: prospect.initialContactDate ?? "",
     targetDate: prospect.targetDate ?? "",
   };

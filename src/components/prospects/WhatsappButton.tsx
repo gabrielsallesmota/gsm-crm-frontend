@@ -1,30 +1,37 @@
 import type { MouseEvent } from "react";
-import type { MessageTemplate, Prospect } from "../../types/prospect";
-import { buildWhatsappUrl, findMatchingTemplate, renderMessage } from "../../utils/messageTemplates";
+import type { MessageTemplate, Prospect, ProspectStage } from "../../types/prospect";
+import { buildWhatsappUrl, resolveProspectMessage } from "../../utils/messageTemplates";
 import { useToast } from "../../hooks/useToast";
 import styles from "./WhatsappButton.module.css";
 
 /**
- * Só renderiza quando existe telefone E um template casando com
- * (estágio, área) do prospect (ver `findMatchingTemplate`) — sem template
- * configurado pra esse estágio, não tem o que mandar, então o botão nem
- * aparece (ver Configurações → Prospecção pra cadastrar um).
+ * Só renderiza quando existe telefone E alguma mensagem resolve pro
+ * (prospect, estágio) atual (ver `resolveProspectMessage` — mensagem
+ * própria do prospect configurada no estágio, ou o template padrão por
+ * área). Sem nenhuma das duas, não tem o que mandar, então o botão nem
+ * aparece (ver Configurações → Prospecção pra cadastrar um template, ou
+ * "Estágios" pra apontar um campo de mensagem do prospect).
  */
 export function WhatsappButton({
   prospect,
+  stage,
   templates,
   size = "normal",
 }: {
   prospect: Prospect;
+  stage: ProspectStage | undefined;
   templates: MessageTemplate[];
   size?: "normal" | "small";
 }) {
   const { toast } = useToast();
   if (!prospect.phoneNormalized) return null;
-  const template = findMatchingTemplate(prospect, templates);
-  if (!template) return null;
+  const resolved = resolveProspectMessage(prospect, stage, templates);
+  if (!resolved) return null;
+  // `const` sozinho não basta pro TS propagar o narrowing de `resolved`
+  // pra dentro de `handleCopy` (function declaration aninhada) — reatribui
+  // pra um `string` de verdade, sem `| undefined`.
+  const message: string = resolved;
 
-  const message = renderMessage(template, prospect);
   const url = buildWhatsappUrl(prospect.phoneNormalized, message);
   const btnClass = size === "small" ? `${styles.btn} ${styles.btnSmall}` : styles.btn;
 

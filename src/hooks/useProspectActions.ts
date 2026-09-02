@@ -21,6 +21,7 @@ export interface ProspectActions {
     dedupeStrategy: DedupeStrategy,
   ): Promise<ImportSummary>;
   exportCsv(): Promise<string>;
+  backfillCadence(): Promise<number>;
 }
 
 /** Mesma regra de camadas de `useLeadActions`: só o hook fala com
@@ -35,5 +36,6 @@ export function useProspectActions(): ProspectActions {
     bulkImport: (rows, defaultStageId, dedupeStrategy) =>
       prospectsService.bulkImport(rows, defaultStageId, dedupeStrategy),
     exportCsv: () => prospectsService.exportCsv(),
+    backfillCadence: () => prospectsService.backfillCadence(),
   };
 }

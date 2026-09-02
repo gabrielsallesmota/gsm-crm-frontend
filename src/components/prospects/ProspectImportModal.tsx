@@ -182,7 +182,8 @@ export function ProspectImportModal({
           fazer quando o telefone já existir cadastrado. Mapeie "Data do primeiro contato (P0)" pra
           cada linha ter sua própria data — sem essa coluna, todas entram com a data de hoje. As
           datas dos follow-ups seguintes são calculadas sozinhas a partir daí (configure a cadência
-          em "Estágios").
+          em "Estágios"). Mapeie "Mensagem 1".."Mensagem 4" pra cada prospect ter sua própria
+          mensagem de WhatsApp por etapa — configure em "Estágios" qual campo cada uma usa.
         </p>
 
         {summary ? (

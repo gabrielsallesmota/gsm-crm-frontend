@@ -73,6 +73,10 @@ export class ProspectsMockRepository implements ProspectsRepository {
     throw new NotImplementedError("Prospecção GSM", REASON);
   }
 
+  async backfillCadence(): Promise<number> {
+    throw new NotImplementedError("Prospecção GSM", REASON);
+  }
+
   async listStages(): Promise<ProspectStage[]> {
     throw new NotImplementedError("Prospecção GSM", REASON);
   }
