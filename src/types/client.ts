@@ -20,7 +20,13 @@ export interface Client {
    * `source === "manual"`. Sem FK de propósito no backend (pode apontar pra
    * duas tabelas diferentes), aqui só usado pra link/depuração. */
   sourceId: string | null;
-  /** `null` até a primeira geração de parcelas (`generateInstallments`). */
+  /** Data em que o negócio foi fechado — por padrão é "hoje" na criação,
+   * mas EDITÁVEL de propósito (`UpdateClientInput.closedAt`): cadastro
+   * retroativo de cliente antigo precisa registrar a data real do
+   * fechamento, não a data em que foi digitado no sistema. */
+  closedAt: string;
+  /** `null` até a primeira geração de parcelas (`generateInstallments`/
+   * `createCustomInstallmentPlan`). */
   paymentType: PaymentType | null;
   totalValueCents: number | null;
   installmentCount: number | null;
@@ -58,6 +64,7 @@ export interface UpdateClientInput {
   city?: string;
   niche?: string;
   notes?: string;
+  closedAt?: string;
 }
 
 export interface GenerateInstallmentsInput {
@@ -66,6 +73,26 @@ export interface GenerateInstallmentsInput {
   /** Ignorado pelo backend quando `paymentType === "vista"` (força 1). */
   installmentCount: number;
   firstDueDate: string;
+}
+
+export interface CustomInstallmentItemInput {
+  dueDate: string;
+  amountCents: number;
+}
+
+/** Alternativa a `GenerateInstallmentsInput` pra plano de pagamento
+ * IRREGULAR — cada parcela com seu próprio valor/vencimento (ex.: entrada
+ * maior + parcelas menores depois), em vez da divisão igual automática.
+ * Pedido explícito do usuário: "realmente precisa ter opção de parcela
+ * dinâmica". */
+export interface CustomInstallmentPlanInput {
+  paymentType: PaymentType;
+  installments: CustomInstallmentItemInput[];
+}
+
+export interface UpdateInstallmentInput {
+  dueDate?: string;
+  amountCents?: number;
 }
 
 export const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {

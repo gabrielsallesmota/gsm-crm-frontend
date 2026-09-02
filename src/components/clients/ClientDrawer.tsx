@@ -12,6 +12,7 @@ import { brl } from "../../utils/currency";
 import styles from "./ClientDrawer.module.css";
 
 type FormState = ReturnType<typeof fromClient>;
+type PlanMode = "equal" | "custom";
 
 function fromClient(client: Client) {
   return {
@@ -21,6 +22,7 @@ function fromClient(client: Client) {
     city: client.city,
     niche: client.niche,
     notes: client.notes,
+    closedAt: client.closedAt,
   };
 }
 
@@ -34,6 +36,22 @@ function fmtDate(iso: string): string {
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+let customRowSeq = 0;
+function nextRowId(): string {
+  customRowSeq += 1;
+  return `row-${customRowSeq}`;
+}
+
+interface CustomRow {
+  id: string;
+  dueDate: string;
+  amountReais: number;
+}
+
+function emptyCustomRow(dueDate: string): CustomRow {
+  return { id: nextRowId(), dueDate, amountReais: 0 };
 }
 
 const STATUS_BADGE: Record<string, { color: string; bg: string }> = {
@@ -57,7 +75,7 @@ export function ClientDrawer({
   onSaved?: (client: Client) => void;
   onDeleted?: () => void;
   /** Algo mudou que NÃO devolve um `Client` pronto (parcelas geradas/
-   * marcadas), mas afeta campos calculados que a lista mostra
+   * marcadas/editadas), mas afeta campos calculados que a lista mostra
    * (`nextDueDate`/`hasOverdueInstallment`) — pede pra página recarregar. */
   onReload?: () => void;
 }) {
@@ -66,6 +84,8 @@ export function ClientDrawer({
     update,
     delete: deleteClient,
     generateInstallments,
+    createCustomInstallmentPlan,
+    updateInstallment,
     markInstallmentPaid,
     markInstallmentUnpaid,
     uploadContract,
@@ -83,14 +103,32 @@ export function ClientDrawer({
   const [contractBusy, setContractBusy] = useState(false);
   const [form, setForm] = useState<FormState>(() => fromClient(client));
 
+  const [showPlanForm, setShowPlanForm] = useState(false);
+  const [planMode, setPlanMode] = useState<PlanMode>("equal");
   const [generating, setGenerating] = useState(false);
+
+  // Modo "parcelas iguais" — quantidade + valor total + 1º vencimento,
+  // divide tudo igual (comportamento original).
   const [planPaymentType, setPlanPaymentType] = useState<PaymentType>(client.paymentType ?? "vista");
   const [planTotalReais, setPlanTotalReais] = useState(
     client.totalValueCents ? client.totalValueCents / 100 : 0,
   );
   const [planCount, setPlanCount] = useState(client.installmentCount ?? 1);
   const [planFirstDueDate, setPlanFirstDueDate] = useState(todayIso());
-  const [showPlanForm, setShowPlanForm] = useState(false);
+
+  // Modo "parcelas personalizadas" — cada parcela com seu próprio valor e
+  // vencimento (ex.: entrada maior + parcelas menores depois). Pedido
+  // explícito do usuário: "realmente precisa ter opção de parcela dinâmica".
+  const [customPaymentType, setCustomPaymentType] = useState<PaymentType>("mensal");
+  const [customRows, setCustomRows] = useState<CustomRow[]>([emptyCustomRow(todayIso())]);
+  const customTotalReais = customRows.reduce((sum, row) => sum + (row.amountReais || 0), 0);
+
+  // Edição pontual de UMA parcela já existente (valor/vencimento) — não
+  // precisa refazer a ficha inteira pra corrigir uma parcela.
+  const [editingInstallmentId, setEditingInstallmentId] = useState<string | null>(null);
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editAmountReais, setEditAmountReais] = useState(0);
+  const [savingInstallmentEdit, setSavingInstallmentEdit] = useState(false);
 
   function startEdit() {
     setForm(fromClient(client));
@@ -167,7 +205,20 @@ export function ClientDrawer({
     }
   }
 
-  async function handleGeneratePlan() {
+  function openPlanForm() {
+    // Reabre sempre limpo — evita misturar resíduo de uma tentativa
+    // anterior (ex.: trocou de modo e voltou) com o plano que já existe.
+    setPlanPaymentType(client.paymentType ?? "vista");
+    setPlanTotalReais(client.totalValueCents ? client.totalValueCents / 100 : 0);
+    setPlanCount(client.installmentCount ?? 1);
+    setPlanFirstDueDate(todayIso());
+    setCustomPaymentType("mensal");
+    setCustomRows([emptyCustomRow(todayIso())]);
+    setPlanMode("equal");
+    setShowPlanForm(true);
+  }
+
+  async function handleGenerateEqualPlan() {
     if (planTotalReais <= 0) {
       toast("Informe o valor total do contrato");
       return;
@@ -196,6 +247,48 @@ export function ClientDrawer({
     }
   }
 
+  function addCustomRow() {
+    const last = customRows[customRows.length - 1];
+    setCustomRows([...customRows, emptyCustomRow(last?.dueDate || todayIso())]);
+  }
+
+  function removeCustomRow(id: string) {
+    setCustomRows((rows) => (rows.length > 1 ? rows.filter((r) => r.id !== id) : rows));
+  }
+
+  function updateCustomRow(id: string, patch: Partial<CustomRow>) {
+    setCustomRows((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  async function handleCreateCustomPlan() {
+    if (customRows.some((r) => !r.dueDate)) {
+      toast("Informe o vencimento de cada parcela");
+      return;
+    }
+    if (customRows.some((r) => r.amountReais <= 0)) {
+      toast("Informe um valor maior que zero pra cada parcela");
+      return;
+    }
+    setGenerating(true);
+    try {
+      await createCustomInstallmentPlan(client.id, {
+        paymentType: customPaymentType,
+        installments: customRows.map((r) => ({
+          dueDate: r.dueDate,
+          amountCents: Math.round(r.amountReais * 100),
+        })),
+      });
+      toast("Parcelas geradas com sucesso");
+      setShowPlanForm(false);
+      reloadInstallments();
+      onReload?.();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível gerar as parcelas");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   async function handleTogglePaid(installmentId: string, currentlyPaid: boolean) {
     try {
       if (currentlyPaid) {
@@ -207,6 +300,34 @@ export function ClientDrawer({
       onReload?.();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Não foi possível atualizar a parcela");
+    }
+  }
+
+  function startEditInstallment(installmentId: string, dueDate: string, amountCents: number) {
+    setEditingInstallmentId(installmentId);
+    setEditDueDate(dueDate);
+    setEditAmountReais(amountCents / 100);
+  }
+
+  async function handleSaveInstallmentEdit(installmentId: string) {
+    if (!editDueDate || editAmountReais <= 0) {
+      toast("Informe vencimento e valor válidos");
+      return;
+    }
+    setSavingInstallmentEdit(true);
+    try {
+      await updateInstallment(client.id, installmentId, {
+        dueDate: editDueDate,
+        amountCents: Math.round(editAmountReais * 100),
+      });
+      toast("Parcela atualizada");
+      setEditingInstallmentId(null);
+      reloadInstallments();
+      onReload?.();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível editar a parcela");
+    } finally {
+      setSavingInstallmentEdit(false);
     }
   }
 
@@ -275,6 +396,15 @@ export function ClientDrawer({
                 value={form.niche}
                 onChange={(e) => setForm({ ...form, niche: e.target.value })}
               />
+              <label className={styles.label}>
+                Data de fechamento
+                <input
+                  className={styles.editInput}
+                  type="date"
+                  value={form.closedAt}
+                  onChange={(e) => setForm({ ...form, closedAt: e.target.value })}
+                />
+              </label>
               <textarea
                 className={styles.editTextarea}
                 placeholder="Observações"
@@ -307,6 +437,10 @@ export function ClientDrawer({
               <div className={styles.field}>
                 <dt>Nicho</dt>
                 <dd>{client.niche || "—"}</dd>
+              </div>
+              <div className={styles.field}>
+                <dt>Data de fechamento</dt>
+                <dd>{fmtDate(client.closedAt)}</dd>
               </div>
               {client.notes && (
                 <div className={styles.field}>
@@ -354,7 +488,7 @@ export function ClientDrawer({
           <div className={styles.sectionHeaderRow}>
             <h3 className={styles.sectionTitle}>Pagamento</h3>
             {!showPlanForm && (
-              <Button onClick={() => setShowPlanForm(true)} disabled={hasPaidInstallment}>
+              <Button onClick={openPlanForm} disabled={hasPaidInstallment}>
                 {installments && installments.length > 0 ? "Refazer parcelas" : "Definir pagamento"}
               </Button>
             )}
@@ -368,51 +502,141 @@ export function ClientDrawer({
 
           {showPlanForm && (
             <div className={styles.planForm}>
-              <label className={styles.label}>
-                Forma de pagamento
-                <select
-                  className={styles.editInput}
-                  value={planPaymentType}
-                  onChange={(e) => setPlanPaymentType(e.target.value as PaymentType)}
+              <div className={styles.planModeToggle}>
+                <button
+                  type="button"
+                  className={
+                    planMode === "equal"
+                      ? `${styles.planModeBtn} ${styles.planModeBtnActive}`
+                      : styles.planModeBtn
+                  }
+                  onClick={() => setPlanMode("equal")}
                 >
-                  <option value="vista">À vista</option>
-                  <option value="mensal">Mensal</option>
-                </select>
-              </label>
-              <label className={styles.label}>
-                Valor total do contrato
-                <CurrencyInput className={styles.editInput} value={planTotalReais} onChange={setPlanTotalReais} />
-              </label>
-              {planPaymentType === "mensal" && (
-                <label className={styles.label}>
-                  Quantidade de parcelas
-                  <input
-                    className={styles.editInput}
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={planCount}
-                    onChange={(e) => setPlanCount(Number(e.target.value) || 1)}
-                  />
-                </label>
-              )}
-              <label className={styles.label}>
-                Data do 1º vencimento
-                <input
-                  className={styles.editInput}
-                  type="date"
-                  value={planFirstDueDate}
-                  onChange={(e) => setPlanFirstDueDate(e.target.value)}
-                />
-              </label>
-              <div className={styles.formActions}>
-                <Button onClick={() => setShowPlanForm(false)} disabled={generating}>
-                  Cancelar
-                </Button>
-                <Button variant="primary" onClick={() => void handleGeneratePlan()} disabled={generating}>
-                  {generating ? "Gerando…" : "Gerar parcelas"}
-                </Button>
+                  Parcelas iguais
+                </button>
+                <button
+                  type="button"
+                  className={
+                    planMode === "custom"
+                      ? `${styles.planModeBtn} ${styles.planModeBtnActive}`
+                      : styles.planModeBtn
+                  }
+                  onClick={() => setPlanMode("custom")}
+                >
+                  Parcelas personalizadas
+                </button>
               </div>
+
+              {planMode === "equal" ? (
+                <>
+                  <label className={styles.label}>
+                    Forma de pagamento
+                    <select
+                      className={styles.editInput}
+                      value={planPaymentType}
+                      onChange={(e) => setPlanPaymentType(e.target.value as PaymentType)}
+                    >
+                      <option value="vista">À vista</option>
+                      <option value="mensal">Mensal</option>
+                    </select>
+                  </label>
+                  <label className={styles.label}>
+                    Valor total do contrato
+                    <CurrencyInput className={styles.editInput} value={planTotalReais} onChange={setPlanTotalReais} />
+                  </label>
+                  {planPaymentType === "mensal" && (
+                    <label className={styles.label}>
+                      Quantidade de parcelas
+                      <input
+                        className={styles.editInput}
+                        type="number"
+                        min={1}
+                        max={120}
+                        value={planCount}
+                        onChange={(e) => setPlanCount(Number(e.target.value) || 1)}
+                      />
+                    </label>
+                  )}
+                  <label className={styles.label}>
+                    Data do 1º vencimento
+                    <input
+                      className={styles.editInput}
+                      type="date"
+                      value={planFirstDueDate}
+                      onChange={(e) => setPlanFirstDueDate(e.target.value)}
+                    />
+                  </label>
+                  <div className={styles.formActions}>
+                    <Button onClick={() => setShowPlanForm(false)} disabled={generating}>
+                      Cancelar
+                    </Button>
+                    <Button variant="primary" onClick={() => void handleGenerateEqualPlan()} disabled={generating}>
+                      {generating ? "Gerando…" : "Gerar parcelas"}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className={styles.mutedText}>
+                    Monte a lista parcela por parcela — cada uma com seu próprio valor e vencimento
+                    (ex.: entrada maior + parcelas menores depois).
+                  </p>
+                  <label className={styles.label}>
+                    Forma de pagamento
+                    <select
+                      className={styles.editInput}
+                      value={customPaymentType}
+                      onChange={(e) => setCustomPaymentType(e.target.value as PaymentType)}
+                    >
+                      <option value="vista">À vista</option>
+                      <option value="mensal">Mensal</option>
+                    </select>
+                  </label>
+
+                  <div className={styles.customRows}>
+                    {customRows.map((row, index) => (
+                      <div key={row.id} className={styles.customRow}>
+                        <span className={styles.customRowSeq}>{index + 1}</span>
+                        <input
+                          className={styles.editInput}
+                          type="date"
+                          value={row.dueDate}
+                          onChange={(e) => updateCustomRow(row.id, { dueDate: e.target.value })}
+                        />
+                        <CurrencyInput
+                          className={styles.editInput}
+                          value={row.amountReais}
+                          onChange={(v) => updateCustomRow(row.id, { amountReais: v })}
+                        />
+                        <button
+                          type="button"
+                          className={styles.customRowRemove}
+                          onClick={() => removeCustomRow(row.id)}
+                          disabled={customRows.length === 1}
+                          aria-label="Remover parcela"
+                          title="Remover parcela"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button onClick={addCustomRow}>+ Adicionar parcela</Button>
+
+                  <div className={styles.customTotal}>
+                    Total: <strong>R$ {brl(customTotalReais)}</strong>
+                  </div>
+
+                  <div className={styles.formActions}>
+                    <Button onClick={() => setShowPlanForm(false)} disabled={generating}>
+                      Cancelar
+                    </Button>
+                    <Button variant="primary" onClick={() => void handleCreateCustomPlan()} disabled={generating}>
+                      {generating ? "Gerando…" : "Gerar parcelas"}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -428,25 +652,63 @@ export function ClientDrawer({
                 </tr>
               </thead>
               <tbody>
-                {installments.map((i) => (
-                  <tr key={i.id}>
-                    <td>{i.sequence}</td>
-                    <td>{fmtDate(i.dueDate)}</td>
-                    <td>R$ {brl(i.amountCents / 100)}</td>
-                    <td>
-                      <Badge
-                        label={INSTALLMENT_STATUS_LABEL[i.status]}
-                        color={STATUS_BADGE[i.status]?.color ?? "#999"}
-                        bg={STATUS_BADGE[i.status]?.bg ?? "rgba(153,153,153,.14)"}
-                      />
-                    </td>
-                    <td>
-                      <Button onClick={() => void handleTogglePaid(i.id, i.paidAt !== null)}>
-                        {i.paidAt !== null ? "Desmarcar" : "Marcar pago"}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {installments.map((i) =>
+                  editingInstallmentId === i.id ? (
+                    <tr key={i.id}>
+                      <td>{i.sequence}</td>
+                      <td>
+                        <input
+                          className={styles.inlineEditInput}
+                          type="date"
+                          value={editDueDate}
+                          onChange={(e) => setEditDueDate(e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <CurrencyInput
+                          className={styles.inlineEditInput}
+                          value={editAmountReais}
+                          onChange={setEditAmountReais}
+                        />
+                      </td>
+                      <td colSpan={2} className={styles.inlineEditActions}>
+                        <Button onClick={() => setEditingInstallmentId(null)} disabled={savingInstallmentEdit}>
+                          Cancelar
+                        </Button>
+                        <Button
+                          variant="primary"
+                          onClick={() => void handleSaveInstallmentEdit(i.id)}
+                          disabled={savingInstallmentEdit}
+                        >
+                          {savingInstallmentEdit ? "Salvando…" : "Salvar"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={i.id}>
+                      <td>{i.sequence}</td>
+                      <td>{fmtDate(i.dueDate)}</td>
+                      <td>R$ {brl(i.amountCents / 100)}</td>
+                      <td>
+                        <Badge
+                          label={INSTALLMENT_STATUS_LABEL[i.status]}
+                          color={STATUS_BADGE[i.status]?.color ?? "#999"}
+                          bg={STATUS_BADGE[i.status]?.bg ?? "rgba(153,153,153,.14)"}
+                        />
+                      </td>
+                      <td className={styles.installmentRowActions}>
+                        {i.paidAt === null && (
+                          <Button onClick={() => startEditInstallment(i.id, i.dueDate, i.amountCents)}>
+                            Editar
+                          </Button>
+                        )}
+                        <Button onClick={() => void handleTogglePaid(i.id, i.paidAt !== null)}>
+                          {i.paidAt !== null ? "Desmarcar" : "Marcar pago"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ),
+                )}
               </tbody>
             </table>
           )}

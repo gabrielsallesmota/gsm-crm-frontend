@@ -4,10 +4,12 @@ import type {
   ClientInstallment,
   ClientListFilter,
   ClientSource,
+  CustomInstallmentPlanInput,
   GenerateInstallmentsInput,
   InstallmentStatus,
   PaymentType,
   UpdateClientInput,
+  UpdateInstallmentInput,
 } from "../../types/client";
 import type { Page } from "../../types/common";
 import { apiRequest, apiRequestBlob } from "./ApiClient";
@@ -21,6 +23,7 @@ interface ClientDto {
   niche: string | null;
   source: ClientSource;
   source_id: string | null;
+  closed_at: string;
   payment_type: PaymentType | null;
   total_value_cents: number | null;
   installment_count: number | null;
@@ -53,6 +56,7 @@ function toClient(dto: ClientDto): Client {
     niche: dto.niche ?? "",
     source: dto.source,
     sourceId: dto.source_id,
+    closedAt: dto.closed_at,
     paymentType: dto.payment_type,
     totalValueCents: dto.total_value_cents,
     installmentCount: dto.installment_count,
@@ -86,6 +90,7 @@ function updateBody(input: UpdateClientInput) {
     city: input.city,
     niche: input.niche,
     notes: input.notes,
+    closed_at: input.closedAt,
   };
 }
 
@@ -142,6 +147,36 @@ export class ClientsApiRepository implements ClientsRepository {
       },
     );
     return dto.map(toInstallment);
+  }
+
+  async createCustomInstallmentPlan(
+    clientId: string,
+    input: CustomInstallmentPlanInput,
+  ): Promise<ClientInstallment[]> {
+    const dto = await apiRequest<InstallmentDto[]>(`/api/v1/clients/${clientId}/installments/custom`, {
+      method: "POST",
+      body: JSON.stringify({
+        payment_type: input.paymentType,
+        installments: input.installments.map((item) => ({
+          due_date: item.dueDate,
+          amount_cents: item.amountCents,
+        })),
+      }),
+    });
+    return dto.map(toInstallment);
+  }
+
+  async updateInstallment(
+    clientId: string,
+    installmentId: string,
+    input: UpdateInstallmentInput,
+  ): Promise<ClientInstallment> {
+    return toInstallment(
+      await apiRequest<InstallmentDto>(`/api/v1/clients/${clientId}/installments/${installmentId}`, {
+        method: "PUT",
+        body: JSON.stringify({ due_date: input.dueDate, amount_cents: input.amountCents }),
+      }),
+    );
   }
 
   async markInstallmentPaid(

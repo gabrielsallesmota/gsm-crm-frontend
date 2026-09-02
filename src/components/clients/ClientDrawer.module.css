@@ -206,6 +206,107 @@
   color: var(--text);
 }
 
+.installmentRowActions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.inlineEditInput {
+  width: 100%;
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 12.5px;
+}
+
+.inlineEditActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Toggle "Parcelas iguais" x "Parcelas personalizadas" — mesmo visual do
+   toggle Todos/Ativo/Passivo de `PipelinePage.module.css`. */
+.planModeToggle {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin-bottom: 14px;
+}
+
+.planModeBtn {
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.planModeBtn:hover {
+  color: var(--text);
+}
+
+.planModeBtnActive {
+  background: var(--card-bg);
+  color: #fff;
+}
+
+.customRows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.customRow {
+  display: grid;
+  grid-template-columns: 20px 1fr 1fr 24px;
+  align-items: center;
+  gap: 8px;
+}
+
+.customRow .editInput {
+  margin-bottom: 0;
+}
+
+.customRowSeq {
+  font-size: 11.5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.customRowRemove {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.customRowRemove:hover {
+  color: #ff5c5c;
+}
+
+.customRowRemove:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.customTotal {
+  font-size: 13.5px;
+  color: var(--text);
+  margin: 12px 0;
+}
+
 .dangerZone {
   border-top: 1px solid var(--border);
   padding-top: 18px;

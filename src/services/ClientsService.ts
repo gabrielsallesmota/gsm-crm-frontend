@@ -6,8 +6,10 @@ import type {
   Client,
   ClientInstallment,
   ClientListFilter,
+  CustomInstallmentPlanInput,
   GenerateInstallmentsInput,
   UpdateClientInput,
+  UpdateInstallmentInput,
 } from "../types/client";
 import type { Page } from "../types/common";
 
@@ -42,6 +44,21 @@ export class ClientsService {
     input: GenerateInstallmentsInput,
   ): Promise<ClientInstallment[]> {
     return repo.generateInstallments(clientId, input);
+  }
+
+  createCustomInstallmentPlan(
+    clientId: string,
+    input: CustomInstallmentPlanInput,
+  ): Promise<ClientInstallment[]> {
+    return repo.createCustomInstallmentPlan(clientId, input);
+  }
+
+  updateInstallment(
+    clientId: string,
+    installmentId: string,
+    input: UpdateInstallmentInput,
+  ): Promise<ClientInstallment> {
+    return repo.updateInstallment(clientId, installmentId, input);
   }
 
   markInstallmentPaid(

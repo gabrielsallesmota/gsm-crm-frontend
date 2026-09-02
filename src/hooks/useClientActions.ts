@@ -2,8 +2,10 @@ import { clientsService } from "../services/ClientsService";
 import type {
   Client,
   ClientInstallment,
+  CustomInstallmentPlanInput,
   GenerateInstallmentsInput,
   UpdateClientInput,
+  UpdateInstallmentInput,
 } from "../types/client";
 
 export interface ClientActions {
@@ -13,6 +15,15 @@ export interface ClientActions {
     clientId: string,
     input: GenerateInstallmentsInput,
   ): Promise<ClientInstallment[]>;
+  createCustomInstallmentPlan(
+    clientId: string,
+    input: CustomInstallmentPlanInput,
+  ): Promise<ClientInstallment[]>;
+  updateInstallment(
+    clientId: string,
+    installmentId: string,
+    input: UpdateInstallmentInput,
+  ): Promise<ClientInstallment>;
   markInstallmentPaid(
     clientId: string,
     installmentId: string,
@@ -31,6 +42,10 @@ export function useClientActions(): ClientActions {
     update: (id, input) => clientsService.update(id, input),
     delete: (id) => clientsService.delete(id),
     generateInstallments: (clientId, input) => clientsService.generateInstallments(clientId, input),
+    createCustomInstallmentPlan: (clientId, input) =>
+      clientsService.createCustomInstallmentPlan(clientId, input),
+    updateInstallment: (clientId, installmentId, input) =>
+      clientsService.updateInstallment(clientId, installmentId, input),
     markInstallmentPaid: (clientId, installmentId, paidAt) =>
       clientsService.markInstallmentPaid(clientId, installmentId, paidAt),
     markInstallmentUnpaid: (clientId, installmentId) =>

@@ -3,8 +3,10 @@ import type {
   Client,
   ClientInstallment,
   ClientListFilter,
+  CustomInstallmentPlanInput,
   GenerateInstallmentsInput,
   UpdateClientInput,
+  UpdateInstallmentInput,
 } from "../../types/client";
 import type { Page } from "../../types/common";
 import { NotImplementedError } from "../../utils/errors";
@@ -39,6 +41,21 @@ export class ClientsMockRepository implements ClientsRepository {
     _clientId: string,
     _input: GenerateInstallmentsInput,
   ): Promise<ClientInstallment[]> {
+    throw new NotImplementedError("Clientes", REASON);
+  }
+
+  async createCustomInstallmentPlan(
+    _clientId: string,
+    _input: CustomInstallmentPlanInput,
+  ): Promise<ClientInstallment[]> {
+    throw new NotImplementedError("Clientes", REASON);
+  }
+
+  async updateInstallment(
+    _clientId: string,
+    _installmentId: string,
+    _input: UpdateInstallmentInput,
+  ): Promise<ClientInstallment> {
     throw new NotImplementedError("Clientes", REASON);
   }
 
