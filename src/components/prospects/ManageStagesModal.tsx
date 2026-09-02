@@ -59,6 +59,15 @@ export function ManageStagesModal({
     return stage.followupBusinessDays != null ? String(stage.followupBusinessDays) : "";
   }
 
+  async function handleToggleFlag(stage: ProspectStage, flag: "isWon" | "isLost", value: boolean) {
+    try {
+      await update(stage.id, { [flag]: value });
+      onChanged();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível salvar o estágio");
+    }
+  }
+
   async function handleChangeMessageField(stage: ProspectStage, value: string) {
     try {
       if (value === "") {
@@ -132,10 +141,12 @@ export function ManageStagesModal({
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <h2 className={styles.modalTitle}>Estágios da prospecção</h2>
         <p className={styles.modalSubtitle}>
-          Só é possível excluir um estágio vazio — mova os prospects antes. "Dias úteis" define a
-          cadência automática: quantos dias úteis (seg-sex, sem feriados nacionais) depois do
-          estágio ANTERIOR a data alvo deste deve cair — deixe em branco pra continuar perguntando a
-          data manualmente ao mover pra ele. "Mensagem" escolhe qual campo de mensagem do PRÓPRIO
+          Só é possível excluir um estágio vazio — mova os prospects antes. Marque "Ganho"/"Perdido"
+          nos estágios finais da pipeline — sem isso, o board não sabe que aquele estágio é uma
+          perda de verdade (não pede motivo, não conta no funil). "Dias úteis" define a cadência
+          automática: quantos dias úteis (seg-sex, sem feriados nacionais) depois do estágio
+          ANTERIOR a data alvo deste deve cair — deixe em branco pra continuar perguntando a data
+          manualmente ao mover pra ele. "Mensagem" escolhe qual campo de mensagem do PRÓPRIO
           prospect (ex.: vindo do CSV) esse estágio usa no botão de WhatsApp, em vez do template
           padrão por área.
         </p>
@@ -146,6 +157,33 @@ export function ManageStagesModal({
               <div className={styles.row}>
                 <span className={styles.dot} style={{ background: stage.color }} />
                 <span className={styles.name}>{stage.name}</span>
+                <button
+                  className={styles.deleteBtn}
+                  type="button"
+                  onClick={() => void handleDelete(stage)}
+                  disabled={deletingId === stage.id}
+                  aria-label={`Excluir estágio ${stage.name}`}
+                >
+                  {deletingId === stage.id ? "Excluindo…" : "Excluir"}
+                </button>
+              </div>
+              <div className={styles.row} style={{ flexWrap: "wrap", marginTop: 4 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={stage.isWon}
+                    onChange={(e) => void handleToggleFlag(stage, "isWon", e.target.checked)}
+                  />
+                  <span>Ganho</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={stage.isLost}
+                    onChange={(e) => void handleToggleFlag(stage, "isLost", e.target.checked)}
+                  />
+                  <span>Perdido</span>
+                </label>
                 <input
                   className={styles.input}
                   style={{ width: 64 }}
@@ -175,15 +213,6 @@ export function ManageStagesModal({
                   <option value="message_3">Mensagem 3</option>
                   <option value="message_4">Mensagem 4</option>
                 </select>
-                <button
-                  className={styles.deleteBtn}
-                  type="button"
-                  onClick={() => void handleDelete(stage)}
-                  disabled={deletingId === stage.id}
-                  aria-label={`Excluir estágio ${stage.name}`}
-                >
-                  {deletingId === stage.id ? "Excluindo…" : "Excluir"}
-                </button>
               </div>
               {rowError?.id === stage.id && <p className={styles.errorNote}>{rowError.message}</p>}
             </div>
