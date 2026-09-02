@@ -94,6 +94,19 @@ export interface Prospect {
   pageObjective: PageObjective | null;
   priority: ProspectPriority;
   origin: ProspectOrigin;
+  // Solução(ões) GSM ofertada(s) — texto livre, pode combinar mais de uma
+  // com "+" (ex.: "Landing Page + Automação de WhatsApp"). Regra pra quem
+  // preenche: só o que faz sentido pra `opportunity` deste lead, não é
+  // pra "empurrar" oferta.
+  offeredService: string;
+  // Lead sem WhatsApp (contato só por e-mail/telefone) — desliga o link
+  // "abrir WhatsApp" (`WhatsappButton.tsx`), mantém "Copiar". Independente
+  // de `whatsappStatus` (funil de validação de outreach).
+  noWhatsapp: boolean;
+  // Motivo da perda — só relevante quando o estágio atual é `isLost`;
+  // `null` = sem motivo registrado (raro depois de mover pra um estágio
+  // perdido, já que o board pede na hora — ver `ProspectionBoard.tsx`).
+  lossReasonId: string | null;
   // Mensagens específicas DESTE prospect — ver `ProspectStage.messageField`
   // e `IMPORTABLE_PROSPECT_FIELDS` (vêm do CSV de import ou digitadas à
   // mão). `""` = sem texto nesse campo (mesma convenção do resto dos
@@ -157,6 +170,8 @@ export interface CreateProspectInput {
   pageObjective?: PageObjective;
   priority?: ProspectPriority;
   origin?: ProspectOrigin;
+  offeredService?: string;
+  noWhatsapp?: boolean;
   message1?: string;
   message2?: string;
   message3?: string;
@@ -224,6 +239,8 @@ export interface ImportRowInput {
   pageObjective?: PageObjective;
   priority?: ProspectPriority;
   origin?: ProspectOrigin;
+  offeredService?: string;
+  noWhatsapp?: boolean;
   message1?: string;
   message2?: string;
   message3?: string;
@@ -276,6 +293,8 @@ export const IMPORTABLE_PROSPECT_FIELDS: { key: keyof ImportRowInput; label: str
   { key: "message2", label: "Mensagem 2" },
   { key: "message3", label: "Mensagem 3" },
   { key: "message4", label: "Mensagem 4" },
+  { key: "offeredService", label: "Serviço ofertado" },
+  { key: "noWhatsapp", label: "Sem WhatsApp" },
 ];
 
 export interface ProspectPriorityBreakdown {
@@ -334,4 +353,22 @@ export interface CreateMessageTemplateInput {
 export interface UpdateMessageTemplateInput {
   niche: string | null;
   message: string;
+}
+
+/** Motivo de perda configurável por tenant — preenchido ao mover um
+ * prospect pra um estágio `isLost` (ver `ProspectionBoard.tsx`), pra
+ * alimentar relatório depois. Cadastro livre em "Motivos de perda". */
+export interface ProspectLossReason {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProspectLossReasonInput {
+  name: string;
+}
+
+export interface UpdateProspectLossReasonInput {
+  name: string;
 }

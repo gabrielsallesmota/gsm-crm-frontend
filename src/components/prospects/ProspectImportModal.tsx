@@ -32,6 +32,20 @@ const ENUM_KEYS: Partial<Record<keyof ImportRowInput, string[]>> = {
 
 const NUMBER_FIELDS = new Set<keyof ImportRowInput>(["googleRating", "googleReviewsCount"]);
 const DATE_FIELDS = new Set<keyof ImportRowInput>(["initialContactDate"]);
+const BOOLEAN_FIELDS = new Set<keyof ImportRowInput>(["noWhatsapp"]);
+const TRUTHY_VALUES = new Set(["true", "sim", "s", "yes", "1", "verdadeiro"]);
+const FALSY_VALUES = new Set(["false", "não", "nao", "n", "no", "0", "falso"]);
+
+/** Só grava o campo quando o valor bate com um dos dois conjuntos
+ * conhecidos — evita interpretar lixo de dado raspado como "false" por
+ * padrão (mesmo espírito de `parseFlexibleDate`: ignora em vez de quebrar
+ * a linha). */
+function parseFlexibleBoolean(raw: string): boolean | undefined {
+  const normalized = raw.trim().toLowerCase();
+  if (TRUTHY_VALUES.has(normalized)) return true;
+  if (FALSY_VALUES.has(normalized)) return false;
+  return undefined;
+}
 
 /** Aceita tanto "02/09/2026" (planilha brasileira, dia/mês/ano) quanto
  * "2026-09-02" (ISO, ex.: reimportando o próprio CSV exportado daqui) e
@@ -101,6 +115,11 @@ function buildRow(headers: string[], mapping: string[], values: string[]): Impor
     if (DATE_FIELDS.has(key)) {
       const iso = parseFlexibleDate(raw);
       if (iso) (row as Record<string, unknown>)[key] = iso;
+      return;
+    }
+    if (BOOLEAN_FIELDS.has(key)) {
+      const bool = parseFlexibleBoolean(raw);
+      if (bool !== undefined) (row as Record<string, unknown>)[key] = bool;
       return;
     }
     (row as Record<string, unknown>)[key] = raw;
@@ -183,7 +202,8 @@ export function ProspectImportModal({
           cada linha ter sua própria data — sem essa coluna, todas entram com a data de hoje. As
           datas dos follow-ups seguintes são calculadas sozinhas a partir daí (configure a cadência
           em "Estágios"). Mapeie "Mensagem 1".."Mensagem 4" pra cada prospect ter sua própria
-          mensagem de WhatsApp por etapa — configure em "Estágios" qual campo cada uma usa.
+          mensagem de WhatsApp por etapa — configure em "Estágios" qual campo cada uma usa. "Sem
+          WhatsApp" aceita sim/não, true/false ou 1/0.
         </p>
 
         {summary ? (

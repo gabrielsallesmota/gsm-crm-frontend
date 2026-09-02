@@ -2,6 +2,7 @@ import type { ProspectsRepository } from "../ProspectsRepository";
 import type {
   CreateMessageTemplateInput,
   CreateProspectInput,
+  CreateProspectLossReasonInput,
   CreateProspectStageInput,
   DedupeStrategy,
   ImportRowInput,
@@ -13,6 +14,7 @@ import type {
   ProspectDashboardMetrics,
   ProspectDuplicateCheck,
   ProspectListFilter,
+  ProspectLossReason,
   ProspectMessageField,
   ProspectOrigin,
   ProspectPriority,
@@ -20,6 +22,7 @@ import type {
   SiteStatus,
   UpdateMessageTemplateInput,
   UpdateProspectInput,
+  UpdateProspectLossReasonInput,
   UpdateProspectStageInput,
   WhatsappStatus,
 } from "../../types/prospect";
@@ -51,6 +54,9 @@ interface ProspectDto {
   page_objective: PageObjective | null;
   priority: ProspectPriority;
   origin: ProspectOrigin;
+  offered_service: string | null;
+  no_whatsapp: boolean;
+  loss_reason_id: string | null;
   message_1: string | null;
   message_2: string | null;
   message_3: string | null;
@@ -99,6 +105,9 @@ function toProspect(dto: ProspectDto): Prospect {
     pageObjective: dto.page_objective,
     priority: dto.priority,
     origin: dto.origin,
+    offeredService: dto.offered_service ?? "",
+    noWhatsapp: dto.no_whatsapp,
+    lossReasonId: dto.loss_reason_id,
     message1: dto.message_1 ?? "",
     message2: dto.message_2 ?? "",
     message3: dto.message_3 ?? "",
@@ -149,6 +158,8 @@ function createBody(input: CreateProspectInput | UpdateProspectInput) {
     page_objective: input.pageObjective,
     priority: input.priority,
     origin: input.origin,
+    offered_service: input.offeredService,
+    no_whatsapp: input.noWhatsapp,
     message_1: input.message1,
     message_2: input.message2,
     message_3: input.message3,
@@ -180,6 +191,8 @@ function importRowBody(row: ImportRowInput) {
     page_objective: row.pageObjective,
     priority: row.priority,
     origin: row.origin,
+    offered_service: row.offeredService,
+    no_whatsapp: row.noWhatsapp,
     message_1: row.message1,
     message_2: row.message2,
     message_3: row.message3,
@@ -237,11 +250,20 @@ export class ProspectsApiRepository implements ProspectsRepository {
     );
   }
 
-  async move(id: string, stageId: string, targetDate?: string | null): Promise<Prospect> {
+  async move(
+    id: string,
+    stageId: string,
+    targetDate?: string | null,
+    lossReasonId?: string | null,
+  ): Promise<Prospect> {
     return toProspect(
       await apiRequest<ProspectDto>(`/api/v1/prospects/${id}/move`, {
         method: "PATCH",
-        body: JSON.stringify({ stage_id: stageId, target_date: targetDate ?? null }),
+        body: JSON.stringify({
+          stage_id: stageId,
+          target_date: targetDate ?? null,
+          loss_reason_id: lossReasonId ?? null,
+        }),
       }),
     );
   }
@@ -420,6 +442,47 @@ export class ProspectsApiRepository implements ProspectsRepository {
   async deleteMessageTemplate(id: string): Promise<void> {
     await apiRequest<void>(`/api/v1/prospect-message-templates/${id}`, { method: "DELETE" });
   }
+
+  async listLossReasons(): Promise<ProspectLossReason[]> {
+    const dto = await apiRequest<ProspectLossReasonDto[]>("/api/v1/prospect-loss-reasons");
+    return dto.map(toLossReason);
+  }
+
+  async createLossReason(input: CreateProspectLossReasonInput): Promise<ProspectLossReason> {
+    return toLossReason(
+      await apiRequest<ProspectLossReasonDto>("/api/v1/prospect-loss-reasons", {
+        method: "POST",
+        body: JSON.stringify({ name: input.name }),
+      }),
+    );
+  }
+
+  async updateLossReason(
+    id: string,
+    input: UpdateProspectLossReasonInput,
+  ): Promise<ProspectLossReason> {
+    return toLossReason(
+      await apiRequest<ProspectLossReasonDto>(`/api/v1/prospect-loss-reasons/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: input.name }),
+      }),
+    );
+  }
+
+  async deleteLossReason(id: string): Promise<void> {
+    await apiRequest<void>(`/api/v1/prospect-loss-reasons/${id}`, { method: "DELETE" });
+  }
+}
+
+interface ProspectLossReasonDto {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function toLossReason(dto: ProspectLossReasonDto): ProspectLossReason {
+  return { id: dto.id, name: dto.name, createdAt: dto.created_at, updatedAt: dto.updated_at };
 }
 
 interface MessageTemplateDto {

@@ -5,12 +5,16 @@ import { useToast } from "../../hooks/useToast";
 import styles from "./WhatsappButton.module.css";
 
 /**
- * Só renderiza quando existe telefone E alguma mensagem resolve pro
- * (prospect, estágio) atual (ver `resolveProspectMessage` — mensagem
- * própria do prospect configurada no estágio, ou o template padrão por
- * área). Sem nenhuma das duas, não tem o que mandar, então o botão nem
- * aparece (ver Configurações → Prospecção pra cadastrar um template, ou
- * "Estágios" pra apontar um campo de mensagem do prospect).
+ * Só renderiza quando alguma mensagem resolve pro (prospect, estágio) atual
+ * (ver `resolveProspectMessage` — mensagem própria do prospect configurada
+ * no estágio, ou o template padrão por área). Sem isso, não tem o que
+ * mandar, então o botão nem aparece (ver Configurações → Prospecção pra
+ * cadastrar um template, ou "Estágios" pra apontar um campo de mensagem).
+ *
+ * O link "abrir WhatsApp" exige telefone E `!prospect.noWhatsapp` — um lead
+ * marcado como "sem WhatsApp" (contato só por e-mail) nunca tem esse link,
+ * mas "Copiar" continua disponível (com ou sem telefone) pra colar a
+ * mensagem num e-mail.
  */
 export function WhatsappButton({
   prospect,
@@ -24,7 +28,6 @@ export function WhatsappButton({
   size?: "normal" | "small";
 }) {
   const { toast } = useToast();
-  if (!prospect.phoneNormalized) return null;
   const resolved = resolveProspectMessage(prospect, stage, templates);
   if (!resolved) return null;
   // `const` sozinho não basta pro TS propagar o narrowing de `resolved`
@@ -32,7 +35,8 @@ export function WhatsappButton({
   // pra um `string` de verdade, sem `| undefined`.
   const message: string = resolved;
 
-  const url = buildWhatsappUrl(prospect.phoneNormalized, message);
+  const canOpenWhatsapp = !prospect.noWhatsapp && !!prospect.phoneNormalized;
+  const url = canOpenWhatsapp ? buildWhatsappUrl(prospect.phoneNormalized, message) : null;
   const btnClass = size === "small" ? `${styles.btn} ${styles.btnSmall}` : styles.btn;
 
   async function handleCopy(e: MouseEvent) {
@@ -52,16 +56,18 @@ export function WhatsappButton({
 
   return (
     <span className={styles.group}>
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={btnClass}
-        onClick={(e) => e.stopPropagation()}
-        title={message}
-      >
-        💬 WhatsApp
-      </a>
+      {url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={btnClass}
+          onClick={(e) => e.stopPropagation()}
+          title={message}
+        >
+          💬 WhatsApp
+        </a>
+      )}
       <button type="button" className={btnClass} onClick={(e) => void handleCopy(e)} title={message}>
         📋 Copiar
       </button>

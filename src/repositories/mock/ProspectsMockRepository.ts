@@ -2,6 +2,7 @@ import type { ProspectsRepository } from "../ProspectsRepository";
 import type {
   CreateMessageTemplateInput,
   CreateProspectInput,
+  CreateProspectLossReasonInput,
   CreateProspectStageInput,
   DedupeStrategy,
   ImportRowInput,
@@ -11,9 +12,11 @@ import type {
   ProspectDashboardMetrics,
   ProspectDuplicateCheck,
   ProspectListFilter,
+  ProspectLossReason,
   ProspectStage,
   UpdateMessageTemplateInput,
   UpdateProspectInput,
+  UpdateProspectLossReasonInput,
   UpdateProspectStageInput,
 } from "../../types/prospect";
 import type { Page } from "../../types/common";
@@ -49,7 +52,12 @@ export class ProspectsMockRepository implements ProspectsRepository {
     throw new NotImplementedError("Prospecção GSM", REASON);
   }
 
-  async move(_id: string, _stageId: string, _targetDate?: string | null): Promise<Prospect> {
+  async move(
+    _id: string,
+    _stageId: string,
+    _targetDate?: string | null,
+    _lossReasonId?: string | null,
+  ): Promise<Prospect> {
     throw new NotImplementedError("Prospecção GSM", REASON);
   }
 
@@ -117,6 +125,25 @@ export class ProspectsMockRepository implements ProspectsRepository {
   }
 
   async deleteMessageTemplate(_id: string): Promise<void> {
+    throw new NotImplementedError("Prospecção GSM", REASON);
+  }
+
+  async listLossReasons(): Promise<ProspectLossReason[]> {
+    throw new NotImplementedError("Prospecção GSM", REASON);
+  }
+
+  async createLossReason(_input: CreateProspectLossReasonInput): Promise<ProspectLossReason> {
+    throw new NotImplementedError("Prospecção GSM", REASON);
+  }
+
+  async updateLossReason(
+    _id: string,
+    _input: UpdateProspectLossReasonInput,
+  ): Promise<ProspectLossReason> {
+    throw new NotImplementedError("Prospecção GSM", REASON);
+  }
+
+  async deleteLossReason(_id: string): Promise<void> {
     throw new NotImplementedError("Prospecção GSM", REASON);
   }
 }

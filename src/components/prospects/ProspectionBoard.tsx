@@ -4,12 +4,14 @@ import { useProspectStageActions } from "../../hooks/useProspectStageActions";
 import { useProspects } from "../../hooks/useProspects";
 import { useProspectActions } from "../../hooks/useProspectActions";
 import { useMessageTemplates } from "../../hooks/useMessageTemplates";
+import { useProspectLossReasons } from "../../hooks/useProspectLossReasons";
 import { EmptyState } from "../common/EmptyState";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { ProspectDrawer } from "./ProspectDrawer";
 import { ProspectImportModal } from "./ProspectImportModal";
 import { ManageStagesModal } from "./ManageStagesModal";
+import { ManageLossReasonsModal } from "./ManageLossReasonsModal";
 import { WhatsappButton } from "./WhatsappButton";
 import { useToast } from "../../hooks/useToast";
 import { prospectsService } from "../../services/ProspectsService";
@@ -21,6 +23,7 @@ import type {
   CreateProspectInput,
   MessageTemplate,
   Prospect,
+  ProspectLossReason,
   ProspectOrigin,
   ProspectStage,
 } from "../../types/prospect";
@@ -76,6 +79,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
   const { reorder: reorderStages } = useProspectStageActions();
   const { toast } = useToast();
   const { data: templates } = useMessageTemplates();
+  const { data: lossReasons, reload: reloadLossReasons } = useProspectLossReasons();
 
   const { data, loading, error, reload } = useProspects({ ...period, page: 1, pageSize: 200 });
   const [dragId, setDragId] = useState<string | null>(null);
@@ -87,10 +91,18 @@ export function ProspectionBoard({ period }: { period: Period }) {
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [managingStages, setManagingStages] = useState(false);
+  const [managingLossReasons, setManagingLossReasons] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
   // Move pendente aguardando a data alvo (só quando o estágio de destino
   // pede — ver `stage.asksTargetDate`); some assim que confirma ou pula.
   const [pendingMove, setPendingMove] = useState<{
+    prospectId: string;
+    stageId: string;
+    stageName: string;
+  } | null>(null);
+  // Move pendente aguardando o motivo da perda (estágio de destino
+  // `isLost`) — some assim que confirma ou pula (`LossReasonPrompt`).
+  const [pendingLossMove, setPendingLossMove] = useState<{
     prospectId: string;
     stageId: string;
     stageName: string;
@@ -121,6 +133,13 @@ export function ProspectionBoard({ period }: { period: Period }) {
     const current = prospects.find((p) => p.id === prospectId);
     if (!current || current.stageId === targetStageId) return; // solto na própria coluna — nada a fazer
     const targetStage = stages?.find((s) => s.id === targetStageId);
+    // Estágio "perdido" pede o motivo ANTES de qualquer outra coisa — não
+    // faz sentido também perguntar data de follow-up pra um prospect que
+    // acabou de ser marcado como perdido.
+    if (targetStage?.isLost) {
+      setPendingLossMove({ prospectId, stageId: targetStageId, stageName: targetStage.name });
+      return;
+    }
     // Se a cadência automática já cobre o caminho até `targetStageId` (todo
     // estágio no meio tem `followupBusinessDays` configurado — ver
     // `computeStageTargetDate`), o backend vai calcular a data sozinho e
@@ -145,6 +164,18 @@ export function ProspectionBoard({ period }: { period: Period }) {
     setPendingMove(null);
     try {
       await move(prospectId, stageId, targetDate);
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível mover o prospect");
+    }
+  }
+
+  async function handleConfirmPendingLossMove(lossReasonId: string | null) {
+    if (!pendingLossMove) return;
+    const { prospectId, stageId } = pendingLossMove;
+    setPendingLossMove(null);
+    try {
+      await move(prospectId, stageId, undefined, lossReasonId);
       reload();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Não foi possível mover o prospect");
@@ -227,6 +258,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
         </div>
         <div className={styles.toolbar}>
           <Button onClick={() => setManagingStages(true)}>Estágios</Button>
+          <Button onClick={() => setManagingLossReasons(true)}>Motivos de perda</Button>
           <Button
             onClick={() => void handleBackfillCadence()}
             disabled={backfilling}
@@ -298,6 +330,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
           prospect={selected}
           stages={stages ?? []}
           templates={templates ?? []}
+          lossReasons={lossReasons ?? []}
           onClose={() => setSelectedId(null)}
           onSaved={() => reload()}
           onDeleted={() => {
@@ -339,11 +372,28 @@ export function ProspectionBoard({ period }: { period: Period }) {
         />
       )}
 
+      {managingLossReasons && (
+        <ManageLossReasonsModal
+          reasons={lossReasons ?? []}
+          onClose={() => setManagingLossReasons(false)}
+          onChanged={() => reloadLossReasons()}
+        />
+      )}
+
       {pendingMove && (
         <TargetDatePrompt
           stageName={pendingMove.stageName}
           onConfirm={(date) => void handleConfirmPendingMove(date)}
           onSkip={() => void handleConfirmPendingMove(null)}
+        />
+      )}
+
+      {pendingLossMove && (
+        <LossReasonPrompt
+          stageName={pendingLossMove.stageName}
+          reasons={lossReasons ?? []}
+          onConfirm={(reasonId) => void handleConfirmPendingLossMove(reasonId)}
+          onSkip={() => void handleConfirmPendingLossMove(null)}
         />
       )}
     </div>
@@ -399,6 +449,59 @@ function TargetDatePrompt({
         <div className={styles.modalActions}>
           <Button onClick={onSkip}>Pular</Button>
           <Button variant="primary" onClick={() => date && onConfirm(date)} disabled={!date}>
+            Confirmar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Aparece ao mover um card pra um estágio `isLost` — motivo é opcional
+ * (dá pra pular quando ainda não configurou nenhum em "Motivos de perda"),
+ * mas registrar ajuda a montar o relatório de perdas depois. */
+function LossReasonPrompt({
+  stageName,
+  reasons,
+  onConfirm,
+  onSkip,
+}: {
+  stageName: string;
+  reasons: ProspectLossReason[];
+  onConfirm: (reasonId: string) => void;
+  onSkip: () => void;
+}) {
+  const [reasonId, setReasonId] = useState("");
+
+  return (
+    <div className={styles.overlay} onClick={onSkip}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <h2 className={styles.modalTitle}>Qual o motivo da perda?</h2>
+        <p className={styles.modalSubtitle}>
+          Movendo pra <strong>{stageName}</strong> — registrar o motivo alimenta o relatório de
+          perdas depois (opcional).
+        </p>
+        {reasons.length === 0 ? (
+          <p className={styles.modalSubtitle}>
+            Nenhum motivo cadastrado ainda — configure em "Motivos de perda".
+          </p>
+        ) : (
+          <select
+            className={styles.select}
+            value={reasonId}
+            onChange={(e) => setReasonId(e.target.value)}
+          >
+            <option value="">Selecione…</option>
+            {reasons.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <div className={styles.modalActions}>
+          <Button onClick={onSkip}>Pular</Button>
+          <Button variant="primary" onClick={() => reasonId && onConfirm(reasonId)} disabled={!reasonId}>
             Confirmar
           </Button>
         </div>

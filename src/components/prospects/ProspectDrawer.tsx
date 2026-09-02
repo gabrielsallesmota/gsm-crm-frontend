@@ -1,5 +1,11 @@
 import { useState } from "react";
-import type { MessageTemplate, Prospect, ProspectStage, UpdateProspectInput } from "../../types/prospect";
+import type {
+  MessageTemplate,
+  Prospect,
+  ProspectLossReason,
+  ProspectStage,
+  UpdateProspectInput,
+} from "../../types/prospect";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { WhatsappButton } from "./WhatsappButton";
@@ -25,6 +31,7 @@ export function ProspectDrawer({
   prospect,
   stages,
   templates,
+  lossReasons,
   onClose,
   onSaved,
   onDeleted,
@@ -32,6 +39,7 @@ export function ProspectDrawer({
   prospect: Prospect;
   stages: ProspectStage[];
   templates: MessageTemplate[];
+  lossReasons: ProspectLossReason[];
   onClose: () => void;
   onSaved?: (prospect: Prospect) => void;
   onDeleted?: () => void;
@@ -100,6 +108,8 @@ export function ProspectDrawer({
         opportunity: form.opportunity,
         priority: form.priority,
         origin: form.origin,
+        offeredService: form.offeredService,
+        noWhatsapp: form.noWhatsapp,
         force,
         ...(form.message1 ? { message1: form.message1 } : {}),
         ...(form.message2 ? { message2: form.message2 } : {}),
@@ -329,6 +339,21 @@ export function ProspectDrawer({
               options={Object.entries(SITE_STATUS).map(([k, v]) => ({ value: k, label: v.label }))}
               onChange={(v) => setForm((f) => ({ ...f, siteStatus: v as FormState["siteStatus"] }))}
             />
+            <div className={styles.field}>
+              <div className={styles.fieldLabel}>Sem WhatsApp</div>
+              {editing ? (
+                <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.noWhatsapp}
+                    onChange={(e) => setForm((f) => ({ ...f, noWhatsapp: e.target.checked }))}
+                  />
+                  <span>Contato só por e-mail/telefone</span>
+                </label>
+              ) : (
+                <div className={styles.fieldValue}>{prospect.noWhatsapp ? "Sim" : "Não"}</div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -392,6 +417,31 @@ export function ProspectDrawer({
               onChange={(v) => setForm((f) => ({ ...f, targetDate: v }))}
               type="date"
             />
+            {prospect.lossReasonId && (
+              <div className={styles.field}>
+                <div className={styles.fieldLabel}>Motivo da perda</div>
+                <div className={styles.fieldValue}>
+                  {lossReasons.find((r) => r.id === prospect.lossReasonId)?.name ?? "—"}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className={`${styles.field} ${styles.fieldFull}`} style={{ marginTop: 10 }}>
+            <div className={styles.fieldLabel}>Serviço ofertado</div>
+            {editing ? (
+              <input
+                className={styles.fieldInput}
+                value={form.offeredService}
+                onChange={(e) => setForm((f) => ({ ...f, offeredService: e.target.value }))}
+                placeholder="Ex.: Landing Page + Automação de WhatsApp"
+              />
+            ) : (
+              <div className={styles.fieldValue}>{prospect.offeredService || "—"}</div>
+            )}
+            <p className={styles.notes} style={{ marginTop: 4 }}>
+              Só solução(ões) GSM justificada(s) pela oportunidade identificada acima — combine mais
+              de uma com "+" se fizer sentido pro lead. Não preencha só pra "engordar" a oferta.
+            </p>
           </div>
         </div>
 
@@ -627,6 +677,8 @@ function fromProspect(prospect: Prospect) {
     pageObjective: prospect.pageObjective ?? "",
     priority: prospect.priority,
     origin: prospect.origin,
+    offeredService: prospect.offeredService,
+    noWhatsapp: prospect.noWhatsapp,
     message1: prospect.message1,
     message2: prospect.message2,
     message3: prospect.message3,

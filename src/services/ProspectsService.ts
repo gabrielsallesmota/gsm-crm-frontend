@@ -5,6 +5,7 @@ import { selectRepository } from "./factory";
 import type {
   CreateMessageTemplateInput,
   CreateProspectInput,
+  CreateProspectLossReasonInput,
   CreateProspectStageInput,
   DedupeStrategy,
   ImportRowInput,
@@ -14,9 +15,11 @@ import type {
   ProspectDashboardMetrics,
   ProspectDuplicateCheck,
   ProspectListFilter,
+  ProspectLossReason,
   ProspectStage,
   UpdateMessageTemplateInput,
   UpdateProspectInput,
+  UpdateProspectLossReasonInput,
   UpdateProspectStageInput,
 } from "../types/prospect";
 import type { Page } from "../types/common";
@@ -44,8 +47,13 @@ export class ProspectsService {
     return repo.update(id, input);
   }
 
-  move(id: string, stageId: string, targetDate?: string | null): Promise<Prospect> {
-    return repo.move(id, stageId, targetDate);
+  move(
+    id: string,
+    stageId: string,
+    targetDate?: string | null,
+    lossReasonId?: string | null,
+  ): Promise<Prospect> {
+    return repo.move(id, stageId, targetDate, lossReasonId);
   }
 
   delete(id: string): Promise<void> {
@@ -110,6 +118,22 @@ export class ProspectsService {
 
   deleteMessageTemplate(id: string): Promise<void> {
     return repo.deleteMessageTemplate(id);
+  }
+
+  listLossReasons(): Promise<ProspectLossReason[]> {
+    return repo.listLossReasons();
+  }
+
+  createLossReason(input: CreateProspectLossReasonInput): Promise<ProspectLossReason> {
+    return repo.createLossReason(input);
+  }
+
+  updateLossReason(id: string, input: UpdateProspectLossReasonInput): Promise<ProspectLossReason> {
+    return repo.updateLossReason(id, input);
+  }
+
+  deleteLossReason(id: string): Promise<void> {
+    return repo.deleteLossReason(id);
   }
 }
 

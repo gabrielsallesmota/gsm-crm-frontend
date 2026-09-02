@@ -1,6 +1,7 @@
 import type {
   CreateMessageTemplateInput,
   CreateProspectInput,
+  CreateProspectLossReasonInput,
   CreateProspectStageInput,
   DedupeStrategy,
   ImportRowInput,
@@ -10,9 +11,11 @@ import type {
   ProspectDashboardMetrics,
   ProspectDuplicateCheck,
   ProspectListFilter,
+  ProspectLossReason,
   ProspectStage,
   UpdateMessageTemplateInput,
   UpdateProspectInput,
+  UpdateProspectLossReasonInput,
   UpdateProspectStageInput,
 } from "../types/prospect";
 import type { Page } from "../types/common";
@@ -23,7 +26,12 @@ export interface ProspectsRepository {
   get(id: string): Promise<Prospect>;
   create(input: CreateProspectInput): Promise<Prospect>;
   update(id: string, input: UpdateProspectInput): Promise<Prospect>;
-  move(id: string, stageId: string, targetDate?: string | null): Promise<Prospect>;
+  move(
+    id: string,
+    stageId: string,
+    targetDate?: string | null,
+    lossReasonId?: string | null,
+  ): Promise<Prospect>;
   delete(id: string): Promise<void>;
   checkDuplicate(phone: string): Promise<ProspectDuplicateCheck>;
   bulkImport(
@@ -50,4 +58,9 @@ export interface ProspectsRepository {
   createMessageTemplate(input: CreateMessageTemplateInput): Promise<MessageTemplate>;
   updateMessageTemplate(id: string, input: UpdateMessageTemplateInput): Promise<MessageTemplate>;
   deleteMessageTemplate(id: string): Promise<void>;
+
+  listLossReasons(): Promise<ProspectLossReason[]>;
+  createLossReason(input: CreateProspectLossReasonInput): Promise<ProspectLossReason>;
+  updateLossReason(id: string, input: UpdateProspectLossReasonInput): Promise<ProspectLossReason>;
+  deleteLossReason(id: string): Promise<void>;
 }

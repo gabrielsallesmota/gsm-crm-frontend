@@ -42,6 +42,7 @@ const PLACEHOLDERS: { token: string; get: (p: Prospect) => string }[] = [
   { token: "{servico_principal}", get: (p) => p.mainService },
   { token: "{cidade}", get: (p) => p.city },
   { token: "{bairro}", get: (p) => p.neighborhood },
+  { token: "{servico_ofertado}", get: (p) => p.offeredService },
   // Mesmo formato usado no resto da tela pra exibir a nota (ver
   // `ProspectDrawer.tsx`, `display={... String(prospect.googleRating) ...}`)
   // — sem casas decimais fixas nem vírgula, só `String(number)`.
