@@ -5,6 +5,80 @@
   margin-bottom: 18px;
 }
 
+/* Toggle Todos/Ativo/Passivo — só aparece pra platform staff (ver
+   `PipelinePage.module.css`, mesmas classes/valores, duplicado aqui porque
+   cada página deste projeto é self-contained em CSS). */
+.sourceFilter {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin-bottom: 18px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.sourceFilterBtn {
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.sourceFilterBtn:hover {
+  color: var(--text);
+}
+
+.sourceFilterBtnActive {
+  background: var(--card-bg);
+  color: #fff;
+}
+
+.sourceDivider {
+  border-top: 1px solid var(--border);
+  margin: 26px 0;
+}
+
+/* Tabela crua de `ProspectsTable` — classe própria (não `.table`) pra não
+   vazar `td`/`th` genéricos pro `<table>` de `LeadRow`, que estiliza suas
+   próprias células via `LeadRow.module.css` (mesma especificidade de
+   seletor — colidir dependeria da ordem de bundling dos CSS Modules). */
+.prospectTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.prospectTable th {
+  text-align: left;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.prospectTable td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.prospectRow {
+  cursor: pointer;
+}
+
+.prospectRow:hover td {
+  background: var(--card-bg-alt);
+}
+
 .pageTitle {
   margin: 0;
   font-family: var(--font-heading);
@@ -52,6 +126,7 @@
   padding: 12px 10px;
   border-bottom: 1px solid var(--border);
 }
+
 
 .empty {
   padding: 40px;

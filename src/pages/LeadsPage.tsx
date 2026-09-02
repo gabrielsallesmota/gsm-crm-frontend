@@ -3,9 +3,15 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useLeads } from "../hooks/useLeads";
 import { useLeadActions } from "../hooks/useLeadActions";
 import { usePipelines } from "../hooks/usePipelines";
+import { useProspects } from "../hooks/useProspects";
+import { useProspectStages } from "../hooks/useProspectStages";
+import { useMessageTemplates } from "../hooks/useMessageTemplates";
+import { useProspectLossReasons } from "../hooks/useProspectLossReasons";
 import { useAuth } from "../hooks/useAuth";
 import { LeadRow } from "../components/leads/LeadRow";
 import { LeadDrawer } from "../components/leads/LeadDrawer";
+import { ProspectDrawer } from "../components/prospects/ProspectDrawer";
+import { Badge } from "../components/common/Badge";
 import { EmptyState } from "../components/common/EmptyState";
 import { Button } from "../components/common/Button";
 import { CurrencyInput } from "../components/common/CurrencyInput";
@@ -13,7 +19,58 @@ import { useToast } from "../hooks/useToast";
 import { ROUTES } from "../constants/routes";
 import styles from "./LeadsPage.module.css";
 
+type SourceFilter = "todos" | "ativo" | "passivo";
+
+const PASSIVO_BADGE = { label: "Passivo", color: "#4aa3ff", bg: "rgba(74,163,255,.14)" };
+const ATIVO_BADGE = { label: "Ativo", color: "#a78bfa", bg: "rgba(167,139,250,.16)" };
+
+const SOURCE_FILTER_LABEL: Record<SourceFilter, string> = {
+  todos: "Todos",
+  ativo: "Ativo (prospecção)",
+  passivo: "Passivo (leads)",
+};
+
 export function LeadsPage() {
+  // Ver PipelinePage.tsx — mesma dualidade Ativo/Passivo, só que na tela de
+  // lista/tabela em vez do quadro kanban. `isPlatformStaff` vem de
+  // `GET /auth/me`.
+  const { user } = useAuth();
+  const isSuperAdmin = user?.isPlatformStaff ?? false;
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("todos");
+  const showPassivo = !isSuperAdmin || sourceFilter !== "ativo";
+  const showAtivo = isSuperAdmin && sourceFilter !== "passivo";
+
+  return (
+    <div>
+      {isSuperAdmin && (
+        <div className={styles.sourceFilter}>
+          {(["todos", "ativo", "passivo"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={
+                sourceFilter === option
+                  ? `${styles.sourceFilterBtn} ${styles.sourceFilterBtnActive}`
+                  : styles.sourceFilterBtn
+              }
+              onClick={() => setSourceFilter(option)}
+            >
+              {SOURCE_FILTER_LABEL[option]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {showPassivo && <LeadsTable taggedPassivo={isSuperAdmin} />}
+
+      {showPassivo && showAtivo && <div className={styles.sourceDivider} />}
+
+      {showAtivo && <ProspectsTable />}
+    </div>
+  );
+}
+
+function LeadsTable({ taggedPassivo }: { taggedPassivo: boolean }) {
   const [search, setSearch] = useState("");
   const { data, loading, error, reload } = useLeads({ search, page: 1, pageSize: 100 });
   const { create } = useLeadActions();
@@ -62,7 +119,9 @@ export function LeadsPage() {
     <div>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.pageTitle}>Leads</h1>
+          <h1 className={styles.pageTitle}>
+            {taggedPassivo && <Badge {...PASSIVO_BADGE} />} Leads
+          </h1>
           <p className={styles.pageSubtitle}>{data ? `${data.total} leads` : "Carregando…"}</p>
         </div>
         <Button
@@ -112,6 +171,97 @@ export function LeadsPage() {
 
       {creating && (
         <QuickCreateModal onClose={() => setCreating(false)} onSubmit={handleCreate} />
+      )}
+    </div>
+  );
+}
+
+/** Espelha `LeadsTable` acima só que pra Prospecção (carteira comercial
+ * ativa da própria GSM) — mesma dado que já aparece no board de
+ * `PipelinePage.tsx`, só que como lista/tabela (pedido explícito: "aba lead
+ * deve aparecer tanto os prospecção quando contatos passivos"). Só
+ * renderizada pra platform staff (ver filtro em `LeadsPage`). */
+function ProspectsTable() {
+  const [search, setSearch] = useState("");
+  const { data: stages } = useProspectStages();
+  const { data: templates } = useMessageTemplates();
+  const { data: lossReasons } = useProspectLossReasons();
+  const { data, loading, error, reload } = useProspects({ search, page: 1, pageSize: 100 });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const prospects = data?.items ?? [];
+  const selected = prospects.find((p) => p.id === selectedId) ?? null;
+
+  return (
+    <div>
+      <div className={styles.header}>
+        <div>
+          <h1 className={styles.pageTitle}>
+            <Badge {...ATIVO_BADGE} /> Prospecção
+          </h1>
+          <p className={styles.pageSubtitle}>{data ? `${data.total} prospects` : "Carregando…"}</p>
+        </div>
+      </div>
+
+      <input
+        className={styles.search}
+        placeholder="Buscar por empresa, cidade ou nicho…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+
+      {error && <EmptyState title="Não foi possível carregar a prospecção" message={error.message} />}
+
+      {!error && (
+        <div className={styles.tableWrap}>
+          <table className={styles.prospectTable}>
+            <thead>
+              <tr>
+                <th>Empresa</th>
+                <th>Estágio</th>
+                <th>Nicho</th>
+                <th>Cidade</th>
+              </tr>
+            </thead>
+            <tbody>
+              {prospects.map((prospect) => {
+                const stage = stages?.find((s) => s.id === prospect.stageId);
+                return (
+                  <tr
+                    key={prospect.id}
+                    className={styles.prospectRow}
+                    onClick={() => setSelectedId(prospect.id)}
+                  >
+                    <td>{prospect.companyName}</td>
+                    <td>
+                      {stage && <Badge label={stage.name} color={stage.color} bg={`${stage.color}22`} />}
+                    </td>
+                    <td>{prospect.niche || "—"}</td>
+                    <td>{prospect.city || "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!loading && prospects.length === 0 && (
+            <div className={styles.empty}>Nenhum prospect encontrado.</div>
+          )}
+        </div>
+      )}
+
+      {selected && stages && (
+        <ProspectDrawer
+          prospect={selected}
+          stages={stages}
+          templates={templates ?? []}
+          lossReasons={lossReasons ?? []}
+          onClose={() => setSelectedId(null)}
+          onSaved={() => reload()}
+          onDeleted={() => {
+            setSelectedId(null);
+            reload();
+          }}
+        />
       )}
     </div>
   );

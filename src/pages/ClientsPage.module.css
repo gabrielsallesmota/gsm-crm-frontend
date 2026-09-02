@@ -1,0 +1,85 @@
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.pageTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.pageSubtitle {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.search {
+  width: 100%;
+  max-width: 380px;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  padding: 10px 14px;
+  font-size: 13.5px;
+  margin-bottom: 18px;
+}
+
+.tableWrap {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  text-align: left;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.row {
+  cursor: pointer;
+}
+
+.row:hover td {
+  background: var(--card-bg-alt);
+}
+
+.overdueBadge {
+  margin-left: 8px;
+}
+
+.chevron {
+  color: var(--muted);
+  text-align: right;
+}
+
+.empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13.5px;
+}

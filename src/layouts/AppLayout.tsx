@@ -19,6 +19,12 @@ const NAV_ITEMS: {
   icon: Parameters<typeof NavIcon>[0]["name"];
   label: string;
   adminOnly?: boolean;
+  /** Acesso de PLATAFORMA (`user.isPlatformStaff`), diferente de
+   * `adminOnly` (que é role NO TENANT). "Clientes" é carteira comercial
+   * interna da GSM — mesmo gate de `ProspectionBoard`/`PipelinePage`, mas
+   * como item de menu PRÓPRIO (ao contrário de Prospecção, que fica
+   * embutida em Pipeline — ver comentário abaixo). */
+  platformStaffOnly?: boolean;
 }[] = [
   { to: ROUTES.dashboard, icon: "dashboard", label: "Dashboard" },
   // Prospecção GSM não tem item de menu próprio — para quem é super admin,
@@ -26,6 +32,7 @@ const NAV_ITEMS: {
   // Passivo/Todos), não como uma tela separada. Ver `PipelinePage.tsx`.
   { to: ROUTES.pipeline, icon: "pipeline", label: "Pipeline" },
   { to: ROUTES.leads, icon: "leads", label: "Leads" },
+  { to: ROUTES.clientes, icon: "clients", label: "Clientes", platformStaffOnly: true },
   { to: ROUTES.tarefas, icon: "tasks", label: "Tarefas" },
   { to: ROUTES.agenda, icon: "agenda", label: "Agenda" },
   { to: ROUTES.relatorios, icon: "reports", label: "Relatórios" },
@@ -97,6 +104,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   // continua funcionando (a comparação nunca era o que fazia o demo
   // funcionar — `isDemoMode`/`canSwitchTenant` já cobrem isso).
   const isAdmin = user?.role === "admin" || user?.role === "gestor";
+  const isPlatformStaff = user?.isPlatformStaff ?? false;
   // Troca de tenant real (produção) — independente do mecanismo de demo
   // (`canSwitchTenant`/`switchTenant`, que continua intocado).
   const canSwitchRealTenant = !isDemoMode && availableTenants.length > 1;
@@ -155,7 +163,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
 
           <nav className={styles.nav}>
-            {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map((item) => (
+            {NAV_ITEMS.filter(
+              (item) =>
+                (!item.adminOnly || isAdmin) && (!item.platformStaffOnly || isPlatformStaff),
+            ).map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}

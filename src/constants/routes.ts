@@ -7,6 +7,8 @@ export const ROUTES = {
   pipeline: "/pipeline",
   leads: "/leads",
   leadDetail: (id: string) => `/leads/${id}`,
+  clientes: "/clientes",
+  clienteDetail: (id: string) => `/clientes/${id}`,
   tarefas: "/tarefas",
   agenda: "/agenda",
   relatorios: "/relatorios",

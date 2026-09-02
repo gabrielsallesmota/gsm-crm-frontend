@@ -27,7 +27,10 @@ async function readErrorDetail(resp: Response): Promise<string> {
 
 async function rawRequest(path: string, options: RequestInit, tokenOverride?: string): Promise<Response> {
   const headers = new Headers(options.headers);
-  if (!headers.has("Content-Type") && options.body) {
+  // `FormData` (upload de contrato) precisa que o browser gere o próprio
+  // `Content-Type: multipart/form-data; boundary=...` — setar
+  // "application/json" aqui quebraria o parsing multipart no backend.
+  if (!headers.has("Content-Type") && options.body && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
   const token = tokenOverride ?? accessToken;
@@ -94,6 +97,28 @@ export async function apiRequestText(path: string, options: RequestInit = {}): P
     throw new ApiError(resp.status, await readErrorDetail(resp));
   }
   return resp.text();
+}
+
+/**
+ * Mesmo fluxo de auth/refresh de `apiRequest`, mas devolve o corpo como
+ * `Blob` — usado pelo download do contrato assinado (PDF), que não é JSON.
+ * Content-Type real do arquivo já vem certo no `Blob` (o browser lê do
+ * header `Content-Type` da resposta).
+ */
+export async function apiRequestBlob(path: string, options: RequestInit = {}): Promise<Blob> {
+  let resp = await rawRequest(path, options);
+  if (resp.status === 401 && refreshTokenValue) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      resp = await rawRequest(path, options);
+    } else {
+      onSessionExpired?.();
+    }
+  }
+  if (!resp.ok) {
+    throw new ApiError(resp.status, await readErrorDetail(resp));
+  }
+  return resp.blob();
 }
 
 export function currentAccessToken(): string | null {

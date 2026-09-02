@@ -8,6 +8,7 @@ import { ForcedPasswordChangePage } from "../pages/ForcedPasswordChangePage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { PipelinePage } from "../pages/PipelinePage";
 import { LeadsPage } from "../pages/LeadsPage";
+import { ClientsPage } from "../pages/ClientsPage";
 import { TasksPage } from "../pages/TasksPage";
 import { AgendaPage } from "../pages/AgendaPage";
 import { ReportsPage } from "../pages/ReportsPage";
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
       { path: ROUTES.pipeline, element: <PipelinePage /> },
       { path: ROUTES.leads, element: <LeadsPage /> },
       { path: `${ROUTES.leads}/:id`, element: <LeadsPage /> },
+      { path: ROUTES.clientes, element: <ClientsPage /> },
       { path: ROUTES.tarefas, element: <TasksPage /> },
       { path: ROUTES.agenda, element: <AgendaPage /> },
       { path: ROUTES.relatorios, element: <ReportsPage /> },
