@@ -76,6 +76,22 @@ export function ProspectDrawer({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [duplicateBlock, setDuplicateBlock] = useState<{ companyName: string } | null>(null);
   const [form, setForm] = useState<FormState>(() => fromProspect(prospect));
+  const [togglingNoWhatsapp, setTogglingNoWhatsapp] = useState(false);
+
+  // Marca/desmarca "sem WhatsApp" na hora, sem precisar entrar em "Editar" e
+  // "Salvar alterações" (pedido explícito do usuário: "muito chato ficar
+  // indo em Editar e salvar, muito trabalhoso"). Só esse campo vai no PATCH.
+  async function handleQuickToggleNoWhatsapp() {
+    setTogglingNoWhatsapp(true);
+    try {
+      const updated = await update(prospect.id, { noWhatsapp: !prospect.noWhatsapp });
+      onSaved?.(updated);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível atualizar");
+    } finally {
+      setTogglingNoWhatsapp(false);
+    }
+  }
 
   function startEdit() {
     setForm(fromProspect(prospect));
@@ -354,7 +370,26 @@ export function ProspectDrawer({
                   <span>Contato só por e-mail/telefone</span>
                 </label>
               ) : (
-                <div className={styles.fieldValue}>{prospect.noWhatsapp ? "Sim" : "Não"}</div>
+                // Fora do modo de edição, o checkbox já salva na hora (PATCH
+                // só desse campo) — não precisa "Editar" + "Salvar
+                // alterações" só pra marcar isso.
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginTop: 6,
+                    cursor: togglingNoWhatsapp ? "default" : "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={prospect.noWhatsapp}
+                    disabled={togglingNoWhatsapp}
+                    onChange={() => void handleQuickToggleNoWhatsapp()}
+                  />
+                  <span>{prospect.noWhatsapp ? "Sim" : "Não"}</span>
+                </label>
               )}
             </div>
           </div>

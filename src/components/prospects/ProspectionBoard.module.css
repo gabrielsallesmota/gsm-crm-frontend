@@ -174,6 +174,49 @@
   gap: 8px;
 }
 
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+/* Toggle rápido de "sem WhatsApp" direto no card — mesmo padrão de pill
+   pequeno do `WhatsappButton` (ver `WhatsappButton.module.css`), mas neutro
+   quando desmarcado e vermelho (mesmo tom de `.targetDateOverdue`) quando
+   marcado, pra ficar óbvio de relance quais prospects já foram triados. */
+.noWhatsappToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.noWhatsappToggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.noWhatsappToggleActive {
+  background: rgba(255, 107, 107, 0.14);
+  border-color: rgba(255, 107, 107, 0.35);
+  color: #ff6b6b;
+}
+
+.noWhatsappToggleActive:hover {
+  background: rgba(255, 107, 107, 0.22);
+  color: #ff6b6b;
+}
+
 .empty {
   font-size: 12px;
   color: var(--faint);

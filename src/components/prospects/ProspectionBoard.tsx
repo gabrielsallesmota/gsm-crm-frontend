@@ -77,7 +77,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
     notImplemented,
     reload: reloadStages,
   } = useProspectStages();
-  const { move, backfillCadence } = useProspectActions();
+  const { move, update, backfillCadence } = useProspectActions();
   const { reorder: reorderStages } = useProspectStageActions();
   const { toast } = useToast();
   const { data: templates } = useMessageTemplates();
@@ -182,6 +182,20 @@ export function ProspectionBoard({ period }: { period: Period }) {
       reload();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Não foi possível mover o prospect");
+    }
+  }
+
+  // Toggle direto do card — antes só dava pra marcar "sem WhatsApp" abrindo
+  // o prospect, clicando "Editar" e "Salvar alterações" (pedido explícito
+  // do usuário: "muito chato ficar indo em Editar e salvar"). Só esse campo
+  // vai no PATCH — não dispara a checagem de duplicidade (que só olha
+  // telefone/empresa/link do Maps, nenhum dos dois presentes aqui).
+  async function handleToggleNoWhatsapp(prospect: Prospect) {
+    try {
+      await update(prospect.id, { noWhatsapp: !prospect.noWhatsapp });
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível atualizar");
     }
   }
 
@@ -332,6 +346,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
                       templates={templates ?? []}
                       onDragStart={() => setDragId(prospect.id)}
                       onClick={() => setSelectedId(prospect.id)}
+                      onToggleNoWhatsapp={() => void handleToggleNoWhatsapp(prospect)}
                     />
                   ))}
                   {stageProspects.length === 0 && !loading && (
@@ -535,12 +550,14 @@ function ProspectCard({
   templates,
   onDragStart,
   onClick,
+  onToggleNoWhatsapp,
 }: {
   prospect: Prospect;
   stage: ProspectStage;
   templates: MessageTemplate[];
   onDragStart: () => void;
   onClick: () => void;
+  onToggleNoWhatsapp: () => void;
 }) {
   const priority = PRIORITY[prospect.priority];
   const whatsapp = WHATSAPP_STATUS[prospect.whatsappStatus];
@@ -582,7 +599,31 @@ function ProspectCard({
         <span className={styles.cardMeta}>{prospect.phoneRaw || "sem telefone"}</span>
         <Badge label={whatsapp.label} color={whatsapp.color} bg={whatsapp.bg} />
       </div>
-      <WhatsappButton prospect={prospect} stage={stage} templates={templates} size="small" />
+      <div className={styles.cardActions}>
+        <WhatsappButton prospect={prospect} stage={stage} templates={templates} size="small" />
+        {/* Toggle direto do card — antes só dava pra marcar isso abrindo o
+            prospect, "Editar" e "Salvar alterações" (pedido explícito do
+            usuário). `stopPropagation` pra não abrir o drawer ao clicar. */}
+        <button
+          type="button"
+          className={
+            prospect.noWhatsapp
+              ? `${styles.noWhatsappToggle} ${styles.noWhatsappToggleActive}`
+              : styles.noWhatsappToggle
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleNoWhatsapp();
+          }}
+          title={
+            prospect.noWhatsapp
+              ? "Marcado como sem WhatsApp — clique pra desmarcar"
+              : "Marcar como sem WhatsApp"
+          }
+        >
+          {prospect.noWhatsapp ? "📵 Sem WhatsApp" : "Marcar sem WhatsApp"}
+        </button>
+      </div>
       {prospect.lastComment && (
         <div className={styles.cardComment} title={prospect.lastComment.text}>
           💬 {prospect.lastComment.text}
