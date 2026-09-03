@@ -2,6 +2,7 @@ import type {
   Client,
   ClientInstallment,
   ClientListFilter,
+  CreateClientInput,
   CustomInstallmentPlanInput,
   GenerateInstallmentsInput,
   UpdateClientInput,
@@ -12,6 +13,9 @@ import type { Page } from "../types/common";
 export interface ClientsRepository {
   list(filter: ClientListFilter): Promise<Page<Client>>;
   get(id: string): Promise<Client>;
+  /** Cadastro manual — botão "+ Novo cliente" (`source` vira "manual").
+   * O caminho normal continua sendo automático (Ganho de um Prospect/Lead). */
+  create(input: CreateClientInput): Promise<Client>;
   update(id: string, input: UpdateClientInput): Promise<Client>;
   delete(id: string): Promise<void>;
 

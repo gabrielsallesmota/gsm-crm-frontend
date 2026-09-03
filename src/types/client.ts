@@ -1,7 +1,10 @@
-/** Cliente = Prospect/Lead que fechou contrato — nasce automaticamente ao
- * mover pra um estágio "Ganho" (ver `maybe_create_client_from_prospect`/
- * `maybe_create_client_from_lead` no backend), nunca é criado manualmente
- * daqui. Tela só edita dados comerciais (contrato, pagamento). */
+/** Cliente = contrato fechado com a GSM. Nasce automaticamente ao mover um
+ * Prospect/Lead pra um estágio "Ganho" (ver
+ * `maybe_create_client_from_prospect`/`maybe_create_client_from_lead` no
+ * backend) — `source` vira "prospect"/"lead" nesse caso. Também pode ser
+ * cadastrado manualmente (`source: "manual"`, botão "+ Novo cliente" em
+ * `ClientsPage`) pra contrato fechado direto, sem passar por Prospecção/
+ * Leads. */
 export type ClientSource = "prospect" | "lead" | "manual";
 
 export type PaymentType = "vista" | "mensal";
@@ -55,6 +58,22 @@ export interface ClientListFilter {
   paymentType?: PaymentType;
   page?: number;
   pageSize?: number;
+}
+
+/** Cadastro manual — botão "+ Novo cliente" (`ClientsPage`). `closedAt`
+ * omitido = hoje (mesmo default do backend). Payment/parcelas não entram
+ * aqui de propósito: depois de criado, a pessoa continua direto no
+ * `ClientDrawer` (que já abre sozinho) pra anexar contrato e definir o
+ * pagamento — mesmo fluxo em duas etapas de "criar" → "editar" que
+ * `LeadsPage`/`QuickCreateModal` já usa. */
+export interface CreateClientInput {
+  companyName: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+  niche?: string;
+  notes?: string;
+  closedAt?: string;
 }
 
 export interface UpdateClientInput {

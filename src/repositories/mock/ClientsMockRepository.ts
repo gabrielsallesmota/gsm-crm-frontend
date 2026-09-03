@@ -3,6 +3,7 @@ import type {
   Client,
   ClientInstallment,
   ClientListFilter,
+  CreateClientInput,
   CustomInstallmentPlanInput,
   GenerateInstallmentsInput,
   UpdateClientInput,
@@ -17,6 +18,10 @@ const REASON =
 /** Ver `ProspectsMockRepository` — mesmo padrão: feature real no backend,
  * mas sempre "indisponível" no modo Demo (dado comercial interno da GSM). */
 export class ClientsMockRepository implements ClientsRepository {
+  async create(_input: CreateClientInput): Promise<Client> {
+    throw new NotImplementedError("Clientes", REASON);
+  }
+
   async list(_filter: ClientListFilter): Promise<Page<Client>> {
     throw new NotImplementedError("Clientes", REASON);
   }

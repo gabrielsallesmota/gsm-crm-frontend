@@ -4,6 +4,7 @@ import type {
   ClientInstallment,
   ClientListFilter,
   ClientSource,
+  CreateClientInput,
   CustomInstallmentPlanInput,
   GenerateInstallmentsInput,
   InstallmentStatus,
@@ -99,6 +100,23 @@ function updateBody(input: UpdateClientInput) {
 }
 
 export class ClientsApiRepository implements ClientsRepository {
+  async create(input: CreateClientInput): Promise<Client> {
+    return toClient(
+      await apiRequest<ClientDto>("/api/v1/clients", {
+        method: "POST",
+        body: JSON.stringify({
+          company_name: input.companyName,
+          phone: input.phone,
+          email: input.email,
+          city: input.city,
+          niche: input.niche,
+          notes: input.notes,
+          closed_at: input.closedAt,
+        }),
+      }),
+    );
+  }
+
   async list(filter: ClientListFilter): Promise<Page<Client>> {
     const params = new URLSearchParams();
     if (filter.search) params.set("search", filter.search);

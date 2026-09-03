@@ -2,6 +2,7 @@ import { clientsService } from "../services/ClientsService";
 import type {
   Client,
   ClientInstallment,
+  CreateClientInput,
   CustomInstallmentPlanInput,
   GenerateInstallmentsInput,
   UpdateClientInput,
@@ -9,6 +10,7 @@ import type {
 } from "../types/client";
 
 export interface ClientActions {
+  create(input: CreateClientInput): Promise<Client>;
   update(id: string, input: UpdateClientInput): Promise<Client>;
   delete(id: string): Promise<void>;
   generateInstallments(
@@ -39,6 +41,7 @@ export interface ClientActions {
  * `clientsService`, componentes/páginas só chamam o hook. */
 export function useClientActions(): ClientActions {
   return {
+    create: (input) => clientsService.create(input),
     update: (id, input) => clientsService.update(id, input),
     delete: (id) => clientsService.delete(id),
     generateInstallments: (clientId, input) => clientsService.generateInstallments(clientId, input),

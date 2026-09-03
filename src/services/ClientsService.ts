@@ -6,6 +6,7 @@ import type {
   Client,
   ClientInstallment,
   ClientListFilter,
+  CreateClientInput,
   CustomInstallmentPlanInput,
   GenerateInstallmentsInput,
   UpdateClientInput,
@@ -19,6 +20,10 @@ const repo: ClientsRepository = selectRepository(
 );
 
 export class ClientsService {
+  create(input: CreateClientInput): Promise<Client> {
+    return repo.create(input);
+  }
+
   list(filter: ClientListFilter): Promise<Page<Client>> {
     return repo.list(filter);
   }
