@@ -12,6 +12,7 @@ import { useTags } from "../../hooks/useTags";
 import { useLeadComments } from "../../hooks/useLeadComments";
 import { useLeadCommentActions } from "../../hooks/useLeadCommentActions";
 import { useToast } from "../../hooks/useToast";
+import { formatPhone } from "../../utils/phone";
 import { WhatsappButton } from "./WhatsappButton";
 import styles from "./LeadDrawer.module.css";
 
@@ -175,7 +176,7 @@ export function LeadDrawer({
               <input
                 className={styles.editInputSmall}
                 value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, phone: formatPhone(e.target.value) }))}
               />
             ) : (
               <div className={styles.fieldValue}>{lead.phone || "—"}</div>

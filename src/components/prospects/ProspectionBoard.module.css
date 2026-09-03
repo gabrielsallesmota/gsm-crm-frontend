@@ -35,6 +35,15 @@
   flex-wrap: wrap;
 }
 
+.sortSelect {
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
 .board {
   display: grid;
   grid-auto-flow: column;

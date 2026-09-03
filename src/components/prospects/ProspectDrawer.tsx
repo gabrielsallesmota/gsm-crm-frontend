@@ -15,6 +15,7 @@ import { useProspectCommentActions } from "../../hooks/useProspectCommentActions
 import { EmptyState } from "../common/EmptyState";
 import { useToast } from "../../hooks/useToast";
 import { ApiError } from "../../types/common";
+import { formatPhone } from "../../utils/phone";
 import {
   PAGE_OBJECTIVE,
   PHONE_TYPE,
@@ -209,10 +210,11 @@ export function ProspectDrawer({
 
         {duplicateBlock && (
           <div className={styles.duplicateWarning}>
-            Já existe outro prospect cadastrado com esse telefone.
+            Já existe outro prospect cadastrado com esse telefone, nome de empresa ou link do Google
+            Maps.
             <div className={styles.duplicateActions}>
               <Button onClick={() => setDuplicateBlock(null)} disabled={saving}>
-                Revisar telefone
+                Revisar dados
               </Button>
               <Button variant="primary" onClick={() => void handleSave(true)} disabled={saving}>
                 Salvar mesmo assim
@@ -289,7 +291,7 @@ export function ProspectDrawer({
               editing={editing}
               value={form.phoneRaw}
               display={prospect.phoneRaw}
-              onChange={(v) => setForm((f) => ({ ...f, phoneRaw: v }))}
+              onChange={(v) => setForm((f) => ({ ...f, phoneRaw: formatPhone(v) }))}
             />
             <SelectField
               label="Tipo de telefone"

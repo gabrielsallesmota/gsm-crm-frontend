@@ -15,6 +15,7 @@ import { LeadImportModal } from "../components/leads/LeadImportModal";
 import { WhatsappButton } from "../components/leads/WhatsappButton";
 import { ProspectionBoard } from "../components/prospects/ProspectionBoard";
 import { originOf } from "../constants/origins";
+import { BOARD_SORT_OPTIONS, sortBoardItems, type BoardSortOption } from "../utils/boardSort";
 import { brl } from "../utils/currency";
 import { EMPTY_PERIOD, type Period } from "../utils/periods";
 import type { StageKey } from "../types/pipeline";
@@ -99,6 +100,7 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
   const [dragColumnId, setDragColumnId] = useState<StageKey | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [sortOption, setSortOption] = useState<BoardSortOption>("none");
 
   async function handleDrop(targetStage: StageKey) {
     if (dragColumnId) {
@@ -182,6 +184,17 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
               ))}
             </select>
           )}
+          <select
+            className={styles.pipelineSelect}
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value as BoardSortOption)}
+          >
+            {BOARD_SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
           <Button onClick={() => setImporting(true)}>Importar CSV</Button>
           <Button onClick={handleExport}>Exportar CSV</Button>
         </div>
@@ -192,7 +205,12 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
       {!error && (
         <div className={styles.board}>
           {pipeline.stages.map((stage) => {
-            const stageLeads = leads.filter((l) => l.stage === stage.id);
+            const stageLeads = sortBoardItems(
+              leads.filter((l) => l.stage === stage.id),
+              sortOption,
+              (l) => l.name,
+              (l) => l.createdAt,
+            );
             return (
               <div
                 key={stage.id}

@@ -17,6 +17,7 @@ import { Button } from "../components/common/Button";
 import { CurrencyInput } from "../components/common/CurrencyInput";
 import { useToast } from "../hooks/useToast";
 import { ROUTES } from "../constants/routes";
+import { formatPhone } from "../utils/phone";
 import styles from "./LeadsPage.module.css";
 
 type SourceFilter = "todos" | "ativo" | "passivo";
@@ -300,7 +301,12 @@ function QuickCreateModal({
         <h2 className={styles.modalTitle}>Novo lead</h2>
         <input className={styles.input} placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} />
         <input className={styles.input} placeholder="Empresa" value={company} onChange={(e) => setCompany(e.target.value)} />
-        <input className={styles.input} placeholder="Telefone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <input
+          className={styles.input}
+          placeholder="Telefone"
+          value={phone}
+          onChange={(e) => setPhone(formatPhone(e.target.value))}
+        />
         <input className={styles.input} placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
         <CurrencyInput className={styles.input} value={value} onChange={setValue} />
         <div className={styles.modalActions}>

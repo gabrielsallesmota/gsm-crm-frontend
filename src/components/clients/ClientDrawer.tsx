@@ -9,6 +9,7 @@ import { useClientActions } from "../../hooks/useClientActions";
 import { useClientInstallments } from "../../hooks/useClientInstallments";
 import { useToast } from "../../hooks/useToast";
 import { brl } from "../../utils/currency";
+import { formatPhone } from "../../utils/phone";
 import styles from "./ClientDrawer.module.css";
 
 type FormState = ReturnType<typeof fromClient>;
@@ -384,7 +385,7 @@ export function ClientDrawer({
                 className={styles.editInput}
                 placeholder="Telefone"
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
               />
               <input
                 className={styles.editInput}

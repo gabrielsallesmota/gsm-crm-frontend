@@ -16,6 +16,7 @@ import {
   type SpacePanelView,
   type WaitlistEntry,
 } from "../types/operations";
+import { formatPhone, onlyDigits } from "../utils/phone";
 import styles from "./TerapeutaDaVezPage.module.css";
 
 type Tab = "operacao" | "escala" | "historico";
@@ -43,18 +44,6 @@ function formatHM(iso: string | null): string {
 function remainingMinutes(iso: string | null, now: Date): number | null {
   if (!iso) return null;
   return Math.max(0, Math.round((new Date(iso).getTime() - now.getTime()) / 60000));
-}
-
-function onlyDigits(s: string): string {
-  return s.replace(/\D/g, "");
-}
-
-function formatPhone(raw: string): string {
-  const v = onlyDigits(raw).slice(0, 11);
-  if (v.length > 10) return `(${v.slice(0, 2)}) ${v.slice(2, 7)}-${v.slice(7)}`;
-  if (v.length > 6) return `(${v.slice(0, 2)}) ${v.slice(2, 6)}-${v.slice(6)}`;
-  if (v.length > 2) return `(${v.slice(0, 2)}) ${v.slice(2)}`;
-  return v;
 }
 
 function queueMetaText(entry: QueueEntry): string {

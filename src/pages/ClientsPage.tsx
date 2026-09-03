@@ -8,6 +8,7 @@ import { EmptyState } from "../components/common/EmptyState";
 import { useToast } from "../hooks/useToast";
 import { CLIENT_SOURCE_LABEL, PAYMENT_TYPE_LABEL, type Client } from "../types/client";
 import { brl } from "../utils/currency";
+import { formatPhone } from "../utils/phone";
 import styles from "./ClientsPage.module.css";
 
 function todayIso(): string {
@@ -198,7 +199,7 @@ function CreateClientModal({
           className={styles.input}
           placeholder="Telefone"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => setPhone(formatPhone(e.target.value))}
         />
         <input
           className={styles.input}

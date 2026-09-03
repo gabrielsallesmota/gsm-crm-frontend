@@ -198,7 +198,9 @@ export function ProspectImportModal({
         <h2 className={styles.modalTitle}>Importar prospects via CSV</h2>
         <p className={styles.modalSubtitle}>
           Suba a planilha, relacione cada coluna com um campo da pipeline (de/para) e escolha o que
-          fazer quando o telefone já existir cadastrado. Mapeie "Data do primeiro contato (P0)" pra
+          fazer quando a linha já existir cadastrada — duplicidade é checada por telefone, nome da
+          empresa OU link do Google Maps (basta bater em um desses pra contar como já existente,
+          contra a base inteira, de qualquer época). Mapeie "Data do primeiro contato (P0)" pra
           cada linha ter sua própria data — sem essa coluna, todas entram com a data de hoje. As
           datas dos follow-ups seguintes são calculadas sozinhas a partir daí (configure a cadência
           em "Estágios"). Mapeie "Mensagem 1".."Mensagem 4" pra cada prospect ter sua própria
@@ -272,7 +274,7 @@ export function ProspectImportModal({
                     </select>
                   </div>
                   <div>
-                    <div className={styles.label}>Se o telefone já existir</div>
+                    <div className={styles.label}>Se já existir (telefone, empresa ou Maps)</div>
                     <select
                       className={styles.select}
                       value={dedupeStrategy}

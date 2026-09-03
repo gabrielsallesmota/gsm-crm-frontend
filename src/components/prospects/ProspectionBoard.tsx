@@ -19,6 +19,8 @@ import { ApiError } from "../../types/common";
 import { PRIORITY, PROSPECT_ORIGIN, WHATSAPP_STATUS } from "../../constants/prospectEnums";
 import type { Period } from "../../utils/periods";
 import { computeStageTargetDate } from "../../utils/prospectCadence";
+import { formatPhone } from "../../utils/phone";
+import { BOARD_SORT_OPTIONS, sortBoardItems, type BoardSortOption } from "../../utils/boardSort";
 import type {
   CreateProspectInput,
   MessageTemplate,
@@ -93,6 +95,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
   const [managingStages, setManagingStages] = useState(false);
   const [managingLossReasons, setManagingLossReasons] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
+  const [sortOption, setSortOption] = useState<BoardSortOption>("none");
   // Move pendente aguardando a data alvo (só quando o estágio de destino
   // pede — ver `stage.asksTargetDate`); some assim que confirma ou pula.
   const [pendingMove, setPendingMove] = useState<{
@@ -257,6 +260,17 @@ export function ProspectionBoard({ period }: { period: Period }) {
           </p>
         </div>
         <div className={styles.toolbar}>
+          <select
+            className={styles.sortSelect}
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value as BoardSortOption)}
+          >
+            {BOARD_SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
           <Button onClick={() => setManagingStages(true)}>Estágios</Button>
           <Button onClick={() => setManagingLossReasons(true)}>Motivos de perda</Button>
           <Button
@@ -286,7 +300,12 @@ export function ProspectionBoard({ period }: { period: Period }) {
       {!error && stages && stages.length > 0 && (
         <div className={styles.board}>
           {stages.map((stage) => {
-            const stageProspects = prospects.filter((p) => p.stageId === stage.id);
+            const stageProspects = sortBoardItems(
+              prospects.filter((p) => p.stageId === stage.id),
+              sortOption,
+              (p) => p.companyName,
+              (p) => p.createdAt,
+            );
             return (
               <div
                 key={stage.id}
@@ -633,7 +652,7 @@ function QuickCreateModal({
           className={styles.input}
           placeholder="Telefone"
           value={phoneRaw}
-          onChange={(e) => setPhoneRaw(e.target.value)}
+          onChange={(e) => setPhoneRaw(formatPhone(e.target.value))}
         />
         <select className={styles.select} value={stageId} onChange={(e) => setStageId(e.target.value)}>
           {stages.map((s) => (
@@ -653,7 +672,11 @@ function QuickCreateModal({
             </option>
           ))}
         </select>
-        {duplicateNote && <p className={styles.duplicateNote}>Já existe um prospect com esse telefone.</p>}
+        {duplicateNote && (
+          <p className={styles.duplicateNote}>
+            Já existe um prospect com esse telefone, nome de empresa ou link do Google Maps.
+          </p>
+        )}
         <div className={styles.modalActions}>
           <Button onClick={onClose} disabled={submitting}>
             Cancelar
