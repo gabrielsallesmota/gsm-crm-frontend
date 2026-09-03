@@ -22,14 +22,22 @@ function fromClient(client: Client) {
     city: client.city,
     niche: client.niche,
     notes: client.notes,
-    closedAt: client.closedAt,
+    // Fallback pra "hoje": `closedAt` é campo novo no backend — se a API
+    // ainda não foi atualizada (deploy de frontend/backend independentes),
+    // evita um input de data controlado virar não-controlado com "".
+    closedAt: client.closedAt || todayIso(),
   };
 }
 
 /** "YYYY-MM-DD" → "DD/MM/AAAA" sem depender de fuso (evitar `new Date(iso)`
  * puro, que interpreta a data como UTC meia-noite e pode "voltar um dia"
- * em fusos negativos como o do Brasil). */
-function fmtDate(iso: string): string {
+ * em fusos negativos como o do Brasil). `undefined`/vazio devolve "—" em
+ * vez de estourar — `closed_at` é um campo novo no backend, então uma
+ * janela de deploy com o backend ainda desatualizado (frontend/backend
+ * publicados por pipelines independentes, sem coordenação) não pode
+ * derrubar a tela inteira. */
+function fmtDate(iso: string | undefined | null): string {
+  if (!iso) return "—";
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }

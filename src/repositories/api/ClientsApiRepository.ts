@@ -56,7 +56,11 @@ function toClient(dto: ClientDto): Client {
     niche: dto.niche ?? "",
     source: dto.source,
     sourceId: dto.source_id,
-    closedAt: dto.closed_at,
+    // `?? ""` (não `dto.closed_at` cru): campo novo no backend — numa
+    // janela de deploy com a API ainda desatualizada (frontend/backend em
+    // pipelines de deploy independentes, sem coordenação), a chave nem
+    // vem no JSON. `fmtDate` já trata "" como "—" em vez de estourar.
+    closedAt: dto.closed_at ?? "",
     paymentType: dto.payment_type,
     totalValueCents: dto.total_value_cents,
     installmentCount: dto.installment_count,

@@ -93,7 +93,8 @@ export function ClientsPage() {
   );
 }
 
-function fmtDate(iso: string): string {
+function fmtDate(iso: string | undefined | null): string {
+  if (!iso) return "—";
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
