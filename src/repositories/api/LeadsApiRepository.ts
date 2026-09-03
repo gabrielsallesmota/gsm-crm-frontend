@@ -16,6 +16,16 @@ import type { StageKey } from "../../types/pipeline";
 import { apiRequest, apiRequestText } from "./ApiClient";
 import { stageIdToKey, stageKeyToId } from "./stageMapping";
 
+interface StageDto {
+  id: string;
+  pipeline_id: string;
+  name: string;
+  color: string;
+  order: number;
+  is_won: boolean;
+  is_lost: boolean;
+}
+
 interface LeadDto {
   id: string;
   tenant_id: string;
@@ -167,9 +177,26 @@ export class LeadsApiRepository implements LeadsRepository {
     if (!pipelineId) {
       throw new Error("Selecione um pipeline para criar o lead.");
     }
-    const stageId = stageKeyToId(pipelineId, input.stage ?? "novo");
+    let stageId = input.stage ? stageKeyToId(pipelineId, input.stage) : undefined;
     if (!stageId) {
-      throw new Error("Estágio do pipeline ainda não carregado — abra a tela de Pipeline antes de criar o lead.");
+      // Sem chave explícita (form rápido de "novo lead", que não escolhe
+      // estágio) — antes dependia só do cache local em `stageMapping`
+      // (populado por um `usePipelines()` anterior), e falhava com "abra a
+      // tela de Pipeline" sempre que o pipeline não tinha estágio mapeado
+      // pra chave fixa "novo" (ex.: pipeline customizado sem um estágio
+      // "Novo"/intake, só com Ganho/Perdido). Resolve direto da API, mesmo
+      // critério do intake público do backend (`PublicCreateLeadUseCase`):
+      // primeiro estágio por `order` que não é ganho nem perdido.
+      const stages = await apiRequest<StageDto[]>(`/api/v1/pipelines/${pipelineId}/stages`);
+      const intake = [...stages]
+        .filter((s) => !s.is_won && !s.is_lost)
+        .sort((a, b) => a.order - b.order)[0];
+      if (!intake) {
+        throw new Error(
+          "Esse pipeline não tem nenhum estágio inicial configurado (todos são Ganho/Perdido) — crie um estágio em Configurações antes de cadastrar um lead.",
+        );
+      }
+      stageId = intake.id;
     }
     const dto = await apiRequest<LeadDto>("/api/v1/leads", {
       method: "POST",
