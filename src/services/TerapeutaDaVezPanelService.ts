@@ -29,8 +29,17 @@ export class TerapeutaDaVezPanelService {
     procedureId: string,
     spaceIds: string[],
     clientName: string,
+    phone: string,
+    payments: PaymentAllocationInput[] = [],
   ): Promise<AttendanceAction> {
-    return terapeutaDaVezPublicRepository.start(attendanceId, procedureId, spaceIds, clientName);
+    return terapeutaDaVezPublicRepository.start(
+      attendanceId,
+      procedureId,
+      spaceIds,
+      clientName,
+      phone,
+      payments,
+    );
   }
 
   finish(
@@ -43,6 +52,14 @@ export class TerapeutaDaVezPanelService {
 
   checkIn(therapistId: string, shift?: Shift): Promise<TherapistAction> {
     return terapeutaDaVezPublicRepository.checkIn(therapistId, shift);
+  }
+
+  pause(therapistId: string): Promise<TherapistAction> {
+    return terapeutaDaVezPublicRepository.pause(therapistId);
+  }
+
+  resume(therapistId: string): Promise<TherapistAction> {
+    return terapeutaDaVezPublicRepository.resume(therapistId);
   }
 
   releaseCleaning(spaceId: string): Promise<PanelState> {

@@ -275,6 +275,18 @@
   cursor: not-allowed;
 }
 
+/* Pisca convidando a chamar o próximo da vez — pedido do usuário: sem isso
+   a recepção precisa ficar de olho na fila pra notar que alguém ficou
+   livre. Só no botão de destaque (`HeroPanel`), não nas linhas da fila. */
+@keyframes heroBtnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 164, 76, 0.55); }
+  50% { box-shadow: 0 0 0 10px rgba(201, 164, 76, 0); }
+}
+
+.heroBtnPulse {
+  animation: heroBtnPulse 1.8s ease-in-out infinite;
+}
+
 /* ---- Fila ------------------------------------------------------------------ */
 
 .queueSection {

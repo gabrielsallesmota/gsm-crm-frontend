@@ -99,17 +99,27 @@ export class TerapeutaDaVezPublicRepository {
     return toAttendanceAction(dto);
   }
 
-  /** `clientName` — nome do paciente, digitado junto com a escolha do
-   * espaço (nunca vira cliente cadastrado, ver `types/operations.ts`). */
+  /** `clientName`/`phone` — pedidos junto com a escolha do procedimento/
+   * espaço; a partir daqui sempre cadastram/reaproveitam um `Client`.
+   * `payments` — pagamento é ANTES de iniciar (pedido do usuário), mas
+   * continua opcional: vazio deixa "pagamento pendente" (ao vivo). */
   async start(
     attendanceId: string,
     procedureId: string,
     spaceIds: string[],
     clientName: string,
+    phone: string,
+    payments: PaymentAllocationInput[] = [],
   ): Promise<AttendanceAction> {
     const dto = await publicRequest<AttendanceActionDto>(`${BASE}/attendances/${attendanceId}/start`, {
       method: "POST",
-      body: JSON.stringify({ procedure_id: procedureId, space_ids: spaceIds, client_name: clientName }),
+      body: JSON.stringify({
+        procedure_id: procedureId,
+        space_ids: spaceIds,
+        client_name: clientName,
+        phone,
+        payments: payments.map((p) => ({ method: p.method, amount: p.amount })),
+      }),
     });
     return toAttendanceAction(dto);
   }
@@ -136,6 +146,25 @@ export class TerapeutaDaVezPublicRepository {
     const dto = await publicRequest<TherapistActionDto>(
       `${BASE}/therapists/${therapistId}/check-in`,
       { method: "POST", body: JSON.stringify({ shift: shift ?? null }) },
+    );
+    return toTherapistAction(dto);
+  }
+
+  /** Pausa manual (ex.: foi almoçar) — sem limite de tempo, nunca vira
+   * histórico/jornada. Bloqueado enquanto o terapeuta está em atendimento. */
+  async pause(therapistId: string): Promise<TherapistAction> {
+    const dto = await publicRequest<TherapistActionDto>(
+      `${BASE}/therapists/${therapistId}/pause`,
+      { method: "POST" },
+    );
+    return toTherapistAction(dto);
+  }
+
+  /** Volta da pausa. */
+  async resume(therapistId: string): Promise<TherapistAction> {
+    const dto = await publicRequest<TherapistActionDto>(
+      `${BASE}/therapists/${therapistId}/resume`,
+      { method: "POST" },
     );
     return toTherapistAction(dto);
   }

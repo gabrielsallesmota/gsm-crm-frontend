@@ -4,8 +4,11 @@ export type SpaceType = "maca" | "cadeira" | "poltrona";
 // passou da janela de horário). Não existe mais Saída manual — questão
 // trabalhista (terapeutas são PJ): a presença termina sozinha quando a
 // janela do turno passa.
-export type TherapistStatus = "ausente" | "idle" | "reception" | "therapy";
-export type QueueStatus = "idle" | "reception" | "therapy";
+// "pausa" = pausa manual (recepção clica Pausar/Retomar — ex.: foi
+// almoçar). Sem limite de tempo, nunca vira histórico/jornada — some do
+// "quem pode ser chamado" enquanto durar, mas continua presente/no turno.
+export type TherapistStatus = "ausente" | "idle" | "pausa" | "reception" | "therapy";
+export type QueueStatus = "idle" | "pausa" | "reception" | "therapy";
 export type SpaceState = "free" | "occupied" | "cleaning";
 export type AttendancePhase = "reception" | "therapy" | "finished" | "declined";
 
@@ -53,6 +56,7 @@ export interface Therapist {
   currentShiftLabel: string | null;
   checkedInAt: string | null;
   checkedOutAt: string | null;
+  onBreakAt: string | null;
   pointsManhaToday: number;
   pointsNoturnoToday: number;
   createdAt: string;
@@ -254,6 +258,13 @@ export interface QueueEntry {
   /** Valor do procedimento escolhido — só existe a partir do "Iniciar
    * terapia" (snapshot do preço do procedimento). */
   price: number | null;
+  /** `true` quando este terapeuta foi chamado fora da ordem da fila —
+   * "decisão do paciente" (cliente escolheu, pulou quem estava na vez). */
+  outOfOrder: boolean;
+  /** Calculado ao vivo — atendimento com valor a cobrar e nenhuma forma de
+   * pagamento registrada ainda (pagamento é pedido antes de iniciar, mas
+   * continua opcional). */
+  paymentPending: boolean;
 }
 
 export interface SpacePanelView {

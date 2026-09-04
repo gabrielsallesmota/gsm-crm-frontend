@@ -46,6 +46,7 @@ export interface TherapistDto {
   current_shift_label: string | null;
   checked_in_at: string | null;
   checked_out_at: string | null;
+  on_break_at: string | null;
   points_manha_today: number;
   points_noturno_today: number;
   created_at: string;
@@ -170,6 +171,8 @@ export interface QueueEntryDto {
   start_at: string | null;
   planned_end_at: string | null;
   price: string | null;
+  out_of_order: boolean;
+  payment_pending: boolean;
 }
 
 export interface SpaceDto {
@@ -341,6 +344,7 @@ export function toTherapist(dto: TherapistDto): Therapist {
     currentShiftLabel: dto.current_shift_label,
     checkedInAt: dto.checked_in_at,
     checkedOutAt: dto.checked_out_at,
+    onBreakAt: dto.on_break_at,
     pointsManhaToday: dto.points_manha_today,
     pointsNoturnoToday: dto.points_noturno_today,
     createdAt: dto.created_at,
@@ -478,6 +482,8 @@ function toQueueEntry(dto: QueueEntryDto): QueueEntry {
     startAt: dto.start_at,
     plannedEndAt: dto.planned_end_at,
     price: dto.price === null ? null : Number(dto.price),
+    outOfOrder: dto.out_of_order,
+    paymentPending: dto.payment_pending,
   };
 }
 

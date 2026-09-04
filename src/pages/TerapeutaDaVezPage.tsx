@@ -49,34 +49,40 @@ function remainingMinutes(iso: string | null, now: Date): number | null {
 function queueMetaText(entry: QueueEntry): string {
   // `clientName` só existe a partir da escolha do espaço (digitado ali,
   // nunca antes) — na recepção ainda não tem nome nenhum pra mostrar.
-  if (entry.status === "reception") return "Aguardando espaço · escolhendo procedimento";
+  if (entry.status === "reception") return "Escolhendo procedimento";
   if (entry.status === "therapy") return `Em terapia · ${entry.clientName ?? ""} · ${entry.spaceNames.join(" + ")}`;
+  if (entry.status === "pausa") return "Em pausa";
   return `${entry.shiftLabel} · ${entry.shiftRange}`;
 }
 
 // Um status só por linha — funde o que antes eram dois lugares (status da
 // fila + seção separada de fila de espera) num único selo, texto + cor
 // (nunca só cor, pedido do usuário). "RESERVADO" cobre quem está livre mas
-// tem uma reserva de terapeuta específico ativa (`state.waitlist`).
-type RowStatus = "livre" | "reservado" | "aguardando_espaco" | "atendendo";
+// tem uma reserva de terapeuta específico ativa (`state.waitlist`). "PAUSA"
+// é pausa manual (Pausar/Retomar) — não é histórico, só sai da fila de quem
+// pode ser chamado enquanto durar.
+type RowStatus = "livre" | "reservado" | "pausa" | "escolhendo_procedimento" | "atendendo";
 
 const ROW_STATUS_LABEL: Record<RowStatus, string> = {
   livre: "LIVRE",
   reservado: "RESERVADO",
-  aguardando_espaco: "AGUARDANDO ESPAÇO",
+  pausa: "EM PAUSA",
+  escolhendo_procedimento: "ESCOLHENDO PROCEDIMENTO",
   atendendo: "ATENDENDO",
 };
 
 const ROW_STATUS_COLOR: Record<RowStatus, string> = {
   livre: "#5A5A5A",
   reservado: "#C9A44C",
-  aguardando_espaco: "#9A7426",
+  pausa: "#7A7A7A",
+  escolhendo_procedimento: "#9A7426",
   atendendo: "#1E8A86",
 };
 
 function rowStatus(entry: QueueEntry, waitlistEntry: WaitlistEntry | undefined): RowStatus {
   if (entry.status === "therapy") return "atendendo";
-  if (entry.status === "reception") return "aguardando_espaco";
+  if (entry.status === "reception") return "escolhendo_procedimento";
+  if (entry.status === "pausa") return "pausa";
   return waitlistEntry ? "reservado" : "livre";
 }
 
@@ -120,6 +126,8 @@ export function TerapeutaDaVezPage() {
     start,
     finish,
     checkIn,
+    pause,
+    resume,
     releaseCleaning,
     createWaitlistEntry,
     confirmWaitlistEntry,
@@ -213,15 +221,25 @@ export function TerapeutaDaVezPage() {
 
   // ---- Procedimento / espaço / confirmação ----------------------------------
   const [wizardEntry, setWizardEntry] = useState<QueueEntry | null>(null);
-  const [wizardStep, setWizardStep] = useState<"procedure" | "space" | "confirm">("procedure");
+  const [wizardStep, setWizardStep] = useState<"procedure" | "space" | "confirm" | "payment">(
+    "procedure",
+  );
   const [chosenProcedureId, setChosenProcedureId] = useState<string | null>(null);
   // Um slot por trecho do procedimento, na mesma ordem de
   // `chosenProcedure.spaceRequirements` — não é mais "N espaços quaisquer
   // desse tipo", é "o espaço do trecho 1", "o espaço do trecho 2" etc.
   const [chosenSpaceIds, setChosenSpaceIds] = useState<(string | null)[]>([]);
-  // Nome do paciente, digitado junto com a escolha do espaço — texto
-  // livre, nunca vira cliente cadastrado (pedido do usuário).
+  // Combo de 2+ trechos, cliente prefere ficar num espaço só o atendimento
+  // inteiro (pedido do usuário: "1h na maca e depois 30min na poltrona,
+  // mas o cliente pediu pra ficar na maca") — quando `true`, só o espaço
+  // do trecho 1 é enviado (backend trata como um trecho só, na duração
+  // total). Sempre falso de novo ao trocar de procedimento/reabrir.
+  const [mergeIntoSingleSpace, setMergeIntoSingleSpace] = useState(false);
+  // Nome e telefone do paciente, pedidos junto com a escolha do espaço —
+  // a partir daqui sempre cadastram/reaproveitam um `Client` (pedido do
+  // usuário: "no escolher procedimento pedir cadastro nome e telefone").
   const [wizardClientName, setWizardClientName] = useState("");
+  const [wizardPhone, setWizardPhone] = useState("");
 
   function openWizard(entry: QueueEntry) {
     setWizardEntry(entry);
@@ -229,7 +247,9 @@ export function TerapeutaDaVezPage() {
     setChosenProcedureId(null);
     setStarting(false);
     setChosenSpaceIds([]);
+    setMergeIntoSingleSpace(false);
     setWizardClientName("");
+    setWizardPhone("");
   }
 
   function closeWizard() {
@@ -257,7 +277,11 @@ export function TerapeutaDaVezPage() {
   function openWaitlistFromWizard() {
     if (!wizardEntry || !chosenProcedureId) return;
     setWaitlistTarget(wizardEntry);
-    setWaitlistForm({ clientName: wizardClientName.trim(), phone: "", procedureId: chosenProcedureId });
+    setWaitlistForm({
+      clientName: wizardClientName.trim(),
+      phone: wizardPhone.trim(),
+      procedureId: chosenProcedureId,
+    });
     closeWizard();
   }
 
@@ -282,6 +306,7 @@ export function TerapeutaDaVezPage() {
     setChosenProcedureId(id);
     const procedure = allProcedures.find((p) => p.id === id);
     setChosenSpaceIds(procedure ? procedure.spaceRequirements.map(() => null) : []);
+    setMergeIntoSingleSpace(false);
   }
 
   // Espaços livres compatíveis com CADA trecho, na mesma ordem — um
@@ -297,21 +322,29 @@ export function TerapeutaDaVezPage() {
     setChosenSpaceIds((prev) => prev.map((id, i) => (i === index ? spaceId : id)));
   }
 
-  const spaceReady =
-    chosenSpaceIds.length > 0 && chosenSpaceIds.every((id) => id !== null);
+  const spaceReady = mergeIntoSingleSpace
+    ? chosenSpaceIds[0] !== null && chosenSpaceIds[0] !== undefined
+    : chosenSpaceIds.length > 0 && chosenSpaceIds.every((id) => id !== null);
   const clientNameReady = wizardClientName.trim().length > 2;
+  const clientPhoneReady = onlyDigits(wizardPhone).length >= 10;
   // Trava duplo clique e cobre o botão "Iniciar terapia" (etapa 3, sem
   // `disabled` nenhum antes) — um clique nele com o estado por algum motivo
   // incompleto simplesmente não fazia nada, sem toast nem erro no console.
   const [starting, setStarting] = useState(false);
 
-  async function confirmStart() {
+  async function confirmStart(payments: PaymentAllocationInput[] = []) {
     if (starting) return;
     // Clique duplicado depois que um clique anterior já fechou o wizard
     // (sucesso ou cancelamento) — ignora em silêncio, não é um erro de
     // verdade pro usuário ver.
     if (!wizardEntry) return;
-    if (!wizardEntry.attendanceId || !chosenProcedureId || !spaceReady || !clientNameReady) {
+    if (
+      !wizardEntry.attendanceId ||
+      !chosenProcedureId ||
+      !spaceReady ||
+      !clientNameReady ||
+      !clientPhoneReady
+    ) {
       // Mensagem específica por campo — se isso ainda aparecer depois de
       // preenchido tudo, o texto já diz sozinho qual condição realmente
       // falhou, em vez de um aviso genérico que não ajuda a diagnosticar.
@@ -320,16 +353,26 @@ export function TerapeutaDaVezPage() {
       if (!chosenProcedureId) missing.push("procedimento");
       if (!spaceReady) missing.push("espaço de cada trecho");
       if (!clientNameReady) missing.push("nome do cliente (mín. 3 letras)");
+      if (!clientPhoneReady) missing.push("telefone do cliente (mín. 10 dígitos)");
       showToast(`Antes de iniciar, falta: ${missing.join(", ")}.`);
       return;
     }
     setStarting(true);
     try {
+      // Combo mesclado num espaço só: manda SÓ o espaço do trecho 1 — o
+      // backend reconhece um único `space_ids` num procedimento de 2+
+      // trechos como "fica nele o atendimento inteiro" (ver
+      // `StartTherapyUseCase`).
+      const spaceIdsToSend = mergeIntoSingleSpace
+        ? [chosenSpaceIds[0] as string]
+        : (chosenSpaceIds as string[]);
       await start(
         wizardEntry.attendanceId,
         chosenProcedureId,
-        chosenSpaceIds as string[],
+        spaceIdsToSend,
         wizardClientName.trim(),
+        wizardPhone.trim(),
+        payments,
       );
       showToast(`Terapia iniciada — liberação prevista às ${formatHM(new Date(Date.now() + (chosenProcedure?.durationMinutes ?? 0) * 60000).toISOString())}.`);
       closeWizard();
@@ -374,7 +417,10 @@ export function TerapeutaDaVezPage() {
   }
 
   function proceedToFinish(entry: QueueEntry, awardPoints: boolean) {
-    if (entry.price !== null && entry.price > 0) {
+    // Já pago no início (pagamento é ANTES de iniciar, pedido do usuário) —
+    // `paymentPending` reflete isso ao vivo, não pergunta forma de
+    // pagamento de novo aqui.
+    if (entry.price !== null && entry.price > 0 && entry.paymentPending) {
       setPaymentTarget({ entry, awardPoints });
       return;
     }
@@ -421,6 +467,27 @@ export function TerapeutaDaVezPage() {
       return;
     }
     showToast(`${therapist.name}: nenhum turno escalado está aberto agora.`);
+  }
+
+  // ---- Pausa manual (ex.: foi almoçar) --------------------------------------
+  // Sem limite de tempo, nunca vira histórico/jornada — só sai do "quem pode
+  // ser chamado" enquanto durar (ver `domain.services.build_queue`).
+  async function handlePause(entry: QueueEntry) {
+    try {
+      await pause(entry.therapistId);
+      showToast(`${entry.name}: em pausa.`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível pausar.");
+    }
+  }
+
+  async function handleResume(entry: QueueEntry) {
+    try {
+      await resume(entry.therapistId);
+      showToast(`${entry.name}: de volta.`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível retomar.");
+    }
   }
 
   if (loading && !state) {
@@ -493,6 +560,16 @@ export function TerapeutaDaVezPage() {
                             ? `${waitlistEntry.clientName} · ${waitlistEntry.procedureName}`
                             : queueMetaText(entry)}
                         </span>
+                        {entry.outOfOrder && (
+                          <span style={{ color: "#B23B3B", fontWeight: 700, fontSize: 12 }}>
+                            Decisão do paciente
+                          </span>
+                        )}
+                        {entry.paymentPending && status !== "livre" && (
+                          <span style={{ color: "#9A7426", fontWeight: 700, fontSize: 12 }}>
+                            Pagamento pendente
+                          </span>
+                        )}
                       </div>
                       <div className={styles.queuePoints}>{entry.points}</div>
                       <StatusBadge status={status} />
@@ -512,7 +589,15 @@ export function TerapeutaDaVezPage() {
                             >
                               Fila de espera
                             </button>
+                            <button type="button" className={styles.ghostBtn} onClick={() => void handlePause(entry)}>
+                              Pausar
+                            </button>
                           </>
+                        )}
+                        {status === "pausa" && (
+                          <button type="button" className={styles.smallBtn} onClick={() => void handleResume(entry)}>
+                            Retomar
+                          </button>
                         )}
                         {status === "reservado" && waitlistEntry && (
                           <>
@@ -535,7 +620,7 @@ export function TerapeutaDaVezPage() {
                             </button>
                           </>
                         )}
-                        {status === "aguardando_espaco" && (
+                        {status === "escolhendo_procedimento" && (
                           <button type="button" className={styles.smallBtn} onClick={() => openWizard(entry)}>
                             Definir procedimento
                           </button>
@@ -552,7 +637,7 @@ export function TerapeutaDaVezPage() {
               </div>
             </section>
 
-            <Sidebar state={state} waiting={waitingToStart} onCheckIn={requestCheckIn} />
+            <Sidebar state={state} waiting={waitingToStart} now={now} onCheckIn={requestCheckIn} />
           </div>
 
           <InProgressSection entries={therapyEntries} now={now} onFinish={finishTherapy} />
@@ -589,17 +674,22 @@ export function TerapeutaDaVezPage() {
           spaceOptionsByRequirement={spaceOptionsByRequirement}
           chosenSpaceIds={chosenSpaceIds}
           pickSpaceForRequirement={pickSpaceForRequirement}
+          mergeIntoSingleSpace={mergeIntoSingleSpace}
+          setMergeIntoSingleSpace={setMergeIntoSingleSpace}
           spaceReady={spaceReady}
           clientName={wizardClientName}
           setClientName={setWizardClientName}
           clientNameReady={clientNameReady}
+          phone={wizardPhone}
+          setPhone={setWizardPhone}
+          clientPhoneReady={clientPhoneReady}
           starting={starting}
           spaces={state.spaces}
           now={now}
           onClose={closeWizard}
           onDecline={() => void declineWizard()}
           onWaitlist={openWaitlistFromWizard}
-          onConfirmStart={() => void confirmStart()}
+          onConfirmStart={(payments) => void confirmStart(payments)}
         />
       )}
 
@@ -624,7 +714,9 @@ export function TerapeutaDaVezPage() {
 
       {paymentTarget && (
         <PaymentModal
-          entry={paymentTarget.entry}
+          title={paymentTarget.entry.name}
+          subtitle={paymentTarget.entry.clientName ?? "Cliente"}
+          total={paymentTarget.entry.price ?? 0}
           onCancel={() => setPaymentTarget(null)}
           onConfirm={(payments) => void doFinish(paymentTarget.entry, paymentTarget.awardPoints, payments)}
         />
@@ -1698,7 +1790,11 @@ function HeroPanel({ nextIdle, onCall }: { nextIdle: QueueEntry | null; onCall: 
               aplicados e a fila se reordena sozinha.
             </div>
           </div>
-          <button type="button" className={styles.heroBtn} onClick={() => onCall(nextIdle)}>
+          <button
+            type="button"
+            className={`${styles.heroBtn} ${styles.heroBtnPulse}`}
+            onClick={() => onCall(nextIdle)}
+          >
             Escolher procedimento
           </button>
         </>
@@ -1718,12 +1814,15 @@ const SHIFT_LABEL_FULL: Record<Shift, string> = { manha: "Manhã", inter: "Inter
 function Sidebar({
   state,
   waiting,
+  now,
   onCheckIn,
 }: {
   state: PanelState;
   waiting: AbsentTherapist[];
+  now: Date;
   onCheckIn: (t: AbsentTherapist) => void;
 }) {
+  const occupiedSpaces = state.spaces.filter((s) => s.state !== "free");
   return (
     <aside className={styles.sidebar}>
       {waiting.length > 0 && (
@@ -1735,6 +1834,19 @@ function Sidebar({
               <button type="button" className={styles.smallBtn} onClick={() => onCheckIn(t)}>
                 Iniciar turno
               </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {occupiedSpaces.length > 0 && (
+        <div className={styles.sidebarBlock}>
+          <span className={styles.sidebarTitle}>Macas/espaços ocupados</span>
+          {occupiedSpaces.map((s) => (
+            <div key={s.id} className={styles.sidebarLine}>
+              <span>{s.name}</span>
+              <span style={{ color: s.state === "cleaning" ? "#C9A44C" : "#1E8A86" }}>
+                {s.state === "cleaning" ? "preparação" : "ocupada"} · {remainingMinutes(s.availableAt, now)} min
+              </span>
             </div>
           ))}
         </div>
@@ -2053,17 +2165,27 @@ interface PaymentRow {
 
 /** Registro operacional de como o cliente pagou — pra bater com o Graces
  * depois, nunca um controle fiscal. Suporta pagamento dividido entre mais de
- * uma forma; a soma precisa fechar exatamente com o valor do atendimento. */
+ * uma forma; a soma precisa fechar exatamente com o valor do atendimento.
+ * Reaproveitado tanto ao FINALIZAR quanto ao INICIAR a terapia (pagamento é
+ * antes de iniciar, pedido do usuário) — por isso os props são genéricos
+ * (título/subtítulo/total), não amarrados a um `QueueEntry` já iniciado. */
 function PaymentModal({
-  entry,
+  eyebrow = "FINALIZAR ATENDIMENTO",
+  title,
+  subtitle,
+  total,
+  confirmLabel = "Finalizar atendimento",
   onCancel,
   onConfirm,
 }: {
-  entry: QueueEntry;
+  eyebrow?: string;
+  title: string;
+  subtitle: string;
+  total: number;
+  confirmLabel?: string;
   onCancel: () => void;
   onConfirm: (payments: PaymentAllocationInput[]) => void;
 }) {
-  const total = entry.price ?? 0;
   const [rows, setRows] = useState<PaymentRow[]>([{ method: "pix", amount: formatMoney(total) }]);
 
   function updateRow(index: number, patch: Partial<PaymentRow>) {
@@ -2102,10 +2224,10 @@ function PaymentModal({
     <div className={styles.overlay}>
       <div className={styles.modal}>
         <div>
-          <div className={styles.modalEyebrow}>FINALIZAR ATENDIMENTO</div>
-          <div className={styles.modalTitle}>{entry.name}</div>
+          <div className={styles.modalEyebrow}>{eyebrow}</div>
+          <div className={styles.modalTitle}>{title}</div>
           <div className={styles.modalSub}>
-            {entry.clientName ?? "Cliente"} · Valor do atendimento: R$ {formatMoney(total)}
+            {subtitle} · Valor: R$ {formatMoney(total)}
           </div>
         </div>
         <div className={styles.modalDivider} />
@@ -2163,7 +2285,7 @@ function PaymentModal({
             onClick={confirm}
             style={{ flex: 2, padding: "14px 12px" }}
           >
-            Finalizar atendimento
+            {confirmLabel}
           </button>
         </div>
         <button type="button" className={styles.paymentSkipBtn} onClick={skipForNow}>
@@ -2210,10 +2332,15 @@ function WizardModal({
   spaceOptionsByRequirement,
   chosenSpaceIds,
   pickSpaceForRequirement,
+  mergeIntoSingleSpace,
+  setMergeIntoSingleSpace,
   spaceReady,
   clientName,
   setClientName,
   clientNameReady,
+  phone,
+  setPhone,
+  clientPhoneReady,
   starting,
   spaces,
   now,
@@ -2223,8 +2350,8 @@ function WizardModal({
   onConfirmStart,
 }: {
   entry: QueueEntry;
-  step: "procedure" | "space" | "confirm";
-  setStep: (s: "procedure" | "space" | "confirm") => void;
+  step: "procedure" | "space" | "confirm" | "payment";
+  setStep: (s: "procedure" | "space" | "confirm" | "payment") => void;
   procedureGroups: Record<string, ProcedureOption[]>;
   chosenProcedure: ProcedureOption | null;
   chosenProcedureId: string | null;
@@ -2232,12 +2359,19 @@ function WizardModal({
   spaceOptionsByRequirement: SpacePanelView[][];
   chosenSpaceIds: (string | null)[];
   pickSpaceForRequirement: (index: number, spaceId: string) => void;
+  /** Combo de 2+ trechos, cliente prefere ficar num espaço só (pedido do
+   * usuário) — quando `true`, só o espaço do trecho 1 é enviado. */
+  mergeIntoSingleSpace: boolean;
+  setMergeIntoSingleSpace: (v: boolean) => void;
   spaceReady: boolean;
-  /** Nome do paciente — digitado junto com a escolha do espaço, nunca
-   * vira cliente cadastrado. */
+  /** Nome e telefone do paciente — pedidos junto com a escolha do espaço;
+   * a partir daqui sempre cadastram/reaproveitam um `Client`. */
   clientName: string;
   setClientName: (v: string) => void;
   clientNameReady: boolean;
+  phone: string;
+  setPhone: (v: string) => void;
+  clientPhoneReady: boolean;
   /** Trava o botão "Iniciar terapia" durante o envio — evita duplo clique e
    * (junto do `disabled`) garante que o clique nunca fique sem nenhum
    * retorno visível. */
@@ -2247,9 +2381,26 @@ function WizardModal({
   onClose: () => void;
   onDecline: () => void;
   onWaitlist: () => void;
-  onConfirmStart: () => void;
+  onConfirmStart: (payments: PaymentAllocationInput[]) => void;
 }) {
   const plannedEnd = chosenProcedure ? new Date(now.getTime() + chosenProcedure.durationMinutes * 60000) : null;
+
+  // Combo de 2+ trechos: espaço escolhido pro trecho 1, candidato a "ficar
+  // nele o atendimento todo" (pedido do usuário). `mergeSpaceAvailable` é
+  // só uma dica visual — livre agora e sem reserva chegando antes do fim
+  // da duração TOTAL do combo; o backend valida de verdade na hora de
+  // confirmar (`StartTherapyUseCase`), então mesmo "não disponível" aqui
+  // ainda deixa tentar.
+  const mergeCandidate =
+    chosenSpaceIds[0] != null
+      ? (spaceOptionsByRequirement[0]?.find((s) => s.id === chosenSpaceIds[0]) ?? null)
+      : null;
+  const mergeSpaceAvailable =
+    !!mergeCandidate &&
+    mergeCandidate.state === "free" &&
+    (!mergeCandidate.occupiesAt ||
+      (remainingMinutes(mergeCandidate.occupiesAt, now) ?? 0) >=
+        (chosenProcedure?.durationMinutes ?? 0));
 
   // Busca por código ou nome — filtra em tempo real conforme digita, sem
   // precisar rolar as categorias todas pra achar um procedimento
@@ -2270,6 +2421,24 @@ function WizardModal({
           .filter(([, items]) => (items as ProcedureOption[]).length > 0),
       )
     : procedureGroups;
+
+  // Pagamento é ANTES de iniciar, pedido do usuário — passo extra só quando
+  // o procedimento tem valor (reaproveita o mesmo `PaymentModal` do
+  // "Finalizar", com rótulos diferentes). Continua opcional: "Não sei
+  // agora" segue direto pro `onConfirmStart([])`, sem bloquear.
+  if (step === "payment" && chosenProcedure) {
+    return (
+      <PaymentModal
+        eyebrow="PAGAMENTO"
+        title={entry.name}
+        subtitle={clientName.trim() || "Cliente"}
+        total={chosenProcedure.price}
+        confirmLabel="Iniciar terapia"
+        onCancel={() => setStep("confirm")}
+        onConfirm={(payments) => onConfirmStart(payments)}
+      />
+    );
+  }
 
   return (
     <div className={styles.overlay}>
@@ -2362,7 +2531,23 @@ function WizardModal({
                 onChange={(e) => setClientName(e.target.value)}
               />
             </div>
-            {chosenProcedure.spaceRequirements.map((req, i) => (
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>TELEFONE DO PACIENTE</span>
+              <input
+                className={styles.fieldInput}
+                placeholder="(00) 00000-0000"
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
+              />
+            </div>
+            {chosenProcedure.spaceRequirements.map((req, i) => {
+              // Combo mesclado num espaço só: some com os seletores dos
+              // trechos seguintes — só o trecho 1 importa (pedido do
+              // usuário: "1h na maca e depois 30min na poltrona, mas o
+              // cliente pediu pra ficar na maca").
+              if (mergeIntoSingleSpace && i > 0) return null;
+              return (
               <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <span style={{ fontSize: 10, letterSpacing: 1.6, color: "#9A7426" }}>
                   TRECHO {i + 1} · {req.label}
@@ -2403,7 +2588,34 @@ function WizardModal({
                   {(spaceOptionsByRequirement[i]?.length ?? 0) === 0 && <div>Nenhum espaço desse tipo cadastrado.</div>}
                 </div>
               </div>
-            ))}
+              );
+            })}
+            {chosenProcedure.spaceRequirements.length > 1 && mergeCandidate && (
+              <div
+                className={styles.heroHint}
+                style={{ borderColor: mergeIntoSingleSpace ? "#1E8A86" : "#c9a44c" }}
+              >
+                {mergeIntoSingleSpace ? (
+                  <>
+                    Vai ficar só na {mergeCandidate.name} o atendimento todo ({chosenProcedure.durationLabel}
+                    ), sem passar pelos outros trechos.{" "}
+                    <button type="button" className={styles.ghostBtn} onClick={() => setMergeIntoSingleSpace(false)}>
+                      Usar espaços separados
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {mergeSpaceAvailable
+                      ? `A ${mergeCandidate.name} está livre pelo tempo todo — dá pra deixar o cliente nela o atendimento inteiro, sem trocar de espaço.`
+                      : `A ${mergeCandidate.name} tem reserva chegando antes do fim do atendimento — ainda dá pra tentar, mas o painel pode recusar na hora de confirmar.`}
+                    {" "}
+                    <button type="button" className={styles.smallBtn} onClick={() => setMergeIntoSingleSpace(true)}>
+                      Ficar só na {mergeCandidate.name} o atendimento todo
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
             {(spaceOptionsByRequirement[0]?.length ?? 0) > 0 &&
               spaceOptionsByRequirement[0]?.every((s) => s.state !== "free") && (
                 <div className={styles.heroHint} style={{ borderColor: "#c9a44c" }}>
@@ -2431,7 +2643,7 @@ function WizardModal({
                 type="button"
                 className={styles.smallBtn}
                 style={{ flex: 2, padding: "14px 12px" }}
-                disabled={!spaceReady || !clientNameReady}
+                disabled={!spaceReady || !clientNameReady || !clientPhoneReady}
                 onClick={() => setStep("confirm")}
               >
                 Continuar
@@ -2447,15 +2659,19 @@ function WizardModal({
               <div className={styles.modalTitle}>Iniciar terapia agora?</div>
             </div>
             <div className={styles.summaryGrid}>
-              <SummaryField label="CLIENTE" value={clientName.trim() || "—"} />
+              <SummaryField label="CLIENTE" value={`${clientName.trim() || "—"} · ${phone.trim() || "—"}`} />
               <SummaryField label="TERAPEUTA" value={entry.name} />
               <SummaryField label="PROCEDIMENTO" value={chosenProcedure.name} />
               <SummaryField
                 label="ESPAÇO"
-                value={chosenSpaceIds
-                  .map((id, i) => spaceOptionsByRequirement[i]?.find((s) => s.id === id)?.name)
-                  .filter(Boolean)
-                  .join(" + ")}
+                value={
+                  mergeIntoSingleSpace
+                    ? `${mergeCandidate?.name ?? "—"} (atendimento todo)`
+                    : chosenSpaceIds
+                        .map((id, i) => spaceOptionsByRequirement[i]?.find((s) => s.id === id)?.name)
+                        .filter(Boolean)
+                        .join(" + ")
+                }
               />
               <SummaryField label="VALOR · PONTOS" value={`${chosenProcedure.priceLabel} · +${chosenProcedure.points} pts`} />
             </div>
@@ -2473,9 +2689,11 @@ function WizardModal({
                 className={styles.smallBtn}
                 style={{ flex: 2, padding: "14px 12px" }}
                 disabled={starting}
-                onClick={onConfirmStart}
+                onClick={() =>
+                  chosenProcedure.price > 0 ? setStep("payment") : onConfirmStart([])
+                }
               >
-                {starting ? "Iniciando…" : "Iniciar terapia"}
+                {starting ? "Iniciando…" : chosenProcedure.price > 0 ? "Ir para pagamento" : "Iniciar terapia"}
               </button>
             </div>
           </>

@@ -33,6 +33,8 @@ export interface TerapeutaDaVezPanel {
     procedureId: string,
     spaceIds: string[],
     clientName: string,
+    phone: string,
+    payments?: PaymentAllocationInput[],
   ) => Promise<AttendanceRecord>;
   finish: (
     attendanceId: string,
@@ -43,6 +45,11 @@ export interface TerapeutaDaVezPanel {
    * trabalhista, terapeutas são PJ). A presença termina sozinha quando a
    * janela do turno passa. */
   checkIn: (therapistId: string, shift?: Shift) => Promise<Therapist>;
+  /** Pausa manual (ex.: foi almoçar) — sem limite de tempo, nunca vira
+   * histórico/jornada. Bloqueada enquanto o terapeuta está em atendimento. */
+  pause: (therapistId: string) => Promise<Therapist>;
+  /** Volta da pausa. */
+  resume: (therapistId: string) => Promise<Therapist>;
   /** Botão pequeno "Liberar" ao lado de um espaço em higienização. */
   releaseCleaning: (spaceId: string) => Promise<void>;
   /** "Colocar na fila de espera" — terapeuta específico, livre, mas o
@@ -147,12 +154,16 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     procedureId: string,
     spaceIds: string[],
     clientName: string,
+    phone: string,
+    payments: PaymentAllocationInput[] = [],
   ) {
     const result = await terapeutaDaVezPanelService.start(
       attendanceId,
       procedureId,
       spaceIds,
       clientName,
+      phone,
+      payments,
     );
     setState(result.state);
     return result.attendance;
@@ -170,6 +181,18 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
 
   async function checkIn(therapistId: string, shift?: Shift) {
     const result = await terapeutaDaVezPanelService.checkIn(therapistId, shift);
+    setState(result.state);
+    return result.therapist;
+  }
+
+  async function pause(therapistId: string) {
+    const result = await terapeutaDaVezPanelService.pause(therapistId);
+    setState(result.state);
+    return result.therapist;
+  }
+
+  async function resume(therapistId: string) {
+    const result = await terapeutaDaVezPanelService.resume(therapistId);
     setState(result.state);
     return result.therapist;
   }
@@ -206,6 +229,8 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     start,
     finish,
     checkIn,
+    pause,
+    resume,
     releaseCleaning,
     createWaitlistEntry,
     confirmWaitlistEntry,
