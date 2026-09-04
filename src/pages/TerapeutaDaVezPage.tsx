@@ -551,7 +551,10 @@ export function TerapeutaDaVezPage() {
                   const waitlistEntry = waitlistByTherapist.get(entry.therapistId);
                   const status = rowStatus(entry, waitlistEntry);
                   return (
-                    <div key={entry.therapistId} className={`${styles.queueRow} ${entry.status !== "idle" ? styles.queueRowTurn : ""}`}>
+                    <div
+                      key={entry.therapistId}
+                      className={`${styles.queueRow} ${entry.status !== "idle" ? styles.queueRowTurn : ""} ${entry.paymentPending ? styles.queueRowPaymentPending : ""}`}
+                    >
                       <div className={styles.queuePos}>{entry.position ?? "—"}</div>
                       <div className={styles.queueInfo}>
                         <span className={styles.queueName}>{entry.name}</span>
@@ -566,9 +569,7 @@ export function TerapeutaDaVezPage() {
                           </span>
                         )}
                         {entry.paymentPending && status !== "livre" && (
-                          <span style={{ color: "#9A7426", fontWeight: 700, fontSize: 12 }}>
-                            Pagamento pendente
-                          </span>
+                          <span className={styles.paymentPendingBadgeInline}>⚠ PAGAMENTO PENDENTE</span>
                         )}
                       </div>
                       <div className={styles.queuePoints}>{entry.points}</div>
@@ -717,6 +718,7 @@ export function TerapeutaDaVezPage() {
           title={paymentTarget.entry.name}
           subtitle={paymentTarget.entry.clientName ?? "Cliente"}
           total={paymentTarget.entry.price ?? 0}
+          allowSkip={false}
           onCancel={() => setPaymentTarget(null)}
           onConfirm={(payments) => void doFinish(paymentTarget.entry, paymentTarget.awardPoints, payments)}
         />
@@ -835,7 +837,10 @@ function InProgressSection({
       <span className={styles.inProgressTitle}>Atendimentos em andamento</span>
       <div className={styles.inProgressGrid}>
         {entries.map((e) => (
-          <div key={e.therapistId} className={styles.inProgressCard}>
+          <div
+            key={e.therapistId}
+            className={`${styles.inProgressCard} ${e.paymentPending ? styles.queueRowPaymentPending : ""}`}
+          >
             <div className={styles.inProgressRow}>
               <span className={styles.queueName}>{e.clientName ?? "Cliente"}</span>
               <span style={{ color: "#C9A44C", fontWeight: 700 }}>
@@ -845,6 +850,11 @@ function InProgressSection({
             <span className={styles.queueMeta}>
               {e.name} · {e.procedureName} · {e.spaceNames.join(" + ")} · libera às {formatHM(e.plannedEndAt)}
             </span>
+            {e.paymentPending && (
+              <span className={styles.paymentPendingBadgeInline} style={{ alignSelf: "flex-start" }}>
+                ⚠ PAGAMENTO PENDENTE
+              </span>
+            )}
             <button type="button" className={styles.smallBtn} style={{ alignSelf: "flex-start" }} onClick={() => onFinish(e)}>
               Finalizar
             </button>
@@ -2175,6 +2185,7 @@ function PaymentModal({
   subtitle,
   total,
   confirmLabel = "Finalizar atendimento",
+  allowSkip = true,
   onCancel,
   onConfirm,
 }: {
@@ -2183,6 +2194,10 @@ function PaymentModal({
   subtitle: string;
   total: number;
   confirmLabel?: string;
+  /** `false` esconde "Não sei agora" — pedido do usuário: não deixar
+   * FINALIZAR um atendimento sem registrar pagamento nenhum (diferente do
+   * pagamento no INÍCIO, que continua opcional). */
+  allowSkip?: boolean;
   onCancel: () => void;
   onConfirm: (payments: PaymentAllocationInput[]) => void;
 }) {
@@ -2288,9 +2303,15 @@ function PaymentModal({
             {confirmLabel}
           </button>
         </div>
-        <button type="button" className={styles.paymentSkipBtn} onClick={skipForNow}>
-          Não sei agora — registrar pagamento depois
-        </button>
+        {allowSkip ? (
+          <button type="button" className={styles.paymentSkipBtn} onClick={skipForNow}>
+            Não sei agora — registrar pagamento depois
+          </button>
+        ) : (
+          <div style={{ color: "#B23B3B", fontWeight: 700, fontSize: 12.5, textAlign: "center" }}>
+            Pagamento pendente — não dá pra finalizar sem registrar a forma de pagamento.
+          </div>
+        )}
       </div>
     </div>
   );

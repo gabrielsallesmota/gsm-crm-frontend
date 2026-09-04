@@ -338,6 +338,34 @@
   border-left-color: #c9a44c;
 }
 
+/* Pagamento pendente num atendimento em andamento — precisa saltar aos
+   olhos da recepção (pedido do usuário), por isso sobrepõe o destaque
+   normal de "em atendimento" com um vermelho de alerta. */
+.queueRowPaymentPending {
+  background: #fdeceb;
+  border-left-color: #b23b3b;
+}
+
+@keyframes paymentPendingPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(178, 59, 59, 0.55); }
+  50% { box-shadow: 0 0 0 8px rgba(178, 59, 59, 0); }
+}
+
+.paymentPendingBadgeInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #b23b3b;
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  animation: paymentPendingPulse 1.8s ease-in-out infinite;
+}
+
 .queuePos {
   font-variant-numeric: tabular-nums;
   font-size: 18px;
