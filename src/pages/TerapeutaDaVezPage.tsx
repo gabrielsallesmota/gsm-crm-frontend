@@ -1471,7 +1471,10 @@ function HistoricoTab({ showToast }: { showToast: (msg: string) => void }) {
   const items = page?.items ?? [];
   const finishedItems = items.filter((i) => i.phase === "finished");
   const totalValue = finishedItems.reduce((acc, i) => acc + (i.price ?? 0), 0);
-  const pendingCount = finishedItems.filter((i) => i.paymentPending).length;
+  // Conta TODOS os pendentes, não só os finalizados — pedido do usuário:
+  // um atendimento ainda em terapia (`phase === "therapy"`) sem pagamento
+  // registrado já aparece aqui como pendente, não só depois de finalizar.
+  const pendingCount = items.filter((i) => i.paymentPending).length;
   const summaryByMethod = useMemo(() => {
     const totals = new Map<PaymentMethod, { label: string; total: number }>();
     for (const item of finishedItems) {
@@ -1622,8 +1625,9 @@ function HistoricoTab({ showToast }: { showToast: (msg: string) => void }) {
 
 /** Registrar (ou corrigir) a forma de pagamento de uma linha do Histórico —
  * mesma mecânica de split/soma exata do `PaymentModal` da finalização, só
- * que operando sobre um `AttendanceRecord` já finalizado em vez de uma
- * `QueueEntry` em terapia. */
+ * que operando sobre um `AttendanceRecord` do Histórico — que pode estar
+ * em terapia (pagamento pendente aparece desde o início) ou já finalizado
+ * — em vez de uma `QueueEntry`. */
 function RegisterPaymentModal({
   record,
   onClose,
@@ -2717,6 +2721,16 @@ function WizardModal({
                 {starting ? "Iniciando…" : chosenProcedure.price > 0 ? "Ir para pagamento" : "Iniciar terapia"}
               </button>
             </div>
+            {chosenProcedure.price > 0 && (
+              <button
+                type="button"
+                className={styles.paymentSkipBtn}
+                disabled={starting}
+                onClick={() => onConfirmStart([])}
+              >
+                Iniciar sem pagar agora — registrar pagamento depois
+              </button>
+            )}
           </>
         )}
       </div>
