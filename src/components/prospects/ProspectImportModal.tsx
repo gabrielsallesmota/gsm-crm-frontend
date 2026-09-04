@@ -10,6 +10,7 @@ import {
   type ProspectStage,
 } from "../../types/prospect";
 import {
+  CONTACT_CHANNEL,
   PAGE_OBJECTIVE,
   PHONE_TYPE,
   PRIORITY,
@@ -28,6 +29,9 @@ const ENUM_KEYS: Partial<Record<keyof ImportRowInput, string[]>> = {
   pageObjective: Object.keys(PAGE_OBJECTIVE),
   priority: Object.keys(PRIORITY),
   origin: Object.keys(PROSPECT_ORIGIN),
+  // "WHATSAPP"/"INSTAGRAM"/"EMAIL" do CSV batem certinho — `buildRow` já
+  // normaliza pra minúsculo antes de comparar (ver abaixo).
+  contactChannel: Object.keys(CONTACT_CHANNEL),
 };
 
 const NUMBER_FIELDS = new Set<keyof ImportRowInput>(["googleRating", "googleReviewsCount"]);

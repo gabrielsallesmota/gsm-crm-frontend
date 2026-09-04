@@ -1,4 +1,5 @@
 import type {
+  ContactChannel,
   PageObjective,
   PhoneType,
   ProspectOrigin,
@@ -41,6 +42,17 @@ export const PRIORITY: Record<ProspectPriority, { label: string; color: string; 
   a: { label: "A", color: "#ff6b6b", bg: "rgba(255,107,107,.14)" },
   b: { label: "B", color: "#f5b13d", bg: "rgba(245,177,61,.14)" },
   c: { label: "C", color: "#9aa6b2", bg: "rgba(255,255,255,.06)" },
+};
+
+/** Canal de abordagem recomendado — cores reaproveitadas das já existentes
+ * no projeto (whatsapp = mesmo verde de `WHATSAPP_STATUS.valido`, instagram
+ * = mesmo rosa de `PROSPECT_ORIGIN.instagram`/`origins.ts`). "E-mail" é tag
+ * branca de propósito (pedido do usuário): texto escuro sobre quase-branco,
+ * legível mesmo no tema escuro do resto do app. */
+export const CONTACT_CHANNEL: Record<ContactChannel, { label: string; color: string; bg: string }> = {
+  whatsapp: { label: "WhatsApp", color: "#2ee66e", bg: "rgba(46,230,110,.12)" },
+  instagram: { label: "Instagram", color: "#e1719c", bg: "rgba(225,48,108,.14)" },
+  email: { label: "E-mail", color: "#0a0e12", bg: "#e6edf2" },
 };
 
 export const PROSPECT_ORIGIN: Record<ProspectOrigin, { label: string; color: string; bg: string }> = {

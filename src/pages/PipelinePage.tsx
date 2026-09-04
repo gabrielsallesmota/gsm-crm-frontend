@@ -293,6 +293,7 @@ function KanbanCard({
       )}
       <div className={styles.cardFooter}>
         <span className={styles.cardValue}>R$ {brl(lead.value)}</span>
+        <Badge {...PASSIVO_BADGE} />
         <Badge label={origin.label} color={origin.color} bg={origin.bg} />
       </div>
       <WhatsappButton lead={lead} templates={templates} size="small" />

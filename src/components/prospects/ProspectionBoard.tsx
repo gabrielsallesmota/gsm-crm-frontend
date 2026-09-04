@@ -12,7 +12,7 @@ import { ProspectDrawer } from "./ProspectDrawer";
 import { ProspectImportModal } from "./ProspectImportModal";
 import { ManageStagesModal } from "./ManageStagesModal";
 import { ManageLossReasonsModal } from "./ManageLossReasonsModal";
-import { WhatsappButton } from "./WhatsappButton";
+import { ChannelTag } from "./ChannelTag";
 import { useToast } from "../../hooks/useToast";
 import { prospectsService } from "../../services/ProspectsService";
 import { ApiError } from "../../types/common";
@@ -569,6 +569,7 @@ function ProspectCard({
             embaixo dela só quando marcada (mesmo com o card minimizado,
             sem precisar abrir o drawer pra saber quando retomar contato). */}
         <div className={styles.cardTopRight}>
+          <Badge {...ATIVO_BADGE} />
           <Badge label={priority.label} color={priority.color} bg={priority.bg} />
           {prospect.targetDate && (
             <span
@@ -600,7 +601,7 @@ function ProspectCard({
         <Badge label={whatsapp.label} color={whatsapp.color} bg={whatsapp.bg} />
       </div>
       <div className={styles.cardActions}>
-        <WhatsappButton prospect={prospect} stage={stage} templates={templates} size="small" />
+        <ChannelTag prospect={prospect} stage={stage} templates={templates} size="small" />
         {/* Toggle direto do card — antes só dava pra marcar isso abrindo o
             prospect, "Editar" e "Salvar alterações" (pedido explícito do
             usuário). `stopPropagation` pra não abrir o drawer ao clicar. */}

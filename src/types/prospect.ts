@@ -18,6 +18,11 @@ export type PageObjective = "orcamento" | "agendamento" | "apresentacao" | "matr
 
 export type ProspectPriority = "a" | "b" | "c";
 
+/** Canal de abordagem recomendado — decide a tag/ação do card
+ * (`ChannelTag.tsx`): WhatsApp mantém o link `wa.me` de sempre; Instagram/
+ * E-mail copiam a mensagem/e-mail pro clipboard em vez de abrir um link. */
+export type ContactChannel = "whatsapp" | "instagram" | "email";
+
 /** De onde a GSM achou o prospect — diferente da "origem" de um Lead (canal
  * pelo qual um CLIENTE do CRM recebeu um lead de fora). */
 export type ProspectOrigin = "google_maps" | "indicacao" | "instagram" | "site" | "evento" | "outro";
@@ -87,6 +92,12 @@ export interface Prospect {
   websiteUrl: string;
   siteStatus: SiteStatus;
   instagram: string;
+  // Canal de abordagem recomendado — ver `ContactChannel`. `email`/
+  // `emailSubject` ficam sempre disponíveis (dá pra ter um e-mail
+  // cadastrado mesmo quando o canal principal é outro).
+  contactChannel: ContactChannel;
+  email: string;
+  emailSubject: string;
   googleRating: number | null;
   googleReviewsCount: number | null;
   positiveNote: string;
@@ -163,6 +174,9 @@ export interface CreateProspectInput {
   websiteUrl?: string;
   siteStatus?: SiteStatus;
   instagram?: string;
+  contactChannel?: ContactChannel;
+  email?: string;
+  emailSubject?: string;
   googleRating?: number;
   googleReviewsCount?: number;
   positiveNote?: string;
@@ -236,6 +250,9 @@ export interface ImportRowInput {
   websiteUrl?: string;
   siteStatus?: SiteStatus;
   instagram?: string;
+  contactChannel?: ContactChannel;
+  email?: string;
+  emailSubject?: string;
   googleRating?: number;
   googleReviewsCount?: number;
   positiveNote?: string;
@@ -285,6 +302,9 @@ export const IMPORTABLE_PROSPECT_FIELDS: { key: keyof ImportRowInput; label: str
   { key: "websiteUrl", label: "Site encontrado" },
   { key: "siteStatus", label: "Status do site" },
   { key: "instagram", label: "Instagram" },
+  { key: "contactChannel", label: "Canal recomendado" },
+  { key: "email", label: "E-mail" },
+  { key: "emailSubject", label: "Assunto do e-mail" },
   { key: "googleRating", label: "Nota do Google" },
   { key: "googleReviewsCount", label: "Qtd. de avaliações" },
   { key: "positiveNote", label: "Observação positiva" },

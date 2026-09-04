@@ -1,5 +1,6 @@
 import type { ProspectsRepository } from "../ProspectsRepository";
 import type {
+  ContactChannel,
   CreateMessageTemplateInput,
   CreateProspectInput,
   CreateProspectLossReasonInput,
@@ -47,6 +48,9 @@ interface ProspectDto {
   website_url: string | null;
   site_status: SiteStatus;
   instagram: string | null;
+  contact_channel: ContactChannel;
+  email: string | null;
+  email_subject: string | null;
   google_rating: number | null;
   google_reviews_count: number | null;
   positive_note: string | null;
@@ -98,6 +102,9 @@ function toProspect(dto: ProspectDto): Prospect {
     websiteUrl: dto.website_url ?? "",
     siteStatus: dto.site_status,
     instagram: dto.instagram ?? "",
+    contactChannel: dto.contact_channel,
+    email: dto.email ?? "",
+    emailSubject: dto.email_subject ?? "",
     googleRating: dto.google_rating,
     googleReviewsCount: dto.google_reviews_count,
     positiveNote: dto.positive_note ?? "",
@@ -151,6 +158,9 @@ function createBody(input: CreateProspectInput | UpdateProspectInput) {
     website_url: input.websiteUrl,
     site_status: input.siteStatus,
     instagram: input.instagram,
+    contact_channel: input.contactChannel,
+    email: input.email,
+    email_subject: input.emailSubject,
     google_rating: input.googleRating,
     google_reviews_count: input.googleReviewsCount,
     positive_note: input.positiveNote,
@@ -185,6 +195,9 @@ function importRowBody(row: ImportRowInput) {
     website_url: row.websiteUrl,
     site_status: row.siteStatus,
     instagram: row.instagram,
+    contact_channel: row.contactChannel,
+    email: row.email,
+    email_subject: row.emailSubject,
     google_rating: row.googleRating,
     google_reviews_count: row.googleReviewsCount,
     positive_note: row.positiveNote,

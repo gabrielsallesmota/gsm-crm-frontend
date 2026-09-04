@@ -8,7 +8,7 @@ import type {
 } from "../../types/prospect";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
-import { WhatsappButton } from "./WhatsappButton";
+import { ChannelTag } from "./ChannelTag";
 import { useProspectActions } from "../../hooks/useProspectActions";
 import { useProspectComments } from "../../hooks/useProspectComments";
 import { useProspectCommentActions } from "../../hooks/useProspectCommentActions";
@@ -17,6 +17,7 @@ import { useToast } from "../../hooks/useToast";
 import { ApiError } from "../../types/common";
 import { formatPhone } from "../../utils/phone";
 import {
+  CONTACT_CHANNEL,
   PAGE_OBJECTIVE,
   PHONE_TYPE,
   PRIORITY,
@@ -121,6 +122,9 @@ export function ProspectDrawer({
         websiteUrl: form.websiteUrl,
         siteStatus: form.siteStatus,
         instagram: form.instagram,
+        contactChannel: form.contactChannel,
+        email: form.email,
+        emailSubject: form.emailSubject,
         positiveNote: form.positiveNote,
         opportunity: form.opportunity,
         priority: form.priority,
@@ -216,7 +220,7 @@ export function ProspectDrawer({
           )}
           <Badge label={`Prioridade ${priority.label}`} color={priority.color} bg={priority.bg} />
           <Badge label={origin.label} color={origin.color} bg={origin.bg} />
-          <WhatsappButton prospect={prospect} stage={stage} templates={templates} />
+          <ChannelTag prospect={prospect} stage={stage} templates={templates} />
           {!editing && (
             <button className={styles.editToggle} onClick={startEdit} type="button">
               ✎ Editar
@@ -331,6 +335,28 @@ export function ProspectDrawer({
               value={form.instagram}
               display={prospect.instagram}
               onChange={(v) => setForm((f) => ({ ...f, instagram: v }))}
+            />
+            <SelectField
+              label="Canal de abordagem"
+              editing={editing}
+              value={form.contactChannel}
+              display={CONTACT_CHANNEL[prospect.contactChannel].label}
+              options={Object.entries(CONTACT_CHANNEL).map(([k, v]) => ({ value: k, label: v.label }))}
+              onChange={(v) => setForm((f) => ({ ...f, contactChannel: v as FormState["contactChannel"] }))}
+            />
+            <Field
+              label="E-mail"
+              editing={editing}
+              value={form.email}
+              display={prospect.email}
+              onChange={(v) => setForm((f) => ({ ...f, email: v }))}
+            />
+            <Field
+              label="Assunto do e-mail"
+              editing={editing}
+              value={form.emailSubject}
+              display={prospect.emailSubject}
+              onChange={(v) => setForm((f) => ({ ...f, emailSubject: v }))}
             />
             <div className={`${styles.field} ${styles.fieldFull}`}>
               <div className={styles.fieldLabel}>Site encontrado</div>
@@ -713,6 +739,9 @@ function fromProspect(prospect: Prospect) {
     websiteUrl: prospect.websiteUrl,
     siteStatus: prospect.siteStatus,
     instagram: prospect.instagram,
+    contactChannel: prospect.contactChannel,
+    email: prospect.email,
+    emailSubject: prospect.emailSubject,
     googleRating: prospect.googleRating != null ? String(prospect.googleRating) : "",
     googleReviewsCount: prospect.googleReviewsCount != null ? String(prospect.googleReviewsCount) : "",
     positiveNote: prospect.positiveNote,

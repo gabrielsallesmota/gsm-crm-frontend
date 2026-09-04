@@ -6,8 +6,13 @@
  * brasileiras costumam exportar com `;`).
  */
 export function parseCsv(text: string): { headers: string[]; rows: string[][] } {
-  const delimiter = detectDelimiter(text);
-  const rows = parseRows(text, delimiter);
+  // BOM UTF-8 residual (caractere invisível U+FEFF) — comum em CSV
+  // exportado do Excel/Sheets no Windows. Sem isso, ele gruda no primeiro
+  // header (ex.: vira "U+FEFF" + "Nome da empresa"), quebrando o match
+  // exato do de/para (`guessMapping`) só pra essa primeira coluna.
+  const withoutBom = text.startsWith("\uFEFF") ? text.slice(1) : text;
+  const delimiter = detectDelimiter(withoutBom);
+  const rows = parseRows(withoutBom, delimiter);
   const [headers, ...body] = rows;
   return { headers: (headers ?? []).map((h) => h.trim()), rows: body.filter((r) => r.some((c) => c.trim())) };
 }
