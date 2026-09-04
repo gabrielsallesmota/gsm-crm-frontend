@@ -13,17 +13,32 @@ export type SpaceState = "free" | "occupied" | "cleaning";
 export type AttendancePhase = "reception" | "therapy" | "finished" | "declined";
 
 /** Controle OPERACIONAL da recepção pra bater com o ERP Graces depois —
- * não é um conceito fiscal/contábil. `carteiraBemEstar`/`creditoConta` são
- * só valores de enum por enquanto, sem integração real ainda. */
-export type PaymentMethod = "pix" | "dinheiro" | "credito" | "debito" | "carteira_bem_estar" | "credito_conta";
+ * não é um conceito fiscal/contábil. Lista e ordem de exibição definidas
+ * pelo usuário (bate com os códigos curtos do Graces, entre parênteses no
+ * rótulo). */
+export type PaymentMethod =
+  | "credito"
+  | "debito"
+  | "dinheiro"
+  | "pix"
+  | "conta_corrente"
+  | "vale_presente"
+  | "resgate"
+  | "cortesia"
+  | "convenio"
+  | "voucher";
 
 export const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] = [
+  { value: "credito", label: "Cartão de Crédito (CR)" },
+  { value: "debito", label: "Cartão de Débito (DB)" },
+  { value: "dinheiro", label: "Dinheiro (R$)" },
   { value: "pix", label: "PIX" },
-  { value: "dinheiro", label: "Dinheiro" },
-  { value: "credito", label: "Cartão de crédito" },
-  { value: "debito", label: "Cartão de débito" },
-  { value: "carteira_bem_estar", label: "Carteira Bem-Estar" },
-  { value: "credito_conta", label: "Crédito Conta" },
+  { value: "conta_corrente", label: "Conta Corrente (CC)" },
+  { value: "vale_presente", label: "Vale Presente (VP)" },
+  { value: "resgate", label: "Resgate (RESG)" },
+  { value: "cortesia", label: "Cortesia (CT)" },
+  { value: "convenio", label: "Convênio (CV)" },
+  { value: "voucher", label: "Voucher" },
 ];
 
 export interface PaymentAllocation {
