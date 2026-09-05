@@ -2090,8 +2090,12 @@ function AgendaTab({
           saving={saving}
           onCancel={() => setModal(null)}
           onSave={() => void handleSave(modal)}
-          onNoShow={modal.appointment ? () => void handleNoShow(modal.appointment!) : undefined}
-          onDelete={modal.appointment ? () => void handleDelete(modal.appointment!) : undefined}
+          {...(modal.appointment
+            ? {
+                onNoShow: () => void handleNoShow(modal.appointment!),
+                onDelete: () => void handleDelete(modal.appointment!),
+              }
+            : {})}
         />
       )}
     </div>
