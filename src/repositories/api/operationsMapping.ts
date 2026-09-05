@@ -257,6 +257,7 @@ export interface AppointmentDto {
   procedure_id: string | null;
   procedure_name: string | null;
   preference_note: string | null;
+  group_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -619,6 +620,7 @@ export function toAppointment(dto: AppointmentDto): Appointment {
     procedureId: dto.procedure_id,
     procedureName: dto.procedure_name,
     preferenceNote: dto.preference_note,
+    groupId: dto.group_id,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
   };

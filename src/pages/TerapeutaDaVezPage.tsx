@@ -1781,14 +1781,15 @@ function defaultSlotMinutes(day: Date): number {
 interface AgendaModalState {
   mode: "create" | "edit";
   appointment: Appointment | null;
+  // Todos os trechos do grupo (INCLUSIVE o 1º, `appointment`), na ordem —
+  // `null` quando é um agendamento de trecho único. Ver docstring de
+  // `Appointment.groupId` — "editar/excluir o conjunto" pedido pelo usuário.
+  groupMembers: Appointment[] | null;
   spaceId: string;
-  // Espaço de cada trecho A PARTIR DO 2º (o 1º é `spaceId`) — só usado no
-  // modo "create" com procedimento "casado" (2+ trechos, tipos diferentes),
-  // igual o combo do Terapeuta da Vez (`chosenSpaceIds`). Editar um
-  // agendamento existente não recompõe os trechos (cada trecho, quando
-  // criado como combo, vira uma linha `Appointment` própria — ver
-  // `AgendaTab.handleSave`), então este campo fica sempre vazio no modo
-  // "edit".
+  // Espaço de cada trecho A PARTIR DO 2º (o 1º é `spaceId`) — usado tanto
+  // no "create" com procedimento "casado" (2+ trechos, tipos diferentes,
+  // igual o combo do Terapeuta da Vez) quanto no "edit" de um `groupMembers`
+  // já existente (pré-preenchido com o espaço atual de cada trecho).
   segmentSpaceIds: string[];
   date: string;
   time: string;
@@ -1812,6 +1813,7 @@ function blankAgendaForm(
   return {
     mode: "create",
     appointment: null,
+    groupMembers: null,
     spaceId,
     segmentSpaceIds: [],
     date,
@@ -1825,14 +1827,15 @@ function blankAgendaForm(
   };
 }
 
-function editAgendaForm(appointment: Appointment): AgendaModalState {
+function editAgendaForm(appointment: Appointment, groupMembers: Appointment[] | null): AgendaModalState {
   const start = new Date(appointment.startAt);
   const end = new Date(appointment.endAt);
   return {
     mode: "edit",
     appointment,
+    groupMembers,
     spaceId: appointment.spaceId,
-    segmentSpaceIds: [],
+    segmentSpaceIds: groupMembers ? groupMembers.slice(1).map((m) => m.spaceId) : [],
     date: isoDate(start),
     time: minutesToHHMM(start.getHours() * 60 + start.getMinutes()),
     durationMinutes: Math.max(5, Math.round((end.getTime() - start.getTime()) / 60000)),
@@ -1942,7 +1945,19 @@ function AgendaTab({
   }
 
   function openEdit(appointment: Appointment) {
-    setModal(editAgendaForm(appointment));
+    if (!appointment.groupId) {
+      setModal(editAgendaForm(appointment, null));
+      return;
+    }
+    // Clicou num bloco que faz parte de um combo ("casado") — reconstitui o
+    // grupo inteiro a partir do dia já carregado (todos os trechos nascem
+    // juntos, minutos um do outro, então nunca atravessam a virada do dia)
+    // e abre o modal ancorado sempre no PRIMEIRO trecho, não no que foi
+    // clicado.
+    const group = appointments
+      .filter((a) => a.groupId === appointment.groupId)
+      .sort((a, b) => a.startAt.localeCompare(b.startAt));
+    setModal(editAgendaForm(group[0] ?? appointment, group.length > 1 ? group : null));
   }
 
   async function handleSave(form: AgendaModalState) {
@@ -1960,6 +1975,10 @@ function AgendaTab({
         // validar a disponibilidade em sequência, não o atalho de mesclar.
         const segments = procedure ? procedure.spaceRequirements : [{ minutes: form.durationMinutes }];
         const spaceIdsInOrder = [form.spaceId, ...form.segmentSpaceIds];
+        // Liga os trechos pra dar pra "editar/excluir o conjunto" depois —
+        // um UUID por combo, gerado aqui mesmo (o backend só guarda, nunca
+        // gera). Trecho único não ganha grupo.
+        const groupId = segments.length > 1 ? crypto.randomUUID() : undefined;
         const createdIds: string[] = [];
         try {
           let cursor = baseStart;
@@ -1978,6 +1997,7 @@ function AgendaTab({
               ...(form.therapistId ? { therapistId: form.therapistId } : {}),
               ...(form.procedureId ? { procedureId: form.procedureId } : {}),
               ...(note ? { preferenceNote: note } : {}),
+              ...(groupId ? { groupId } : {}),
             };
             const created = await terapeutaDaVezPublicRepository.createAppointment(input);
             createdIds.push(created.id);
@@ -2000,12 +2020,72 @@ function AgendaTab({
         showToast(
           `${form.clientName.trim()}: agendamento criado${segments.length > 1 ? ` (${segments.length} trechos)` : ""}.`,
         );
+      } else if (form.appointment && form.groupMembers && form.groupMembers.length > 1) {
+        // "Editar o conjunto": reencadeia cada trecho a partir do novo
+        // horário base, preservando a duração de cada um (imutável) e
+        // permitindo trocar o espaço de cada trecho — igual o create
+        // combo, só que via PATCH em cada trecho já existente em vez de
+        // POST. Sem transação cobrindo as N chamadas: se um trecho esbarrar
+        // em conflito, desfaz (melhor esforço) os que já foram atualizados
+        // nesta tentativa, voltando pro valor de antes.
+        const members = form.groupMembers;
+        const spaceIdsInOrder = [form.spaceId, ...form.segmentSpaceIds];
+        const updatedIds: string[] = [];
+        try {
+          let cursor = baseStart;
+          for (let i = 0; i < members.length; i++) {
+            const member = members[i]!;
+            const minutes = Math.round(
+              (new Date(member.endAt).getTime() - new Date(member.startAt).getTime()) / 60000,
+            );
+            const segStart = cursor;
+            const segEnd = new Date(segStart.getTime() + minutes * 60000);
+            cursor = segEnd;
+            const notePrefix = `Trecho ${i + 1}/${members.length}`;
+            const note = [notePrefix, form.preferenceNote.trim() || null].filter(Boolean).join(" · ");
+            await terapeutaDaVezPublicRepository.updateAppointment(member.id, {
+              clientName: form.clientName.trim(),
+              phone: form.phone,
+              spaceId: spaceIdsInOrder[i] ?? member.spaceId,
+              startAt: segStart.toISOString(),
+              endAt: segEnd.toISOString(),
+              preferenceNote: note,
+              ...(form.therapistId ? { therapistId: form.therapistId } : { clearTherapist: true }),
+            });
+            updatedIds.push(member.id);
+          }
+        } catch (err) {
+          for (const id of updatedIds) {
+            const original = members.find((m) => m.id === id);
+            if (!original) continue;
+            try {
+              await terapeutaDaVezPublicRepository.updateAppointment(id, {
+                clientName: original.clientName,
+                phone: original.clientPhone,
+                spaceId: original.spaceId,
+                startAt: original.startAt,
+                endAt: original.endAt,
+                preferenceNote: original.preferenceNote ?? "",
+                ...(original.therapistId
+                  ? { therapistId: original.therapistId }
+                  : { clearTherapist: true }),
+              });
+            } catch {
+              // melhor esforço — se nem isso funcionar, a recepção vê o
+              // estado inconsistente na grade pra corrigir na mão.
+            }
+          }
+          throw err;
+        }
+        showToast(`${form.clientName.trim()}: agendamento (conjunto) atualizado.`);
       } else if (form.appointment) {
         const endAt = new Date(baseStart.getTime() + form.durationMinutes * 60000);
         // Nota: não existe "clearProcedure" no backend (mesma convenção de
         // `clearTherapist`, mas só pra terapeuta) — dá pra TROCAR de
         // procedimento, não pra voltar a "nenhum" depois de definido.
         const input: UpdateAppointmentInput = {
+          clientName: form.clientName.trim(),
+          phone: form.phone,
           spaceId: form.spaceId,
           startAt: baseStart.toISOString(),
           endAt: endAt.toISOString(),
@@ -2025,9 +2105,15 @@ function AgendaTab({
     }
   }
 
-  async function handleNoShow(appointment: Appointment) {
+  async function handleNoShow(appointment: Appointment, groupMembers: Appointment[] | null) {
     try {
-      await terapeutaDaVezPublicRepository.markAppointmentNoShow(appointment.id);
+      // Combo "casado": marca TODOS os trechos como falta junto — o
+      // cliente não veio pro agendamento inteiro, não faria sentido um
+      // trecho ficar "faltou" e o outro continuar "agendado".
+      const targets = groupMembers && groupMembers.length > 1 ? groupMembers : [appointment];
+      for (const a of targets) {
+        await terapeutaDaVezPublicRepository.markAppointmentNoShow(a.id);
+      }
       showToast(`${appointment.clientName}: marcado como falta.`);
       setModal(null);
       await load();
@@ -2036,10 +2122,18 @@ function AgendaTab({
     }
   }
 
-  async function handleDelete(appointment: Appointment) {
-    if (!confirm(`Excluir o agendamento de ${appointment.clientName}?`)) return;
+  async function handleDelete(appointment: Appointment, groupMembers: Appointment[] | null) {
+    const isGroup = groupMembers && groupMembers.length > 1 && appointment.groupId;
+    const confirmMsg = isGroup
+      ? `Excluir o agendamento (conjunto) de ${appointment.clientName} — ${groupMembers.length} trechos?`
+      : `Excluir o agendamento de ${appointment.clientName}?`;
+    if (!confirm(confirmMsg)) return;
     try {
-      await terapeutaDaVezPublicRepository.deleteAppointment(appointment.id);
+      if (isGroup && appointment.groupId) {
+        await terapeutaDaVezPublicRepository.deleteAppointmentGroup(appointment.groupId);
+      } else {
+        await terapeutaDaVezPublicRepository.deleteAppointment(appointment.id);
+      }
       showToast("Agendamento excluído.");
       setModal(null);
       await load();
@@ -2199,8 +2293,8 @@ function AgendaTab({
           onSave={() => void handleSave(modal)}
           {...(modal.appointment
             ? {
-                onNoShow: () => void handleNoShow(modal.appointment!),
-                onDelete: () => void handleDelete(modal.appointment!),
+                onNoShow: () => void handleNoShow(modal.appointment!, modal.groupMembers),
+                onDelete: () => void handleDelete(modal.appointment!, modal.groupMembers),
               }
             : {})}
         />
@@ -2237,19 +2331,25 @@ function AgendaAppointmentModal({
   const selectedProcedure = procedures.find((p) => p.id === form.procedureId) ?? null;
   const segments = selectedProcedure ? selectedProcedure.spaceRequirements : [];
   const isCombo = segments.length > 1;
+  // Editando um agendamento "casado" já existente — cada trecho é um
+  // `Appointment` próprio, ligados por `groupId` (ver `AgendaTab.openEdit`).
+  const isEditGroup = !isCreate && !!form.groupMembers && form.groupMembers.length > 1;
 
   // Pedido do usuário: só oferecer procedimento compatível com o ESPAÇO já
   // escolhido (1º trecho) — mesma regra de tipo do combo do Terapeuta da
   // Vez. No modo "edit" mantém o comportamento mais simples de antes (não
-  // dá pra reconstituir os trechos de um agendamento já existente, então só
-  // oferece procedimento de trecho ÚNICO — mais o que já estava escolhido,
-  // pra não sumir da lista se for um combo antigo).
+  // dá pra trocar o procedimento de um combo já existente, só editar
+  // trecho/espaço/horário — então só oferece procedimento de trecho ÚNICO
+  // — mais o que já estava escolhido, pra não sumir da lista).
   const procedureOptions = isCreate
     ? procedures.filter((p) => !selectedSpace || p.spaceRequirements[0]?.type === selectedSpace.type)
     : procedures.filter((p) => p.spaceRequirements.length === 1 || p.id === form.procedureId);
 
+  // No "edit" (solo ou conjunto) os seletores de trecho já nascem
+  // preenchidos com o espaço atual de cada trecho (`editAgendaForm`), então
+  // só o "create" combo precisa validar se todos foram escolhidos.
   const segmentsReady =
-    segments.length <= 1 || segments.slice(1).every((_, i) => !!form.segmentSpaceIds[i]);
+    !isCreate || segments.length <= 1 || segments.slice(1).every((_, i) => !!form.segmentSpaceIds[i]);
   const ok =
     form.clientName.trim().length > 2 &&
     onlyDigits(form.phone).length >= 10 &&
@@ -2292,13 +2392,14 @@ function AgendaAppointmentModal({
     <div className={styles.overlay}>
       <div className={styles.modal}>
         <div>
-          <div className={styles.modalEyebrow}>AGENDA</div>
+          <div className={styles.modalEyebrow}>AGENDA{isEditGroup ? " · CONJUNTO" : ""}</div>
           <div className={styles.modalTitle}>
             {form.mode === "create" ? "Novo agendamento" : form.appointment?.clientName}
           </div>
           {form.appointment && (
             <div className={styles.modalSub}>
               Status: {APPOINTMENT_STATUS_LABEL[form.appointment.status]}
+              {isEditGroup ? ` · ${form.groupMembers!.length} trechos` : ""}
             </div>
           )}
         </div>
@@ -2321,7 +2422,9 @@ function AgendaAppointmentModal({
           />
         </div>
         <div className={styles.field}>
-          <span className={styles.fieldLabel}>ESPAÇO{isCombo ? " — TRECHO 1" : ""}</span>
+          <span className={styles.fieldLabel}>
+            ESPAÇO{isCombo || isEditGroup ? " — TRECHO 1" : ""}
+          </span>
           <select
             className={styles.fieldInput}
             value={form.spaceId}
@@ -2371,6 +2474,28 @@ function AgendaAppointmentModal({
             </span>
           )}
         </div>
+        {isEditGroup &&
+          form.groupMembers!.slice(1).map((member, i) => {
+            const type = spaces.find((s) => s.id === member.spaceId)?.type;
+            return (
+              <div className={styles.field} key={member.id}>
+                <span className={styles.fieldLabel}>ESPAÇO — TRECHO {i + 2}</span>
+                <select
+                  className={styles.fieldInput}
+                  value={form.segmentSpaceIds[i] ?? member.spaceId}
+                  onChange={(e) => selectSegmentSpace(i, e.target.value)}
+                >
+                  {spaces
+                    .filter((s) => s.type === type)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            );
+          })}
         {isCreate && segments.slice(1).map((segment, i) => (
           <div className={styles.field} key={i}>
             <span className={styles.fieldLabel}>
@@ -2443,7 +2568,7 @@ function AgendaAppointmentModal({
               onClick={onDelete}
               style={{ flex: 1, color: "#B23B3B" }}
             >
-              Excluir
+              {isEditGroup ? "Excluir conjunto" : "Excluir"}
             </button>
           )}
           {onNoShow && (

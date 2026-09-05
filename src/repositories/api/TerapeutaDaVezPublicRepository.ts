@@ -318,6 +318,7 @@ export class TerapeutaDaVezPublicRepository {
         therapist_id: input.therapistId ?? null,
         procedure_id: input.procedureId ?? null,
         preference_note: input.preferenceNote ?? null,
+        group_id: input.groupId ?? null,
       }),
     });
     return toAppointment(dto);
@@ -329,6 +330,8 @@ export class TerapeutaDaVezPublicRepository {
     const dto = await publicRequest<AppointmentDto>(`${BASE}/appointments/${appointmentId}`, {
       method: "PATCH",
       body: JSON.stringify({
+        client_name: input.clientName ?? null,
+        phone: input.phone ?? null,
         space_id: input.spaceId ?? null,
         start_at: input.startAt ?? null,
         end_at: input.endAt ?? null,
@@ -351,6 +354,12 @@ export class TerapeutaDaVezPublicRepository {
 
   async deleteAppointment(appointmentId: string): Promise<void> {
     await publicRequest<void>(`${BASE}/appointments/${appointmentId}`, { method: "DELETE" });
+  }
+
+  /** "Excluir o conjunto" de um procedimento "casado" — apaga todos os
+   * trechos que compartilham o mesmo `groupId` de uma vez. */
+  async deleteAppointmentGroup(groupId: string): Promise<void> {
+    await publicRequest<void>(`${BASE}/appointments/group/${groupId}`, { method: "DELETE" });
   }
 
   /** "Volta mais tarde" — reserva rápida sem espaço/terapeuta, só pra

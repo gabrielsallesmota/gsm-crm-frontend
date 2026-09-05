@@ -440,6 +440,12 @@ export interface Appointment {
   procedureId: string | null;
   procedureName: string | null;
   preferenceNote: string | null;
+  /** Liga os trechos de um procedimento "casado" (2+ espaços em sequência,
+   * ex.: Maca 30min + Poltrona 15min) — cada trecho é um `Appointment`
+   * próprio, todos com o mesmo `groupId` (gerado no frontend na hora de
+   * criar). `null` = trecho único (a maioria). Usado só pra "editar/
+   * excluir o conjunto" na Agenda. */
+  groupId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -453,6 +459,8 @@ export interface CreateAppointmentInput {
   therapistId?: string;
   procedureId?: string;
   preferenceNote?: string;
+  /** Ver docstring de `Appointment.groupId`. */
+  groupId?: string;
 }
 
 /** `undefined` em cada campo quer dizer "não mexe" — mesma convenção do
@@ -460,6 +468,8 @@ export interface CreateAppointmentInput {
  * terapeuta definido" é um estado de verdade que só omitir `therapistId`
  * não consegue expressar. */
 export interface UpdateAppointmentInput {
+  clientName?: string;
+  phone?: string;
   spaceId?: string;
   startAt?: string;
   endAt?: string;
