@@ -177,6 +177,8 @@ export interface QueueEntryDto {
   price: string | null;
   out_of_order: boolean;
   payment_pending: boolean;
+  next_appointment_at: string | null;
+  next_appointment_client_name: string | null;
 }
 
 export interface SpaceDto {
@@ -531,6 +533,8 @@ function toQueueEntry(dto: QueueEntryDto): QueueEntry {
     price: dto.price === null ? null : Number(dto.price),
     outOfOrder: dto.out_of_order,
     paymentPending: dto.payment_pending,
+    nextAppointmentAt: dto.next_appointment_at,
+    nextAppointmentClientName: dto.next_appointment_client_name,
   };
 }
 

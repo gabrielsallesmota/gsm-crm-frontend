@@ -280,6 +280,11 @@ export interface QueueEntry {
    * pagamento registrada ainda (pagamento é pedido antes de iniciar, mas
    * continua opcional). */
   paymentPending: boolean;
+  /** Próximo agendamento de HOJE (Agenda) pra este terapeuta — `null`
+   * quando não tem nenhum. Mostrado embaixo da linha na fila, destacado
+   * quando faltar menos de 1h (pedido do usuário). */
+  nextAppointmentAt: string | null;
+  nextAppointmentClientName: string | null;
 }
 
 export interface SpacePanelView {

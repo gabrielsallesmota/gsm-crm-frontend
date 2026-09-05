@@ -664,6 +664,21 @@ export function TerapeutaDaVezPage() {
                         {entry.paymentPending && status !== "livre" && (
                           <span className={styles.paymentPendingBadgeInline}>⚠ PAGAMENTO PENDENTE</span>
                         )}
+                        {entry.nextAppointmentAt &&
+                          (() => {
+                            const minutes = remainingMinutes(entry.nextAppointmentAt, now);
+                            const soon = minutes !== null && minutes < 60;
+                            return (
+                              <span
+                                className={styles.queueMeta}
+                                style={soon ? { color: "#B23B3B", fontWeight: 700 } : undefined}
+                              >
+                                Próximo agendamento: {formatHM(entry.nextAppointmentAt)}
+                                {entry.nextAppointmentClientName ? ` · ${entry.nextAppointmentClientName}` : ""}
+                                {minutes !== null ? ` (faltam ${minutes} min)` : ""}
+                              </span>
+                            );
+                          })()}
                       </div>
                       <div className={styles.queuePoints}>{entry.points}</div>
                       <StatusBadge status={status} />
