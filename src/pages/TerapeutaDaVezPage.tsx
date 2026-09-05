@@ -1766,12 +1766,35 @@ function combineDateAndTime(dateIso: string, time: string): Date {
   return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1, Math.floor(minutes / 60), minutes % 60);
 }
 
+/** Próximo horário "redondo" (múltiplo de `AGENDA_SLOT_MINUTES`) — usado
+ * como padrão do botão "Novo agendamento" (sem célula clicada pra herdar o
+ * horário). Só faz sentido arredondar pra frente quando o dia escolhido é
+ * hoje; em outro dia, começa do início da grade. */
+function defaultSlotMinutes(day: Date): number {
+  if (isoDate(day) !== isoDate(new Date())) return AGENDA_START_MINUTES;
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const rounded = Math.ceil(nowMinutes / AGENDA_SLOT_MINUTES) * AGENDA_SLOT_MINUTES;
+  return Math.min(Math.max(rounded, AGENDA_START_MINUTES), AGENDA_END_MINUTES - AGENDA_SLOT_MINUTES);
+}
+
 interface AgendaModalState {
   mode: "create" | "edit";
   appointment: Appointment | null;
   spaceId: string;
+  // Espaço de cada trecho A PARTIR DO 2º (o 1º é `spaceId`) — só usado no
+  // modo "create" com procedimento "casado" (2+ trechos, tipos diferentes),
+  // igual o combo do Terapeuta da Vez (`chosenSpaceIds`). Editar um
+  // agendamento existente não recompõe os trechos (cada trecho, quando
+  // criado como combo, vira uma linha `Appointment` própria — ver
+  // `AgendaTab.handleSave`), então este campo fica sempre vazio no modo
+  // "edit".
+  segmentSpaceIds: string[];
   date: string;
   time: string;
+  // SEMPRE derivada (do procedimento escolhido, ou do agendamento existente
+  // no modo "edit") — nunca digitada à mão, pedido do usuário ("Duração
+  // deve ser imutável").
   durationMinutes: number;
   clientName: string;
   phone: string;
@@ -1780,17 +1803,23 @@ interface AgendaModalState {
   preferenceNote: string;
 }
 
-function blankAgendaForm(date: string, spaceId: string, time: string): AgendaModalState {
+function blankAgendaForm(
+  date: string,
+  spaceId: string,
+  time: string,
+  therapistId = "",
+): AgendaModalState {
   return {
     mode: "create",
     appointment: null,
     spaceId,
+    segmentSpaceIds: [],
     date,
     time,
     durationMinutes: 30,
     clientName: "",
     phone: "",
-    therapistId: "",
+    therapistId,
     procedureId: "",
     preferenceNote: "",
   };
@@ -1803,6 +1832,7 @@ function editAgendaForm(appointment: Appointment): AgendaModalState {
     mode: "edit",
     appointment,
     spaceId: appointment.spaceId,
+    segmentSpaceIds: [],
     date: isoDate(start),
     time: minutesToHHMM(start.getHours() * 60 + start.getMinutes()),
     durationMinutes: Math.max(5, Math.round((end.getTime() - start.getTime()) / 60000)),
@@ -1831,12 +1861,24 @@ function AgendaTab({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [totals, setTotals] = useState({ total: 0, noShowCount: 0 });
+  const [therapistFilter, setTherapistFilter] = useState("");
   const [modal, setModal] = useState<AgendaModalState | null>(null);
   const [saving, setSaving] = useState(false);
 
   const dayIso = isoDate(day);
   const spaces = state.spaces;
+
+  // Filtro por profissional (pedido do usuário) — só estreita o que aparece
+  // na grade/contadores, nunca as colunas (que continuam sendo os espaços).
+  const visibleAppointments = useMemo(
+    () =>
+      therapistFilter ? appointments.filter((a) => a.therapistId === therapistFilter) : appointments,
+    [appointments, therapistFilter],
+  );
+  const noShowCount = useMemo(
+    () => visibleAppointments.filter((a) => a.status === "no_show").length,
+    [visibleAppointments],
+  );
 
   // Terapeutas "conhecidos" hoje (fila + ausentes escalados) — não existe
   // endpoint público de "todos os terapeutas" fora da gestão (senha), então
@@ -1854,7 +1896,6 @@ function AgendaTab({
     try {
       const result = await terapeutaDaVezPublicRepository.listAppointmentsForDay(dayIso);
       setAppointments(result.appointments);
-      setTotals({ total: result.total, noShowCount: result.noShowCount });
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Não foi possível carregar a Agenda.");
     } finally {
@@ -1867,13 +1908,15 @@ function AgendaTab({
   }, [load]);
 
   // Prefill vindo de "volta mais tarde" (procedimento não era rápido o
-  // suficiente) — abre já o modal de criar com nome/telefone/procedimento.
+  // suficiente) — abre já o modal de criar com nome/telefone/procedimento,
+  // num espaço do TIPO certo pra esse procedimento (`prefill.spaceType`).
   useEffect(() => {
     if (!prefill) return;
     const today = new Date();
     setDay(today);
+    const space = spaces.find((s) => s.type === prefill.spaceType) ?? spaces[0];
     setModal({
-      ...blankAgendaForm(isoDate(today), spaces[0]?.id ?? "", "10:00"),
+      ...blankAgendaForm(isoDate(today), space?.id ?? "", minutesToHHMM(defaultSlotMinutes(today))),
       clientName: prefill.clientName,
       phone: prefill.phone,
       procedureId: prefill.procedureId,
@@ -1884,7 +1927,18 @@ function AgendaTab({
   }, [prefill]);
 
   function openCreate(spaceId: string, slotMinutes: number) {
-    setModal(blankAgendaForm(dayIso, spaceId, minutesToHHMM(slotMinutes)));
+    setModal(blankAgendaForm(dayIso, spaceId, minutesToHHMM(slotMinutes), therapistFilter));
+  }
+
+  function openNewAppointment() {
+    setModal(
+      blankAgendaForm(
+        dayIso,
+        spaces[0]?.id ?? "",
+        minutesToHHMM(defaultSlotMinutes(day)),
+        therapistFilter,
+      ),
+    );
   }
 
   function openEdit(appointment: Appointment) {
@@ -1895,28 +1949,65 @@ function AgendaTab({
     if (saving) return;
     setSaving(true);
     try {
-      const startAt = combineDateAndTime(form.date, form.time);
-      const endAt = new Date(startAt.getTime() + form.durationMinutes * 60000);
+      const baseStart = combineDateAndTime(form.date, form.time);
       if (form.mode === "create") {
-        const input: CreateAppointmentInput = {
-          clientName: form.clientName.trim(),
-          phone: form.phone,
-          spaceId: form.spaceId,
-          startAt: startAt.toISOString(),
-          endAt: endAt.toISOString(),
-          ...(form.therapistId ? { therapistId: form.therapistId } : {}),
-          ...(form.procedureId ? { procedureId: form.procedureId } : {}),
-          ...(form.preferenceNote.trim() ? { preferenceNote: form.preferenceNote.trim() } : {}),
-        };
-        await terapeutaDaVezPublicRepository.createAppointment(input);
-        showToast(`${form.clientName.trim()}: agendamento criado.`);
+        const procedure = procedures.find((p) => p.id === form.procedureId) ?? null;
+        // Procedimento "casado" (2+ trechos, tipos de espaço diferentes) —
+        // igual o combo do Terapeuta da Vez: cada trecho ocupa um espaço na
+        // SEQUÊNCIA (trecho 2 começa quando o trecho 1 termina), cada um
+        // validado pelo backend na hora de criar. Sem suporte a "ficar só
+        // num espaço" aqui (diferente do wizard) — pedido do usuário foi só
+        // validar a disponibilidade em sequência, não o atalho de mesclar.
+        const segments = procedure ? procedure.spaceRequirements : [{ minutes: form.durationMinutes }];
+        const spaceIdsInOrder = [form.spaceId, ...form.segmentSpaceIds];
+        const createdIds: string[] = [];
+        try {
+          let cursor = baseStart;
+          for (let i = 0; i < segments.length; i++) {
+            const segStart = cursor;
+            const segEnd = new Date(segStart.getTime() + segments[i]!.minutes * 60000);
+            cursor = segEnd;
+            const notePrefix = segments.length > 1 ? `Trecho ${i + 1}/${segments.length}` : null;
+            const note = [notePrefix, form.preferenceNote.trim() || null].filter(Boolean).join(" · ");
+            const input: CreateAppointmentInput = {
+              clientName: form.clientName.trim(),
+              phone: form.phone,
+              spaceId: spaceIdsInOrder[i] ?? form.spaceId,
+              startAt: segStart.toISOString(),
+              endAt: segEnd.toISOString(),
+              ...(form.therapistId ? { therapistId: form.therapistId } : {}),
+              ...(form.procedureId ? { procedureId: form.procedureId } : {}),
+              ...(note ? { preferenceNote: note } : {}),
+            };
+            const created = await terapeutaDaVezPublicRepository.createAppointment(input);
+            createdIds.push(created.id);
+          }
+        } catch (err) {
+          // Um trecho seguinte esbarrou em conflito — desfaz o(s) trecho(s)
+          // já criado(s) nesta tentativa pra não deixar órfão na grade
+          // (não há transação cobrindo as N chamadas HTTP).
+          for (const id of createdIds) {
+            try {
+              await terapeutaDaVezPublicRepository.deleteAppointment(id);
+            } catch {
+              // melhor esforço — se nem isso funcionar, sobra o toast de
+              // erro abaixo mesmo, e a recepção vê o(s) trecho(s) órfão(s)
+              // na grade pra apagar na mão.
+            }
+          }
+          throw err;
+        }
+        showToast(
+          `${form.clientName.trim()}: agendamento criado${segments.length > 1 ? ` (${segments.length} trechos)` : ""}.`,
+        );
       } else if (form.appointment) {
+        const endAt = new Date(baseStart.getTime() + form.durationMinutes * 60000);
         // Nota: não existe "clearProcedure" no backend (mesma convenção de
         // `clearTherapist`, mas só pra terapeuta) — dá pra TROCAR de
         // procedimento, não pra voltar a "nenhum" depois de definido.
         const input: UpdateAppointmentInput = {
           spaceId: form.spaceId,
-          startAt: startAt.toISOString(),
+          startAt: baseStart.toISOString(),
           endAt: endAt.toISOString(),
           preferenceNote: form.preferenceNote,
           ...(form.procedureId ? { procedureId: form.procedureId } : {}),
@@ -1990,8 +2081,24 @@ function AgendaTab({
         <button type="button" className={styles.ghostBtn} onClick={() => setDay((d) => addDays(d, 1))}>
           Próximo dia →
         </button>
+        <select
+          className={styles.fieldInput}
+          style={{ width: "auto" }}
+          value={therapistFilter}
+          onChange={(e) => setTherapistFilter(e.target.value)}
+        >
+          <option value="">Todos os terapeutas</option>
+          {knownTherapists.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <button type="button" className={styles.smallBtn} onClick={openNewAppointment}>
+          + Novo agendamento
+        </button>
         <span className={styles.escalaWeekLabel} style={{ marginLeft: "auto", fontWeight: 600 }}>
-          {totals.total} agendamento(s) hoje · {totals.noShowCount} faltaram
+          {visibleAppointments.length} agendamento(s) · {noShowCount} faltaram
         </span>
       </div>
 
@@ -2039,7 +2146,7 @@ function AgendaTab({
                 ))}
               </Fragment>
             ))}
-            {appointments.map((a) => {
+            {visibleAppointments.map((a) => {
               const colIndex = spaces.findIndex((s) => s.id === a.spaceId);
               if (colIndex === -1) return null;
               const start = new Date(a.startAt);
@@ -2125,19 +2232,59 @@ function AgendaAppointmentModal({
   onNoShow?: () => void;
   onDelete?: () => void;
 }) {
+  const isCreate = form.mode === "create";
+  const selectedSpace = spaces.find((s) => s.id === form.spaceId) ?? null;
+  const selectedProcedure = procedures.find((p) => p.id === form.procedureId) ?? null;
+  const segments = selectedProcedure ? selectedProcedure.spaceRequirements : [];
+  const isCombo = segments.length > 1;
+
+  // Pedido do usuário: só oferecer procedimento compatível com o ESPAÇO já
+  // escolhido (1º trecho) — mesma regra de tipo do combo do Terapeuta da
+  // Vez. No modo "edit" mantém o comportamento mais simples de antes (não
+  // dá pra reconstituir os trechos de um agendamento já existente, então só
+  // oferece procedimento de trecho ÚNICO — mais o que já estava escolhido,
+  // pra não sumir da lista se for um combo antigo).
+  const procedureOptions = isCreate
+    ? procedures.filter((p) => !selectedSpace || p.spaceRequirements[0]?.type === selectedSpace.type)
+    : procedures.filter((p) => p.spaceRequirements.length === 1 || p.id === form.procedureId);
+
+  const segmentsReady =
+    segments.length <= 1 || segments.slice(1).every((_, i) => !!form.segmentSpaceIds[i]);
   const ok =
     form.clientName.trim().length > 2 &&
     onlyDigits(form.phone).length >= 10 &&
     form.spaceId !== "" &&
-    form.durationMinutes > 0 &&
-    hhmmToMinutes(form.time) !== null;
+    hhmmToMinutes(form.time) !== null &&
+    (!isCreate || form.procedureId !== "") &&
+    segmentsReady;
+
+  function selectSpace(spaceId: string) {
+    const space = spaces.find((s) => s.id === spaceId);
+    setForm((f) => {
+      const current = procedures.find((p) => p.id === f.procedureId);
+      const stillCompatible = !current || current.spaceRequirements[0]?.type === space?.type;
+      if (stillCompatible) return { ...f, spaceId };
+      // Trocou pra um espaço de outro tipo — o procedimento escolhido não
+      // serve mais pro 1º trecho, limpa junto (duração e trechos seguintes
+      // também dependiam dele).
+      return { ...f, spaceId, procedureId: "", durationMinutes: 30, segmentSpaceIds: [] };
+    });
+  }
 
   function selectProcedure(procedureId: string) {
     const procedure = procedures.find((p) => p.id === procedureId);
     setForm((f) => ({
       ...f,
       procedureId,
-      durationMinutes: procedure ? procedure.durationMinutes : f.durationMinutes,
+      durationMinutes: procedure ? procedure.durationMinutes : 30,
+      segmentSpaceIds: procedure ? procedure.spaceRequirements.slice(1).map(() => "") : [],
+    }));
+  }
+
+  function selectSegmentSpace(index: number, spaceId: string) {
+    setForm((f) => ({
+      ...f,
+      segmentSpaceIds: f.segmentSpaceIds.map((id, i) => (i === index ? spaceId : id)),
     }));
   }
 
@@ -2174,11 +2321,11 @@ function AgendaAppointmentModal({
           />
         </div>
         <div className={styles.field}>
-          <span className={styles.fieldLabel}>ESPAÇO</span>
+          <span className={styles.fieldLabel}>ESPAÇO{isCombo ? " — TRECHO 1" : ""}</span>
           <select
             className={styles.fieldInput}
             value={form.spaceId}
-            onChange={(e) => setForm((f) => ({ ...f, spaceId: e.target.value }))}
+            onChange={(e) => selectSpace(e.target.value)}
           >
             {spaces.map((s) => (
               <option key={s.id} value={s.id}>
@@ -2203,20 +2350,48 @@ function AgendaAppointmentModal({
           </select>
         </div>
         <div className={styles.field}>
-          <span className={styles.fieldLabel}>PROCEDIMENTO (OPCIONAL)</span>
+          <span className={styles.fieldLabel}>
+            PROCEDIMENTO{isCreate ? "" : " (OPCIONAL)"}
+          </span>
           <select
             className={styles.fieldInput}
             value={form.procedureId}
             onChange={(e) => selectProcedure(e.target.value)}
           >
-            <option value="">A definir</option>
-            {procedures.map((p) => (
+            <option value="">{isCreate ? "Selecione…" : "A definir"}</option>
+            {procedureOptions.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} ({p.durationLabel})
               </option>
             ))}
           </select>
+          {isCreate && selectedSpace && procedureOptions.length === 0 && (
+            <span className={styles.modalSub}>
+              Nenhum procedimento cadastrado pra esse tipo de espaço ({selectedSpace.name}).
+            </span>
+          )}
         </div>
+        {isCreate && segments.slice(1).map((segment, i) => (
+          <div className={styles.field} key={i}>
+            <span className={styles.fieldLabel}>
+              ESPAÇO — TRECHO {i + 2} ({segment.label})
+            </span>
+            <select
+              className={styles.fieldInput}
+              value={form.segmentSpaceIds[i] ?? ""}
+              onChange={(e) => selectSegmentSpace(i, e.target.value)}
+            >
+              <option value="">Selecione…</option>
+              {spaces
+                .filter((s) => s.type === segment.type)
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        ))}
         <div style={{ display: "flex", gap: 10 }}>
           <div className={styles.field} style={{ flex: 1 }}>
             <span className={styles.fieldLabel}>DATA</span>
@@ -2237,17 +2412,17 @@ function AgendaAppointmentModal({
             />
           </div>
           <div className={styles.field} style={{ flex: 1 }}>
-            <span className={styles.fieldLabel}>DURAÇÃO (MIN)</span>
-            <input
-              className={styles.fieldInput}
-              type="number"
-              min={5}
-              step={5}
-              value={form.durationMinutes}
-              onChange={(e) => setForm((f) => ({ ...f, durationMinutes: Number(e.target.value) || 0 }))}
-            />
+            {/* Duração é sempre derivada (do procedimento, ou do agendamento
+                já existente) — pedido do usuário: nunca um campo editável. */}
+            <span className={styles.fieldLabel}>DURAÇÃO</span>
+            <span className={styles.fieldInput} style={{ display: "flex", alignItems: "center" }}>
+              {form.durationMinutes} min
+            </span>
           </div>
         </div>
+        {segments.length > 0 && (
+          <div className={styles.modalSub}>{segments.map((s) => s.label).join(" + ")}</div>
+        )}
         <div className={styles.field}>
           <span className={styles.fieldLabel}>PREFERÊNCIA (OPCIONAL)</span>
           <input
