@@ -16,3 +16,15 @@ export function formatPhone(raw: string): string {
   if (v.length > 2) return `(${v.slice(0, 2)}) ${v.slice(2)}`;
   return v;
 }
+
+/** Espelha `app.shared.phone.normalize_phone` do backend — DDI 55 + só
+ * dígitos, formato que o `wa.me/...` espera. Usado onde a tela só tem o
+ * telefone CRU salvo (ex.: `ReturnReservation.clientPhone`), sem uma versão
+ * já normalizada vinda do backend (diferente de Leads/Prospecção, que
+ * expõem `phoneNormalized` pronto). */
+export function toWhatsappPhone(raw: string): string {
+  const digits = onlyDigits(raw);
+  if (digits.startsWith("55") && digits.length > 11) return digits;
+  const national = digits.replace(/^0+/, "");
+  return national ? `55${national}` : digits;
+}

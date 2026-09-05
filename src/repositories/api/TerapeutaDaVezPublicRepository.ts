@@ -1,34 +1,46 @@
 import { ApiError } from "../../types/common";
 import { BASE_URL } from "./ApiClient";
 import {
+  toAppointment,
+  toAppointmentsForDay,
   toAttendance,
   toAttendanceAction,
   toHistoryPage,
   toPanelState,
+  toReturnReservationAction,
   toScheduleEntry,
   toTherapistAction,
   toWaitlistAction,
+  type AppointmentDto,
+  type AppointmentsForDayDto,
   type AttendanceActionDto,
   type AttendanceDto,
   type HistoryPageDto,
   type PanelStateDto,
+  type ReturnReservationActionDto,
   type ScheduleEntryDto,
   type TherapistActionDto,
   type WaitlistActionDto,
 } from "./operationsMapping";
 import type {
+  Appointment,
+  AppointmentsForDay,
   AttendanceAction,
   AttendanceRecord,
+  CreateAppointmentInput,
+  CreateReturnReservationInput,
   CreateScheduleEntryInput,
   CreateWaitlistEntryInput,
   HistoryFilter,
   HistoryPage,
   PanelState,
   PaymentAllocationInput,
+  ReturnReservationAction,
   ScheduleEntry,
   Shift,
   SubstituteScheduleEntryTherapistInput,
   TherapistAction,
+  UpdateAppointmentInput,
   UpdateScheduleEntryHoursInput,
   WaitlistAction,
 } from "../../types/operations";
@@ -283,6 +295,88 @@ export class TerapeutaDaVezPublicRepository {
       body: JSON.stringify({ payments: payments.map((p) => ({ method: p.method, amount: p.amount })) }),
     });
     return toAttendance(dto);
+  }
+
+  /** Agenda do dia — grade estilo Google Agenda, sem senha (mesmo critério
+   * de Escala/Histórico). `day` sempre "yyyy-mm-dd". */
+  async listAppointmentsForDay(day: string): Promise<AppointmentsForDay> {
+    const dto = await publicRequest<AppointmentsForDayDto>(
+      `${BASE}/appointments?${new URLSearchParams({ day }).toString()}`,
+    );
+    return toAppointmentsForDay(dto);
+  }
+
+  async createAppointment(input: CreateAppointmentInput): Promise<Appointment> {
+    const dto = await publicRequest<AppointmentDto>(`${BASE}/appointments`, {
+      method: "POST",
+      body: JSON.stringify({
+        client_name: input.clientName,
+        phone: input.phone,
+        space_id: input.spaceId,
+        start_at: input.startAt,
+        end_at: input.endAt,
+        therapist_id: input.therapistId ?? null,
+        procedure_id: input.procedureId ?? null,
+        preference_note: input.preferenceNote ?? null,
+      }),
+    });
+    return toAppointment(dto);
+  }
+
+  /** Cobre editar E "remarcar" (só mudar `startAt`/`endAt`) — mesmo
+   * endpoint, a diferença é só quais campos são enviados. */
+  async updateAppointment(appointmentId: string, input: UpdateAppointmentInput): Promise<Appointment> {
+    const dto = await publicRequest<AppointmentDto>(`${BASE}/appointments/${appointmentId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        space_id: input.spaceId ?? null,
+        start_at: input.startAt ?? null,
+        end_at: input.endAt ?? null,
+        therapist_id: input.therapistId ?? null,
+        clear_therapist: input.clearTherapist ?? false,
+        procedure_id: input.procedureId ?? null,
+        preference_note: input.preferenceNote ?? null,
+        status: input.status ?? null,
+      }),
+    });
+    return toAppointment(dto);
+  }
+
+  async markAppointmentNoShow(appointmentId: string): Promise<Appointment> {
+    const dto = await publicRequest<AppointmentDto>(`${BASE}/appointments/${appointmentId}/no-show`, {
+      method: "POST",
+    });
+    return toAppointment(dto);
+  }
+
+  async deleteAppointment(appointmentId: string): Promise<void> {
+    await publicRequest<void>(`${BASE}/appointments/${appointmentId}`, { method: "DELETE" });
+  }
+
+  /** "Volta mais tarde" — reserva rápida sem espaço/terapeuta, só pra
+   * procedimento curto (o backend valida de novo, mas a tela já filtra
+   * pela mesma regra antes de oferecer este atalho). */
+  async createReturnReservation(input: CreateReturnReservationInput): Promise<ReturnReservationAction> {
+    const dto = await publicRequest<ReturnReservationActionDto>(`${BASE}/return-reservations`, {
+      method: "POST",
+      body: JSON.stringify({
+        client_name: input.clientName,
+        phone: input.phone,
+        procedure_id: input.procedureId,
+        minutes: input.minutes,
+      }),
+    });
+    return toReturnReservationAction(dto);
+  }
+
+  /** Serve tanto pra "cliente voltou" quanto "cancelar" — mesma operação
+   * no backend, só o texto do botão/toast muda no frontend. */
+  async resolveReturnReservation(reservationId: string): Promise<PanelState> {
+    const dto = await publicRequest<PanelStateDto>(
+      `${BASE}/return-reservations/${reservationId}/resolve`,
+      { method: "POST" },
+    );
+    return toPanelState(dto);
   }
 }
 

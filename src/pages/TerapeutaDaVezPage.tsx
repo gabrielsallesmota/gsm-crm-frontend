@@ -1,26 +1,56 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTerapeutaDaVezPanel } from "../hooks/useTerapeutaDaVezPanel";
 import { terapeutaDaVezPublicRepository } from "../repositories/api/TerapeutaDaVezPublicRepository";
 import {
   PAYMENT_METHOD_OPTIONS,
   type AbsentTherapist,
+  type Appointment,
+  type AppointmentStatus,
   type AttendanceRecord,
+  type CreateAppointmentInput,
   type HistoryPage,
   type PanelState,
   type PaymentAllocationInput,
   type PaymentMethod,
   type ProcedureOption,
   type QueueEntry,
+  type ReturnReservation,
   type ScheduleEntry,
   type Shift,
   type SpacePanelView,
+  type SpaceType,
+  type UpdateAppointmentInput,
   type WaitlistEntry,
 } from "../types/operations";
-import { formatPhone, onlyDigits } from "../utils/phone";
+import { buildWhatsappUrl } from "../utils/messageTemplates";
+import { formatPhone, onlyDigits, toWhatsappPhone } from "../utils/phone";
 import styles from "./TerapeutaDaVezPage.module.css";
 
-type Tab = "operacao" | "escala" | "historico";
-const TAB_LABEL: Record<Tab, string> = { operacao: "Operação", escala: "Escala", historico: "Histórico" };
+type Tab = "operacao" | "escala" | "historico" | "agenda";
+const TAB_LABEL: Record<Tab, string> = {
+  operacao: "Operação",
+  escala: "Escala",
+  historico: "Histórico",
+  agenda: "Agenda",
+};
+
+// Espelha `QUICK_RETURN_MAX_DURATION_MINUTES` do backend
+// (`domain.entities`) — procedimento até esse tamanho oferece a reserva
+// rápida de "volta mais tarde"; mais longo que isso direciona pra Agenda.
+const QUICK_RETURN_MAX_DURATION_MINUTES = 25;
+
+/** Dados já escolhidos na tentativa de "volta mais tarde" (nome, telefone,
+ * procedimento) que não era rápido o suficiente — repassados pra Agenda,
+ * que abre o modal de criar já com isto preenchido (pedido do usuário:
+ * "demais deve direcionar para a tela de agendamento... com os campos já
+ * pré preenchidos"). */
+interface AgendaPrefill {
+  clientName: string;
+  phone: string;
+  procedureId: string;
+  spaceType: SpaceType | null;
+  durationMinutes: number;
+}
 
 const SHIFT_ORDER: Shift[] = ["manha", "inter", "noturno"];
 const SHIFT_DOT: Record<Shift, string> = { manha: "#1E8A86", inter: "#C9A44C", noturno: "#0B4F4C" };
@@ -132,6 +162,8 @@ export function TerapeutaDaVezPage() {
     createWaitlistEntry,
     confirmWaitlistEntry,
     cancelWaitlistEntry,
+    createReturnReservation,
+    resolveReturnReservation,
   } = useTerapeutaDaVezPanel();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -490,6 +522,64 @@ export function TerapeutaDaVezPage() {
     }
   }
 
+  // ---- "Volta mais tarde" (reserva rápida) + Agenda -------------------------
+  // Pedido do usuário: procedimento RÁPIDO (Quick 15min, Shiatsu 25min) vira
+  // uma reserva com contagem regressiva + botão de WhatsApp; procedimento
+  // mais longo direciona pra Agenda, já com os campos preenchidos.
+  const [returnReservationOpen, setReturnReservationOpen] = useState(false);
+  const [returnReservationForm, setReturnReservationForm] = useState({
+    clientName: "",
+    phone: "",
+    procedureId: "",
+    minutes: 15,
+  });
+  const [agendaPrefill, setAgendaPrefill] = useState<AgendaPrefill | null>(null);
+
+  function openReturnReservationModal() {
+    setReturnReservationForm({ clientName: "", phone: "", procedureId: "", minutes: 15 });
+    setReturnReservationOpen(true);
+  }
+
+  async function confirmReturnReservation() {
+    const procedure = allProcedures.find((p) => p.id === returnReservationForm.procedureId);
+    if (!procedure || procedure.durationMinutes > QUICK_RETURN_MAX_DURATION_MINUTES) return;
+    try {
+      await createReturnReservation({
+        clientName: returnReservationForm.clientName.trim(),
+        phone: returnReservationForm.phone,
+        procedureId: returnReservationForm.procedureId,
+        minutes: returnReservationForm.minutes,
+      });
+      showToast(`${returnReservationForm.clientName.trim()}: reserva de retorno criada.`);
+      setReturnReservationOpen(false);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível criar a reserva.");
+    }
+  }
+
+  function redirectReturnReservationToAgenda() {
+    const procedure = allProcedures.find((p) => p.id === returnReservationForm.procedureId);
+    if (!procedure) return;
+    setAgendaPrefill({
+      clientName: returnReservationForm.clientName.trim(),
+      phone: returnReservationForm.phone,
+      procedureId: procedure.id,
+      spaceType: procedure.spaceRequirements[0]?.type ?? null,
+      durationMinutes: procedure.durationMinutes,
+    });
+    setReturnReservationOpen(false);
+    setActiveTab("agenda");
+  }
+
+  async function handleResolveReturnReservation(reservation: ReturnReservation, verb: string) {
+    try {
+      await resolveReturnReservation(reservation.id);
+      showToast(`${reservation.clientName}: ${verb}.`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível atualizar a reserva.");
+    }
+  }
+
   if (loading && !state) {
     return (
       <div className={styles.page} style={{ alignItems: "center", justifyContent: "center" }}>
@@ -539,6 +629,9 @@ export function TerapeutaDaVezPage() {
                 <div className={styles.queueSubtitle}>
                   Trilha: {state.pointsMin}–{state.pointsMax} pts
                 </div>
+                <button type="button" className={styles.smallBtn} onClick={openReturnReservationModal}>
+                  Reservar retorno
+                </button>
               </div>
               <div className={styles.queueList}>
                 {nobodyStartedYet && (
@@ -638,7 +731,13 @@ export function TerapeutaDaVezPage() {
               </div>
             </section>
 
-            <Sidebar state={state} waiting={waitingToStart} now={now} onCheckIn={requestCheckIn} />
+            <Sidebar
+              state={state}
+              waiting={waitingToStart}
+              now={now}
+              onCheckIn={requestCheckIn}
+              onResolveReturnReservation={handleResolveReturnReservation}
+            />
           </div>
 
           <InProgressSection entries={therapyEntries} now={now} onFinish={finishTherapy} />
@@ -648,6 +747,15 @@ export function TerapeutaDaVezPage() {
 
       {activeTab === "escala" && <EscalaTab state={state} showToast={showToast} />}
       {activeTab === "historico" && <HistoricoTab showToast={showToast} />}
+      {activeTab === "agenda" && (
+        <AgendaTab
+          state={state}
+          procedures={allProcedures}
+          showToast={showToast}
+          prefill={agendaPrefill}
+          onPrefillConsumed={() => setAgendaPrefill(null)}
+        />
+      )}
 
       {toastMsg && <div className={styles.toast}>{toastMsg}</div>}
 
@@ -660,6 +768,17 @@ export function TerapeutaDaVezPage() {
           ok={waitlistOk}
           onCancel={() => setWaitlistTarget(null)}
           onConfirm={() => void confirmWaitlist()}
+        />
+      )}
+
+      {returnReservationOpen && (
+        <ReturnReservationModal
+          form={returnReservationForm}
+          setForm={setReturnReservationForm}
+          procedures={allProcedures}
+          onCancel={() => setReturnReservationOpen(false)}
+          onConfirm={() => void confirmReturnReservation()}
+          onRedirectToAgenda={redirectReturnReservationToAgenda}
         />
       )}
 
@@ -792,7 +911,7 @@ function Header({ now }: { now: Date }) {
 
 // ---- Navegação em abas --------------------------------------------------------
 
-const TAB_ORDER: Tab[] = ["operacao", "escala", "historico"];
+const TAB_ORDER: Tab[] = ["operacao", "escala", "historico", "agenda"];
 
 function TabStrip({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
   return (
@@ -1623,6 +1742,551 @@ function HistoricoTab({ showToast }: { showToast: (msg: string) => void }) {
   );
 }
 
+// ---- Aba Agenda ---------------------------------------------------------------
+// Grade estilo Google Agenda (pedido do usuário) — colunas = espaços, linhas =
+// horário (passo de 30min). Não deixa marcar em cima de outro horário: o
+// backend garante (`find_conflicting_appointment`), mesma checagem que já
+// protege o cliente que chega sem hora marcada.
+
+const AGENDA_START_MINUTES = 480; // 08:00
+const AGENDA_END_MINUTES = 1320; // 22:00
+const AGENDA_SLOT_MINUTES = 30;
+const AGENDA_SLOT_COUNT = (AGENDA_END_MINUTES - AGENDA_START_MINUTES) / AGENDA_SLOT_MINUTES;
+
+const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
+  scheduled: "Agendado",
+  completed: "Concluído",
+  no_show: "Faltou",
+  cancelled: "Cancelado",
+};
+
+function combineDateAndTime(dateIso: string, time: string): Date {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  const minutes = hhmmToMinutes(time) ?? 0;
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1, Math.floor(minutes / 60), minutes % 60);
+}
+
+interface AgendaModalState {
+  mode: "create" | "edit";
+  appointment: Appointment | null;
+  spaceId: string;
+  date: string;
+  time: string;
+  durationMinutes: number;
+  clientName: string;
+  phone: string;
+  therapistId: string;
+  procedureId: string;
+  preferenceNote: string;
+}
+
+function blankAgendaForm(date: string, spaceId: string, time: string): AgendaModalState {
+  return {
+    mode: "create",
+    appointment: null,
+    spaceId,
+    date,
+    time,
+    durationMinutes: 30,
+    clientName: "",
+    phone: "",
+    therapistId: "",
+    procedureId: "",
+    preferenceNote: "",
+  };
+}
+
+function editAgendaForm(appointment: Appointment): AgendaModalState {
+  const start = new Date(appointment.startAt);
+  const end = new Date(appointment.endAt);
+  return {
+    mode: "edit",
+    appointment,
+    spaceId: appointment.spaceId,
+    date: isoDate(start),
+    time: minutesToHHMM(start.getHours() * 60 + start.getMinutes()),
+    durationMinutes: Math.max(5, Math.round((end.getTime() - start.getTime()) / 60000)),
+    clientName: appointment.clientName,
+    phone: appointment.clientPhone,
+    therapistId: appointment.therapistId ?? "",
+    procedureId: appointment.procedureId ?? "",
+    preferenceNote: appointment.preferenceNote ?? "",
+  };
+}
+
+function AgendaTab({
+  state,
+  procedures,
+  showToast,
+  prefill,
+  onPrefillConsumed,
+}: {
+  state: PanelState;
+  procedures: ProcedureOption[];
+  showToast: (msg: string) => void;
+  prefill: AgendaPrefill | null;
+  onPrefillConsumed: () => void;
+}) {
+  const [day, setDay] = useState(() => new Date());
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [totals, setTotals] = useState({ total: 0, noShowCount: 0 });
+  const [modal, setModal] = useState<AgendaModalState | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const dayIso = isoDate(day);
+  const spaces = state.spaces;
+
+  // Terapeutas "conhecidos" hoje (fila + ausentes escalados) — não existe
+  // endpoint público de "todos os terapeutas" fora da gestão (senha), então
+  // esta é a melhor aproximação disponível sem pedir senha na Agenda.
+  const knownTherapists = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const q of state.queue) map.set(q.therapistId, q.name);
+    for (const t of state.absent) map.set(t.id, t.name);
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [state.queue, state.absent]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const result = await terapeutaDaVezPublicRepository.listAppointmentsForDay(dayIso);
+      setAppointments(result.appointments);
+      setTotals({ total: result.total, noShowCount: result.noShowCount });
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Não foi possível carregar a Agenda.");
+    } finally {
+      setLoading(false);
+    }
+  }, [dayIso]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Prefill vindo de "volta mais tarde" (procedimento não era rápido o
+  // suficiente) — abre já o modal de criar com nome/telefone/procedimento.
+  useEffect(() => {
+    if (!prefill) return;
+    const today = new Date();
+    setDay(today);
+    setModal({
+      ...blankAgendaForm(isoDate(today), spaces[0]?.id ?? "", "10:00"),
+      clientName: prefill.clientName,
+      phone: prefill.phone,
+      procedureId: prefill.procedureId,
+      durationMinutes: prefill.durationMinutes,
+    });
+    onPrefillConsumed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
+
+  function openCreate(spaceId: string, slotMinutes: number) {
+    setModal(blankAgendaForm(dayIso, spaceId, minutesToHHMM(slotMinutes)));
+  }
+
+  function openEdit(appointment: Appointment) {
+    setModal(editAgendaForm(appointment));
+  }
+
+  async function handleSave(form: AgendaModalState) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const startAt = combineDateAndTime(form.date, form.time);
+      const endAt = new Date(startAt.getTime() + form.durationMinutes * 60000);
+      if (form.mode === "create") {
+        const input: CreateAppointmentInput = {
+          clientName: form.clientName.trim(),
+          phone: form.phone,
+          spaceId: form.spaceId,
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+          ...(form.therapistId ? { therapistId: form.therapistId } : {}),
+          ...(form.procedureId ? { procedureId: form.procedureId } : {}),
+          ...(form.preferenceNote.trim() ? { preferenceNote: form.preferenceNote.trim() } : {}),
+        };
+        await terapeutaDaVezPublicRepository.createAppointment(input);
+        showToast(`${form.clientName.trim()}: agendamento criado.`);
+      } else if (form.appointment) {
+        // Nota: não existe "clearProcedure" no backend (mesma convenção de
+        // `clearTherapist`, mas só pra terapeuta) — dá pra TROCAR de
+        // procedimento, não pra voltar a "nenhum" depois de definido.
+        const input: UpdateAppointmentInput = {
+          spaceId: form.spaceId,
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+          preferenceNote: form.preferenceNote,
+          ...(form.procedureId ? { procedureId: form.procedureId } : {}),
+          ...(form.therapistId ? { therapistId: form.therapistId } : { clearTherapist: true }),
+        };
+        await terapeutaDaVezPublicRepository.updateAppointment(form.appointment.id, input);
+        showToast(`${form.clientName.trim()}: agendamento atualizado.`);
+      }
+      setModal(null);
+      await load();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível salvar o agendamento.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleNoShow(appointment: Appointment) {
+    try {
+      await terapeutaDaVezPublicRepository.markAppointmentNoShow(appointment.id);
+      showToast(`${appointment.clientName}: marcado como falta.`);
+      setModal(null);
+      await load();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível marcar falta.");
+    }
+  }
+
+  async function handleDelete(appointment: Appointment) {
+    if (!confirm(`Excluir o agendamento de ${appointment.clientName}?`)) return;
+    try {
+      await terapeutaDaVezPublicRepository.deleteAppointment(appointment.id);
+      showToast("Agendamento excluído.");
+      setModal(null);
+      await load();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível excluir o agendamento.");
+    }
+  }
+
+  const dayLabel = day.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+  });
+  const todayIso = isoDate(new Date());
+
+  const slots = useMemo(
+    () =>
+      Array.from(
+        { length: AGENDA_SLOT_COUNT },
+        (_, i) => AGENDA_START_MINUTES + i * AGENDA_SLOT_MINUTES,
+      ),
+    [],
+  );
+
+  return (
+    <div className={styles.escalaTab}>
+      <div className={styles.escalaToolbar}>
+        <button type="button" className={styles.ghostBtn} onClick={() => setDay((d) => addDays(d, -1))}>
+          ← Dia anterior
+        </button>
+        <span className={styles.escalaWeekLabel} style={{ textTransform: "capitalize" }}>
+          {dayLabel}
+        </span>
+        {dayIso !== todayIso && (
+          <button type="button" className={styles.ghostBtn} onClick={() => setDay(new Date())}>
+            Hoje
+          </button>
+        )}
+        <button type="button" className={styles.ghostBtn} onClick={() => setDay((d) => addDays(d, 1))}>
+          Próximo dia →
+        </button>
+        <span className={styles.escalaWeekLabel} style={{ marginLeft: "auto", fontWeight: 600 }}>
+          {totals.total} agendamento(s) hoje · {totals.noShowCount} faltaram
+        </span>
+      </div>
+
+      {loadError && <div className={styles.escalaError}>{loadError}</div>}
+      {loading && appointments.length === 0 && (
+        <div className={styles.escalaLoading}>Carregando Agenda…</div>
+      )}
+      {!loading && spaces.length === 0 && (
+        <EmptyState
+          title="Nenhum espaço cadastrado."
+          hint="Cadastre espaços na gestão antes de usar a Agenda."
+        />
+      )}
+
+      {spaces.length > 0 && (
+        <div className={styles.agendaGridWrap}>
+          <div
+            className={styles.agendaGrid}
+            style={{
+              gridTemplateColumns: `72px repeat(${spaces.length}, minmax(140px, 1fr))`,
+              gridTemplateRows: `40px repeat(${slots.length}, 34px)`,
+            }}
+          >
+            <div className={styles.agendaHeaderCorner} />
+            {spaces.map((s) => (
+              <div key={s.id} className={styles.agendaHeaderCell}>
+                {s.name}
+              </div>
+            ))}
+            {slots.map((minutes, rowIndex) => (
+              <Fragment key={minutes}>
+                <div
+                  className={styles.agendaTimeCell}
+                  style={{ gridRow: rowIndex + 2, gridColumn: 1 }}
+                >
+                  {minutes % 60 === 0 ? minutesToHHMM(minutes) : ""}
+                </div>
+                {spaces.map((s, colIndex) => (
+                  <div
+                    key={s.id}
+                    className={styles.agendaSlotCell}
+                    style={{ gridRow: rowIndex + 2, gridColumn: colIndex + 2 }}
+                    onClick={() => openCreate(s.id, minutes)}
+                  />
+                ))}
+              </Fragment>
+            ))}
+            {appointments.map((a) => {
+              const colIndex = spaces.findIndex((s) => s.id === a.spaceId);
+              if (colIndex === -1) return null;
+              const start = new Date(a.startAt);
+              const startMinutes = start.getHours() * 60 + start.getMinutes();
+              const rowIndex = Math.round(
+                (startMinutes - AGENDA_START_MINUTES) / AGENDA_SLOT_MINUTES,
+              );
+              if (rowIndex < 0 || rowIndex >= slots.length) return null;
+              const durationMinutes = Math.max(
+                AGENDA_SLOT_MINUTES,
+                Math.round((new Date(a.endAt).getTime() - start.getTime()) / 60000),
+              );
+              const rowSpan = Math.max(1, Math.ceil(durationMinutes / AGENDA_SLOT_MINUTES));
+              const blockClass =
+                a.status === "no_show"
+                  ? styles.agendaBlockNoShow
+                  : a.status === "cancelled"
+                    ? styles.agendaBlockCancelled
+                    : "";
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`${styles.agendaBlock} ${blockClass}`}
+                  style={{ gridRow: `${rowIndex + 2} / span ${rowSpan}`, gridColumn: colIndex + 2 }}
+                  onClick={() => openEdit(a)}
+                >
+                  <span className={styles.agendaBlockName}>{a.clientName}</span>
+                  <span className={styles.agendaBlockMeta}>
+                    {formatHM(a.startAt)}–{formatHM(a.endAt)}
+                    {a.procedureName ? ` · ${a.procedureName}` : ""}
+                    {a.therapistName ? ` · ${a.therapistName}` : ""}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {modal && (
+        <AgendaAppointmentModal
+          form={modal}
+          setForm={(updater) => setModal((prev) => (prev ? updater(prev) : prev))}
+          spaces={spaces}
+          therapists={knownTherapists}
+          procedures={procedures}
+          saving={saving}
+          onCancel={() => setModal(null)}
+          onSave={() => void handleSave(modal)}
+          onNoShow={modal.appointment ? () => void handleNoShow(modal.appointment!) : undefined}
+          onDelete={modal.appointment ? () => void handleDelete(modal.appointment!) : undefined}
+        />
+      )}
+    </div>
+  );
+}
+
+function AgendaAppointmentModal({
+  form,
+  setForm,
+  spaces,
+  therapists,
+  procedures,
+  saving,
+  onCancel,
+  onSave,
+  onNoShow,
+  onDelete,
+}: {
+  form: AgendaModalState;
+  setForm: (updater: (f: AgendaModalState) => AgendaModalState) => void;
+  spaces: SpacePanelView[];
+  therapists: { id: string; name: string }[];
+  procedures: ProcedureOption[];
+  saving: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+  onNoShow?: () => void;
+  onDelete?: () => void;
+}) {
+  const ok =
+    form.clientName.trim().length > 2 &&
+    onlyDigits(form.phone).length >= 10 &&
+    form.spaceId !== "" &&
+    form.durationMinutes > 0 &&
+    hhmmToMinutes(form.time) !== null;
+
+  function selectProcedure(procedureId: string) {
+    const procedure = procedures.find((p) => p.id === procedureId);
+    setForm((f) => ({
+      ...f,
+      procedureId,
+      durationMinutes: procedure ? procedure.durationMinutes : f.durationMinutes,
+    }));
+  }
+
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
+        <div>
+          <div className={styles.modalEyebrow}>AGENDA</div>
+          <div className={styles.modalTitle}>
+            {form.mode === "create" ? "Novo agendamento" : form.appointment?.clientName}
+          </div>
+          {form.appointment && (
+            <div className={styles.modalSub}>
+              Status: {APPOINTMENT_STATUS_LABEL[form.appointment.status]}
+            </div>
+          )}
+        </div>
+        <div className={styles.modalDivider} />
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>NOME DO CLIENTE</span>
+          <input
+            className={styles.fieldInput}
+            value={form.clientName}
+            onChange={(e) => setForm((f) => ({ ...f, clientName: e.target.value }))}
+          />
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>TELEFONE</span>
+          <input
+            className={styles.fieldInput}
+            inputMode="tel"
+            value={form.phone}
+            onChange={(e) => setForm((f) => ({ ...f, phone: formatPhone(e.target.value) }))}
+          />
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>ESPAÇO</span>
+          <select
+            className={styles.fieldInput}
+            value={form.spaceId}
+            onChange={(e) => setForm((f) => ({ ...f, spaceId: e.target.value }))}
+          >
+            {spaces.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>TERAPEUTA (OPCIONAL)</span>
+          <select
+            className={styles.fieldInput}
+            value={form.therapistId}
+            onChange={(e) => setForm((f) => ({ ...f, therapistId: e.target.value }))}
+          >
+            <option value="">Sem preferência</option>
+            {therapists.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>PROCEDIMENTO (OPCIONAL)</span>
+          <select
+            className={styles.fieldInput}
+            value={form.procedureId}
+            onChange={(e) => selectProcedure(e.target.value)}
+          >
+            <option value="">A definir</option>
+            {procedures.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.durationLabel})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <div className={styles.field} style={{ flex: 1 }}>
+            <span className={styles.fieldLabel}>DATA</span>
+            <input
+              className={styles.fieldInput}
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+            />
+          </div>
+          <div className={styles.field} style={{ flex: 1 }}>
+            <span className={styles.fieldLabel}>HORÁRIO</span>
+            <input
+              className={styles.fieldInput}
+              type="time"
+              value={form.time}
+              onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+            />
+          </div>
+          <div className={styles.field} style={{ flex: 1 }}>
+            <span className={styles.fieldLabel}>DURAÇÃO (MIN)</span>
+            <input
+              className={styles.fieldInput}
+              type="number"
+              min={5}
+              step={5}
+              value={form.durationMinutes}
+              onChange={(e) => setForm((f) => ({ ...f, durationMinutes: Number(e.target.value) || 0 }))}
+            />
+          </div>
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>PREFERÊNCIA (OPCIONAL)</span>
+          <input
+            className={styles.fieldInput}
+            placeholder="Ex.: prefere terapeuta homem"
+            value={form.preferenceNote}
+            onChange={(e) => setForm((f) => ({ ...f, preferenceNote: e.target.value }))}
+          />
+        </div>
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.ghostBtn} onClick={onCancel} style={{ flex: 1 }}>
+            Cancelar
+          </button>
+          {onDelete && (
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              onClick={onDelete}
+              style={{ flex: 1, color: "#B23B3B" }}
+            >
+              Excluir
+            </button>
+          )}
+          {onNoShow && (
+            <button type="button" className={styles.ghostBtn} onClick={onNoShow} style={{ flex: 1 }}>
+              Marcar falta
+            </button>
+          )}
+          <button
+            type="button"
+            className={styles.smallBtn}
+            disabled={!ok || saving}
+            onClick={onSave}
+            style={{ flex: 2, padding: "14px 12px" }}
+          >
+            {form.mode === "create" ? "Criar agendamento" : "Salvar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Registrar (ou corrigir) a forma de pagamento de uma linha do Histórico —
  * mesma mecânica de split/soma exata do `PaymentModal` da finalização, só
  * que operando sobre um `AttendanceRecord` do Histórico — que pode estar
@@ -1830,11 +2494,13 @@ function Sidebar({
   waiting,
   now,
   onCheckIn,
+  onResolveReturnReservation,
 }: {
   state: PanelState;
   waiting: AbsentTherapist[];
   now: Date;
   onCheckIn: (t: AbsentTherapist) => void;
+  onResolveReturnReservation: (reservation: ReturnReservation, verb: string) => void;
 }) {
   const occupiedSpaces = state.spaces.filter((s) => s.state !== "free");
   return (
@@ -1850,6 +2516,49 @@ function Sidebar({
               </button>
             </div>
           ))}
+        </div>
+      )}
+      {state.returnReservations.length > 0 && (
+        <div className={styles.sidebarBlock}>
+          <span className={styles.sidebarTitle}>Volta mais tarde</span>
+          {state.returnReservations.map((r) => {
+            const minutes = remainingMinutes(r.returnAt, now);
+            const message = `Faltam ${minutes} minutos para sua massagem!`;
+            return (
+              <div key={r.id} className={styles.returnReservationLine}>
+                <span>
+                  {r.clientName} · {r.procedureName}
+                </span>
+                <span style={{ color: minutes !== null && minutes <= 0 ? "#B23B3B" : "#C9A44C" }}>
+                  {minutes !== null && minutes > 0 ? `volta em ${minutes} min` : "já devia ter voltado"}
+                </span>
+                <div className={styles.returnReservationActions}>
+                  <a
+                    className={styles.ghostBtn}
+                    href={buildWhatsappUrl(toWhatsappPhone(r.clientPhone), message)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    💬 WhatsApp
+                  </a>
+                  <button
+                    type="button"
+                    className={styles.smallBtn}
+                    onClick={() => onResolveReturnReservation(r, "cliente voltou")}
+                  >
+                    Cliente voltou
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.ghostBtn}
+                    onClick={() => onResolveReturnReservation(r, "reserva cancelada")}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
       {occupiedSpaces.length > 0 && (
@@ -2062,6 +2771,136 @@ function WaitlistModal({
           >
             Reservar
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Modal: "volta mais tarde" -----------------------------------------------
+// Procedimento RÁPIDO (Quick 15min, Shiatsu 25min) ganha reserva direta com
+// contagem regressiva; qualquer coisa mais longa direciona pra Agenda, já
+// com nome/telefone/procedimento preenchidos (pedido do usuário).
+
+interface ReturnReservationForm {
+  clientName: string;
+  phone: string;
+  procedureId: string;
+  minutes: number;
+}
+
+function ReturnReservationModal({
+  form,
+  setForm,
+  procedures,
+  onCancel,
+  onConfirm,
+  onRedirectToAgenda,
+}: {
+  form: ReturnReservationForm;
+  setForm: (updater: (f: ReturnReservationForm) => ReturnReservationForm) => void;
+  procedures: ProcedureOption[];
+  onCancel: () => void;
+  onConfirm: () => void;
+  onRedirectToAgenda: () => void;
+}) {
+  const procedure = procedures.find((p) => p.id === form.procedureId) ?? null;
+  const eligible = procedure ? procedure.durationMinutes <= QUICK_RETURN_MAX_DURATION_MINUTES : null;
+  const ok =
+    form.clientName.trim().length > 2 &&
+    onlyDigits(form.phone).length >= 10 &&
+    procedure !== null &&
+    form.minutes > 0;
+
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
+        <div>
+          <div className={styles.modalEyebrow}>VOLTA MAIS TARDE</div>
+          <div className={styles.modalTitle}>Reservar retorno</div>
+          <div className={styles.modalSub}>
+            Cliente prefere voltar depois em vez de esperar sentado — avisamos pelo WhatsApp
+            perto da hora.
+          </div>
+        </div>
+        <div className={styles.modalDivider} />
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>NOME DO CLIENTE</span>
+          <input
+            className={styles.fieldInput}
+            placeholder="Digite o nome completo"
+            value={form.clientName}
+            onChange={(e) => setForm((f) => ({ ...f, clientName: e.target.value }))}
+          />
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>TELEFONE</span>
+          <input
+            className={styles.fieldInput}
+            placeholder="(00) 00000-0000"
+            inputMode="tel"
+            value={form.phone}
+            onChange={(e) => setForm((f) => ({ ...f, phone: formatPhone(e.target.value) }))}
+          />
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>PROCEDIMENTO</span>
+          <select
+            className={styles.fieldInput}
+            value={form.procedureId}
+            onChange={(e) => setForm((f) => ({ ...f, procedureId: e.target.value }))}
+          >
+            <option value="">Selecione…</option>
+            {procedures.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.durationLabel})
+              </option>
+            ))}
+          </select>
+        </div>
+        {eligible === true && (
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>VOLTA EM QUANTOS MINUTOS?</span>
+            <input
+              className={styles.fieldInput}
+              type="number"
+              min={1}
+              step={5}
+              value={form.minutes}
+              onChange={(e) => setForm((f) => ({ ...f, minutes: Number(e.target.value) || 0 }))}
+            />
+          </div>
+        )}
+        {eligible === false && (
+          <div className={styles.modalSub} style={{ color: "#9A7426" }}>
+            {procedure!.name} não é rápido o suficiente pra reserva direta — vamos te direcionar
+            pra Agenda pra marcar um horário certo.
+          </div>
+        )}
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.ghostBtn} onClick={onCancel} style={{ flex: 1 }}>
+            Cancelar
+          </button>
+          {eligible === false ? (
+            <button
+              type="button"
+              className={styles.smallBtn}
+              onClick={onRedirectToAgenda}
+              style={{ flex: 2, padding: "14px 12px" }}
+            >
+              Ir para Agenda
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={styles.smallBtn}
+              disabled={!ok}
+              onClick={onConfirm}
+              style={{ flex: 2, padding: "14px 12px" }}
+            >
+              Confirmar reserva
+            </button>
+          )}
         </div>
       </div>
     </div>

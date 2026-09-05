@@ -1,9 +1,11 @@
 import { terapeutaDaVezPublicRepository } from "../repositories/api/TerapeutaDaVezPublicRepository";
 import type {
   AttendanceAction,
+  CreateReturnReservationInput,
   CreateWaitlistEntryInput,
   PanelState,
   PaymentAllocationInput,
+  ReturnReservationAction,
   Shift,
   TherapistAction,
   WaitlistAction,
@@ -76,6 +78,14 @@ export class TerapeutaDaVezPanelService {
 
   cancelWaitlistEntry(entryId: string): Promise<PanelState> {
     return terapeutaDaVezPublicRepository.cancelWaitlistEntry(entryId);
+  }
+
+  createReturnReservation(input: CreateReturnReservationInput): Promise<ReturnReservationAction> {
+    return terapeutaDaVezPublicRepository.createReturnReservation(input);
+  }
+
+  resolveReturnReservation(reservationId: string): Promise<PanelState> {
+    return terapeutaDaVezPublicRepository.resolveReturnReservation(reservationId);
   }
 }
 

@@ -374,6 +374,9 @@ export interface PanelState {
   /** Resumo "valores registrados" do dia, por forma de pagamento — só
    * conferência operacional com o Graces, não é faturamento contábil. */
   paymentsToday: PaymentSummaryEntry[];
+  /** "Volta mais tarde" — ver `ReturnReservation`. Mostrada no painel
+   * principal (não só na Agenda), com contagem regressiva ao vivo. */
+  returnReservations: ReturnReservation[];
 }
 
 export interface AttendanceRecord {
@@ -408,6 +411,92 @@ export interface AttendanceAction {
 
 export interface WaitlistAction {
   entry: WaitlistEntry;
+  state: PanelState;
+}
+
+// ---- Agenda do dia + "volta mais tarde" -------------------------------------
+// Grade estilo Google Agenda (colunas = espaços, linhas = horário) — não deixa
+// marcar em cima de outro horário, igual já vale pro cliente que chega sem
+// hora marcada (o backend cruza os dois: ver `find_conflicting_appointment`/
+// `find_conflicting_space`). "Volta mais tarde" é uma reserva RÁPIDA (sem
+// espaço/terapeuta) só pra procedimento curto — o resto é direcionado pra
+// Agenda de verdade, pré-preenchida.
+
+export type AppointmentStatus = "scheduled" | "completed" | "no_show" | "cancelled";
+
+export interface Appointment {
+  id: string;
+  clientName: string;
+  clientPhone: string;
+  spaceId: string;
+  spaceName: string;
+  startAt: string;
+  endAt: string;
+  status: AppointmentStatus;
+  statusLabel: string;
+  /** `null` = sem preferência, a recepção resolve na hora (ver `preferenceNote`). */
+  therapistId: string | null;
+  therapistName: string | null;
+  procedureId: string | null;
+  procedureName: string | null;
+  preferenceNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAppointmentInput {
+  clientName: string;
+  phone: string;
+  spaceId: string;
+  startAt: string;
+  endAt: string;
+  therapistId?: string;
+  procedureId?: string;
+  preferenceNote?: string;
+}
+
+/** `undefined` em cada campo quer dizer "não mexe" — mesma convenção do
+ * resto do módulo. `clearTherapist: true` existe à parte porque "sem
+ * terapeuta definido" é um estado de verdade que só omitir `therapistId`
+ * não consegue expressar. */
+export interface UpdateAppointmentInput {
+  spaceId?: string;
+  startAt?: string;
+  endAt?: string;
+  therapistId?: string;
+  clearTherapist?: boolean;
+  procedureId?: string;
+  preferenceNote?: string;
+  status?: AppointmentStatus;
+}
+
+export interface AppointmentsForDay {
+  appointments: Appointment[];
+  total: number;
+  noShowCount: number;
+}
+
+/** Ver docstring de `PanelState.returnReservations`. */
+export interface ReturnReservation {
+  id: string;
+  clientName: string;
+  clientPhone: string;
+  procedureId: string;
+  procedureName: string;
+  returnAt: string;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface CreateReturnReservationInput {
+  clientName: string;
+  phone: string;
+  procedureId: string;
+  minutes: number;
+}
+
+export interface ReturnReservationAction {
+  reservation: ReturnReservation;
   state: PanelState;
 }
 

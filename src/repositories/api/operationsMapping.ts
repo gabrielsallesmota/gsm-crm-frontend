@@ -7,6 +7,8 @@
  */
 import type {
   AbsentTherapist,
+  Appointment,
+  AppointmentsForDay,
   AttendanceAction,
   AttendanceRecord,
   BusinessHoursEntry,
@@ -21,6 +23,8 @@ import type {
   Procedure,
   ProcedureOption,
   QueueEntry,
+  ReturnReservation,
+  ReturnReservationAction,
   ScheduleEntry,
   Shift,
   ShiftHoursEntry,
@@ -238,6 +242,47 @@ export interface WaitlistEntryDto {
   available_at: string | null;
 }
 
+export interface AppointmentDto {
+  id: string;
+  client_name: string;
+  client_phone: string;
+  space_id: string;
+  space_name: string;
+  start_at: string;
+  end_at: string;
+  status: string;
+  status_label: string;
+  therapist_id: string | null;
+  therapist_name: string | null;
+  procedure_id: string | null;
+  procedure_name: string | null;
+  preference_note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AppointmentsForDayDto {
+  appointments: AppointmentDto[];
+  total: number;
+  no_show_count: number;
+}
+
+export interface ReturnReservationDto {
+  id: string;
+  client_name: string;
+  client_phone: string;
+  procedure_id: string;
+  procedure_name: string;
+  return_at: string;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface ReturnReservationActionDto {
+  reservation: ReturnReservationDto;
+  state: PanelStateDto;
+}
+
 export interface PanelStateDto {
   server_time: string;
   points_min: number;
@@ -258,6 +303,7 @@ export interface PanelStateDto {
   next_open_at: string | null;
   waitlist: WaitlistEntryDto[];
   payments_today: PaymentSummaryEntryDto[];
+  return_reservations: ReturnReservationDto[];
 }
 
 export interface AttendanceDto {
@@ -557,6 +603,52 @@ export function toWaitlistAction(dto: WaitlistActionDto): WaitlistAction {
   return { entry: toWaitlistEntry(dto.entry), state: toPanelState(dto.state) };
 }
 
+export function toAppointment(dto: AppointmentDto): Appointment {
+  return {
+    id: dto.id,
+    clientName: dto.client_name,
+    clientPhone: dto.client_phone,
+    spaceId: dto.space_id,
+    spaceName: dto.space_name,
+    startAt: dto.start_at,
+    endAt: dto.end_at,
+    status: dto.status as Appointment["status"],
+    statusLabel: dto.status_label,
+    therapistId: dto.therapist_id,
+    therapistName: dto.therapist_name,
+    procedureId: dto.procedure_id,
+    procedureName: dto.procedure_name,
+    preferenceNote: dto.preference_note,
+    createdAt: dto.created_at,
+    updatedAt: dto.updated_at,
+  };
+}
+
+export function toAppointmentsForDay(dto: AppointmentsForDayDto): AppointmentsForDay {
+  return {
+    appointments: dto.appointments.map(toAppointment),
+    total: dto.total,
+    noShowCount: dto.no_show_count,
+  };
+}
+
+export function toReturnReservation(dto: ReturnReservationDto): ReturnReservation {
+  return {
+    id: dto.id,
+    clientName: dto.client_name,
+    clientPhone: dto.client_phone,
+    procedureId: dto.procedure_id,
+    procedureName: dto.procedure_name,
+    returnAt: dto.return_at,
+    createdAt: dto.created_at,
+    resolvedAt: dto.resolved_at,
+  };
+}
+
+export function toReturnReservationAction(dto: ReturnReservationActionDto): ReturnReservationAction {
+  return { reservation: toReturnReservation(dto.reservation), state: toPanelState(dto.state) };
+}
+
 export function toPanelState(dto: PanelStateDto): PanelState {
   const groups: Record<string, ProcedureOption[]> = {};
   for (const [category, items] of Object.entries(dto.procedure_groups)) {
@@ -582,6 +674,7 @@ export function toPanelState(dto: PanelStateDto): PanelState {
     nextOpenAt: dto.next_open_at,
     waitlist: dto.waitlist.map(toWaitlistEntry),
     paymentsToday: dto.payments_today.map(toPaymentSummaryEntry),
+    returnReservations: dto.return_reservations.map(toReturnReservation),
   };
 }
 

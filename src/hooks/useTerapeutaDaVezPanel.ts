@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { terapeutaDaVezPanelService } from "../services/TerapeutaDaVezPanelService";
 import type {
   AttendanceRecord,
+  CreateReturnReservationInput,
   CreateWaitlistEntryInput,
   PanelState,
   PaymentAllocationInput,
+  ReturnReservation,
   Shift,
   Therapist,
   WaitlistEntry,
@@ -57,6 +59,11 @@ export interface TerapeutaDaVezPanel {
   createWaitlistEntry: (input: CreateWaitlistEntryInput) => Promise<WaitlistEntry>;
   confirmWaitlistEntry: (entryId: string) => Promise<AttendanceRecord>;
   cancelWaitlistEntry: (entryId: string) => Promise<void>;
+  /** "Volta mais tarde" rápida — mostrada no painel principal (sidebar),
+   * por isso passa pelo hook (igual fila de espera) em vez de ir direto
+   * pelo repository como Escala/Histórico. */
+  createReturnReservation: (input: CreateReturnReservationInput) => Promise<ReturnReservation>;
+  resolveReturnReservation: (reservationId: string) => Promise<void>;
 }
 
 /** Próximo instante em que ALGUMA coisa do painel muda sozinha, sem clique
@@ -77,6 +84,9 @@ function nextTransitionAt(state: PanelState): number | null {
   }
   for (const w of state.waitlist) {
     if (w.availableAt) candidates.push(w.availableAt);
+  }
+  for (const r of state.returnReservations) {
+    candidates.push(r.returnAt);
   }
   if (candidates.length === 0) return null;
   return Math.min(...candidates.map((iso) => new Date(iso).getTime()));
@@ -219,6 +229,17 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     setState(next);
   }
 
+  async function createReturnReservation(input: CreateReturnReservationInput) {
+    const result = await terapeutaDaVezPanelService.createReturnReservation(input);
+    setState(result.state);
+    return result.reservation;
+  }
+
+  async function resolveReturnReservation(reservationId: string) {
+    const next = await terapeutaDaVezPanelService.resolveReturnReservation(reservationId);
+    setState(next);
+  }
+
   return {
     state,
     loading,
@@ -235,5 +256,7 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     createWaitlistEntry,
     confirmWaitlistEntry,
     cancelWaitlistEntry,
+    createReturnReservation,
+    resolveReturnReservation,
   };
 }
