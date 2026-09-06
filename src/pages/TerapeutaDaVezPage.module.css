@@ -1007,10 +1007,11 @@
   cursor: not-allowed;
 }
 
-/* Espaço "livre agora" mas com reserva futura chegando — continua
-   selecionável (o backend valida de verdade se bate com o horário deste
-   combo), mas precisa se destacar visualmente do resto pra quem está
-   escolhendo, não só falhar depois com um erro. */
+/* Espaço "livre agora" com reserva futura chegando, mas que ainda cabe
+   dentro do horário deste procedimento (a duração termina antes da
+   reserva começar) — só um "de olho nisso", não impede escolher. Quando
+   NÃO cabe, o espaço já vem desabilitado (`.spaceOptionDisabled`) — ver
+   `conflictsWithReservation` no `WizardModal`. */
 .spaceOptionWarning {
   border-color: #c9a44c;
   border-left-color: #c9a44c;

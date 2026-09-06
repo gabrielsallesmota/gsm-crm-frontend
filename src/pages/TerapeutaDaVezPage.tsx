@@ -3569,11 +3569,10 @@ function WizardModal({
   const plannedEnd = chosenProcedure ? new Date(now.getTime() + chosenProcedure.durationMinutes * 60000) : null;
 
   // Combo de 2+ trechos: espaço escolhido pro trecho 1, candidato a "ficar
-  // nele o atendimento todo" (pedido do usuário). `mergeSpaceAvailable` é
-  // só uma dica visual — livre agora e sem reserva chegando antes do fim
-  // da duração TOTAL do combo; o backend valida de verdade na hora de
-  // confirmar (`StartTherapyUseCase`), então mesmo "não disponível" aqui
-  // ainda deixa tentar.
+  // nele o atendimento todo" (pedido do usuário). `mergeSpaceAvailable`
+  // bloqueia o botão de mesclar quando a reserva futura deste espaço bate
+  // com a duração TOTAL do combo — o backend segue validando de novo na
+  // hora de confirmar (`StartTherapyUseCase`), como garantia final.
   const mergeCandidate =
     chosenSpaceIds[0] != null
       ? (spaceOptionsByRequirement[0]?.find((s) => s.id === chosenSpaceIds[0]) ?? null)
@@ -3730,6 +3729,17 @@ function WizardModal({
               // usuário: "1h na maca e depois 30min na poltrona, mas o
               // cliente pediu pra ficar na maca").
               if (mergeIntoSingleSpace && i > 0) return null;
+              // Duração real deste trecho (a TOTAL do combo quando
+              // mesclado num espaço só) e quantos minutos faltam pra ele
+              // COMEÇAR — trechos são sequenciais, então o 2º só começa
+              // quando o 1º termina, e assim por diante.
+              const segmentMinutes = mergeIntoSingleSpace
+                ? chosenProcedure.durationMinutes
+                : req.minutes;
+              let startOffsetMinutes = 0;
+              for (let j = 0; j < i; j++) {
+                startOffsetMinutes += chosenProcedure.spaceRequirements[j]?.minutes ?? 0;
+              }
               return (
               <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <span style={{ fontSize: 10, letterSpacing: 1.6, color: "#9A7426" }}>
@@ -3738,17 +3748,25 @@ function WizardModal({
                 <div className={styles.spaceGrid}>
                   {spaceOptionsByRequirement[i]?.map((s) => {
                     const selected = chosenSpaceIds[i] === s.id;
+                    const minutesUntilOccupied = s.occupiesAt
+                      ? remainingMinutes(s.occupiesAt, now)
+                      : null;
+                    // "Livre agora" mas com reserva futura chegando — dá pra
+                    // saber com certeza se ela bate com o horário deste
+                    // trecho (comparando com a duração/posição dele no
+                    // combo), então já BLOQUEIA de vez em vez de só avisar
+                    // e deixar falhar depois no "Iniciar terapia" (pedido
+                    // do usuário). O backend continua validando de novo no
+                    // fim, como garantia final.
+                    const conflictsWithReservation =
+                      minutesUntilOccupied !== null &&
+                      startOffsetMinutes + segmentMinutes > minutesUntilOccupied;
                     // Livre em geral, OU já selecionado num trecho anterior/posterior
                     // deste mesmo procedimento (reaproveitar o mesmo espaço em
                     // trechos não sequenciais no tempo é permitido pelo backend).
-                    const disabled = s.state !== "free" && !selected;
-                    // "Livre agora" mas com reserva futura chegando (outro
-                    // atendimento já em andamento vai usar este espaço daqui a
-                    // pouco) — não dá pra saber com certeza no front se bate com
-                    // o horário deste combo (o backend é quem valida de verdade
-                    // no fim), mas o recepcionista PRECISA ver isso antes de
-                    // escolher, não só depois de um erro — pedido explícito.
-                    const reservedSoon = s.state === "free" && !!s.occupiesAt;
+                    const disabled =
+                      (s.state !== "free" && !selected) || (conflictsWithReservation && !selected);
+                    const reservedSoon = s.state === "free" && !!s.occupiesAt && !conflictsWithReservation;
                     return (
                       <button
                         key={s.id}
@@ -3758,11 +3776,22 @@ function WizardModal({
                         disabled={disabled}
                       >
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{s.name}</div>
-                        <div style={{ fontSize: 11.5, color: reservedSoon ? "#9A7426" : "#5A5A5A" }}>
-                          {s.state === "free" && !reservedSoon && "Disponível agora"}
+                        <div
+                          style={{
+                            fontSize: 11.5,
+                            color: conflictsWithReservation
+                              ? "#B23B3B"
+                              : reservedSoon
+                                ? "#9A7426"
+                                : "#5A5A5A",
+                          }}
+                        >
+                          {s.state === "free" && !s.occupiesAt && "Disponível agora"}
                           {s.state === "free" &&
-                            reservedSoon &&
-                            `⚠ Ocupada em ${remainingMinutes(s.occupiesAt, now)} min — confira o horário`}
+                            conflictsWithReservation &&
+                            `✕ Não cabe — ocupada em ${minutesUntilOccupied} min`}
+                          {reservedSoon &&
+                            `⚠ Ocupada em ${minutesUntilOccupied} min — confira o horário`}
                           {s.state !== "free" && `Ocupado até ${formatHM(s.availableAt)}`}
                         </div>
                       </button>
@@ -3790,9 +3819,14 @@ function WizardModal({
                   <>
                     {mergeSpaceAvailable
                       ? `A ${mergeCandidate.name} está livre pelo tempo todo — dá pra deixar o cliente nela o atendimento inteiro, sem trocar de espaço.`
-                      : `A ${mergeCandidate.name} tem reserva chegando antes do fim do atendimento — ainda dá pra tentar, mas o painel pode recusar na hora de confirmar.`}
+                      : `A ${mergeCandidate.name} tem reserva chegando antes do fim do atendimento (${chosenProcedure.durationLabel}) — não cabe ficar nela o atendimento todo.`}
                     {" "}
-                    <button type="button" className={styles.smallBtn} onClick={() => setMergeIntoSingleSpace(true)}>
+                    <button
+                      type="button"
+                      className={styles.smallBtn}
+                      disabled={!mergeSpaceAvailable}
+                      onClick={() => setMergeIntoSingleSpace(true)}
+                    >
                       Ficar só na {mergeCandidate.name} o atendimento todo
                     </button>
                   </>
