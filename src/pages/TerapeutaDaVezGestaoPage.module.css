@@ -149,6 +149,35 @@
   gap: 5px;
 }
 
+/* Checklist de procedimentos do terapeuta — largura cheia dentro do
+   `.form` (flex-wrap), pra nunca disputar espaço com os campos curtos ao
+   lado e sempre cair na própria linha. */
+.checklistGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+}
+
+.checklistGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 2px 0 6px;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
 .list {
   background: var(--card-bg);
   border: 1px solid var(--border);

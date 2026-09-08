@@ -76,15 +76,27 @@ export interface Therapist {
   pointsNoturnoToday: number;
   createdAt: string;
   updatedAt: string;
+  /** Procedimentos que ele realiza (marcados na gestão) — usado pra
+   * filtrar quem pode ser oferecido num agendamento de um procedimento
+   * específico. */
+  procedureIds: string[];
 }
 
 export interface CreateTherapistInput {
   code: string;
   name: string;
   active?: boolean;
+  procedureIds?: string[];
 }
 
 export type UpdateTherapistInput = Partial<CreateTherapistInput>;
+
+/** Versão enxuta pro select de terapeuta da Agenda — já vem filtrada pelo
+ * backend (qualificado pro procedimento + escalado na data escolhida). */
+export interface TherapistOption {
+  id: string;
+  name: string;
+}
 
 export interface TherapistPoints {
   date: string;
@@ -229,6 +241,11 @@ export interface SpaceAdmin {
   name: string;
   type: SpaceType;
   active: boolean;
+  /** Cor customizada do card no kanban — só "ocupado"/"higienizando" (pedido
+   * do usuário); "livre" nunca é customizável, sempre a cor padrão do
+   * sistema. `null` = usa o padrão global daquele estado. */
+  colorOccupied: string | null;
+  colorCleaning: string | null;
 }
 
 export interface CreateSpaceInput {
@@ -236,6 +253,10 @@ export interface CreateSpaceInput {
   name: string;
   type: SpaceType;
   active?: boolean;
+  /** `undefined` = não mexe (edição) / sem cor (criação); string vazia
+   * `""` sinaliza "limpar, voltar pro padrão global" numa edição. */
+  colorOccupied?: string | null;
+  colorCleaning?: string | null;
 }
 
 export type UpdateSpaceInput = Partial<CreateSpaceInput>;
@@ -301,6 +322,11 @@ export interface SpacePanelView {
    * andamento tem um trecho futuro reservado aqui (procedimento com mais
    * de um espaço, ex.: maca agora + esta poltrona daqui a pouco). */
   occupiesAt: string | null;
+  /** Cor customizada por espaço — só usada quando `state` é "occupied" ou
+   * "cleaning" (ver `SpaceAdmin.colorOccupied`/`colorCleaning`). `null` =
+   * usa a cor padrão global daquele estado. */
+  colorOccupied: string | null;
+  colorCleaning: string | null;
 }
 
 export interface PanelAlert {
@@ -407,6 +433,33 @@ export interface AttendanceRecord {
    * ainda (a recepção terminou sem informar na hora) — sempre derivado do
    * backend, nunca um campo que se digita. */
   paymentPending: boolean;
+  /** Histórico de "estender tempo"/"adicionar procedimento" desse
+   * atendimento (botão 🕐 ao lado de Finalizar) — auditoria, ordem
+   * cronológica. */
+  extensions: AttendanceExtension[];
+}
+
+/** Uma linha do histórico de extensão de um atendimento — ver
+ * `ExtendAttendanceInput`/botão 🕐 ao lado de "Finalizar". */
+export interface AttendanceExtension {
+  kind: "time_extension" | "add_procedure";
+  addedMinutes: number;
+  procedureName: string | null;
+  previousPlannedEndAt: string;
+  newPlannedEndAt: string;
+  previousPrice: number;
+  newPrice: number;
+  createdAt: string;
+}
+
+/** "Estender tempo": `addedMinutes` + `newTotalPrice` (recepção digita os
+ * dois). "Adicionar procedimento": `procedureId` (minutos/valor somados
+ * automaticamente pelo backend). */
+export interface ExtendAttendanceInput {
+  kind: "time_extension" | "add_procedure";
+  addedMinutes?: number;
+  newTotalPrice?: number;
+  procedureId?: string;
 }
 
 export interface AttendanceAction {

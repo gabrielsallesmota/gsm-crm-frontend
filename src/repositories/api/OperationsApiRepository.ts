@@ -98,7 +98,16 @@ async function operationsRequestText(path: string): Promise<string> {
  * tem alias de camelCase nos schemas Pydantic) — mesma convenção usada em
  * `LeadsApiRepository`. */
 function therapistBody(input: CreateTherapistInput | UpdateTherapistInput) {
-  return { code: input.code, name: input.name, active: input.active };
+  // `procedureIds` ausente (`undefined`) vira chave ausente no JSON —
+  // `JSON.stringify` descarta `undefined` — que o backend lê como "não
+  // mexe nas qualificações já salvas"; `[]` explícito chega como array
+  // vazio de verdade ("tirei todas").
+  return {
+    code: input.code,
+    name: input.name,
+    active: input.active,
+    procedure_ids: input.procedureIds,
+  };
 }
 
 function procedureBody(input: CreateProcedureInput | UpdateProcedureInput) {
@@ -115,7 +124,20 @@ function procedureBody(input: CreateProcedureInput | UpdateProcedureInput) {
 }
 
 function spaceBody(input: CreateSpaceInput | UpdateSpaceInput) {
-  return { code: input.code, name: input.name, type: input.type, active: input.active };
+  const body: Record<string, unknown> = {
+    code: input.code,
+    name: input.name,
+    type: input.type,
+    active: input.active,
+  };
+  // Convenção pra cor customizada (ocupado/higienizando): `undefined` = não
+  // mexe, string vazia `""` = "limpar, volta pro padrão global" (só faz
+  // sentido numa edição), hex de verdade = define a cor.
+  if (input.colorOccupied === "") body.clear_color_occupied = true;
+  else if (input.colorOccupied) body.color_occupied = input.colorOccupied;
+  if (input.colorCleaning === "") body.clear_color_cleaning = true;
+  else if (input.colorCleaning) body.color_cleaning = input.colorCleaning;
+  return body;
 }
 
 /** Filtros compartilhados entre a listagem paginada e o export (CSV) do

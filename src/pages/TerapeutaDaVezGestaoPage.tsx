@@ -191,13 +191,78 @@ function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
 
 // ---- Terapeutas ---------------------------------------------------------------
 
+/** Checklist de procedimentos que o terapeuta realiza — pedido do usuário:
+ * "campo (check) com os procedimentos que realiza (buscando da tabela
+ * procedimento)". Agrupado por categoria, mesma organização do seletor de
+ * procedimento do wizard público (`ProcedureOption.category`). Usado pra
+ * filtrar quem pode ser oferecido num agendamento daquele procedimento. */
+function TherapistProcedureChecklist({
+  procedures,
+  selectedIds,
+  onToggle,
+}: {
+  procedures: Procedure[];
+  selectedIds: string[];
+  onToggle: (procedureId: string) => void;
+}) {
+  const byCategory = useMemo(() => {
+    const map = new Map<string, Procedure[]>();
+    for (const p of procedures) {
+      if (!p.active) continue;
+      const list = map.get(p.category) ?? [];
+      list.push(p);
+      map.set(p.category, list);
+    }
+    return [...map.entries()];
+  }, [procedures]);
+
+  if (byCategory.length === 0) {
+    return <p className={styles.rowMeta}>Nenhum procedimento ativo cadastrado ainda.</p>;
+  }
+
+  return (
+    <div className={styles.checklistGroup}>
+      <span className={styles.fieldLabel}>Procedimentos que realiza</span>
+      {byCategory.map(([category, items]) => (
+        <div key={category}>
+          <span className={styles.rowMeta}>{category}</span>
+          <div className={styles.checklistGrid}>
+            {items.map((p) => (
+              <label key={p.id} className={styles.checkboxGroup}>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(p.id)}
+                  onChange={() => onToggle(p.id)}
+                />
+                {p.name}
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TherapistFormFields({
   form,
   setForm,
+  procedures,
 }: {
   form: CreateTherapistInput;
   setForm: (updater: (f: CreateTherapistInput) => CreateTherapistInput) => void;
+  procedures: Procedure[];
 }) {
+  function toggleProcedure(procedureId: string) {
+    setForm((f) => {
+      const current = f.procedureIds ?? [];
+      const next = current.includes(procedureId)
+        ? current.filter((id) => id !== procedureId)
+        : [...current, procedureId];
+      return { ...f, procedureIds: next };
+    });
+  }
+
   return (
     <>
       <input
@@ -220,14 +285,25 @@ function TherapistFormFields({
         />
         Ativo
       </label>
+      <TherapistProcedureChecklist
+        procedures={procedures}
+        selectedIds={form.procedureIds ?? []}
+        onToggle={toggleProcedure}
+      />
     </>
   );
 }
 
-const EMPTY_THERAPIST_FORM: CreateTherapistInput = { code: "", name: "", active: true };
+const EMPTY_THERAPIST_FORM: CreateTherapistInput = {
+  code: "",
+  name: "",
+  active: true,
+  procedureIds: [],
+};
 
 function TherapistsTab() {
   const { data, loading, error, reload } = useTherapists();
+  const { data: procedures } = useProcedures();
   const actions = useTherapistActions();
   const { toast } = useToast();
   const [form, setForm] = useState<CreateTherapistInput>(EMPTY_THERAPIST_FORM);
@@ -239,7 +315,7 @@ function TherapistsTab() {
 
   function startEdit(t: Therapist) {
     setEditing(t);
-    setEditForm({ code: t.code, name: t.name, active: t.active });
+    setEditForm({ code: t.code, name: t.name, active: t.active, procedureIds: t.procedureIds });
   }
 
   async function handleAdd() {
@@ -293,7 +369,7 @@ function TherapistsTab() {
         um dia específico, use a aba Histórico.
       </p>
       <div className={styles.form}>
-        <TherapistFormFields form={form} setForm={setForm} />
+        <TherapistFormFields form={form} setForm={setForm} procedures={procedures ?? []} />
         <Button variant="primary" onClick={() => void handleAdd()} disabled={submitting}>
           Adicionar
         </Button>
@@ -312,7 +388,7 @@ function TherapistsTab() {
       {editing && (
         <Modal title={`Editar terapeuta`} onClose={() => setEditing(null)}>
           <div className={styles.form} style={{ margin: 0 }}>
-            <TherapistFormFields form={editForm} setForm={setEditForm} />
+            <TherapistFormFields form={editForm} setForm={setEditForm} procedures={procedures ?? []} />
           </div>
           <div className={styles.rowActions} style={{ marginTop: 16, justifyContent: "flex-end" }}>
             <Button variant="ghost" onClick={() => setEditing(null)}>
@@ -876,6 +952,39 @@ function ProceduresTab() {
 
 const EMPTY_SPACE_FORM: CreateSpaceInput = { code: "", name: "", type: "maca", active: true };
 
+/** Cor customizada de um estado do espaço (ocupado/higienizando) — pedido
+ * do usuário: "livre deve seguir a cor já pré definida", só ocupado e
+ * higienizando ganham seletor próprio. Checkbox liga/desliga porque
+ * `<input type="color">` não tem um estado "vazio" de verdade — desmarcado
+ * manda `""` (sinal de "limpar, volta pro padrão global", ver `spaceBody`
+ * em `OperationsApiRepository.ts`). */
+function SpaceColorField({
+  label,
+  defaultColor,
+  value,
+  onChange,
+}: {
+  label: string;
+  defaultColor: string;
+  value: string | null | undefined;
+  onChange: (next: string | null) => void;
+}) {
+  const enabled = !!value;
+  return (
+    <div className={styles.field} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <label className={styles.checkboxGroup}>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => onChange(e.target.checked ? defaultColor : "")}
+        />
+        {label}
+      </label>
+      {value && <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />}
+    </div>
+  );
+}
+
 function SpaceFormFields({
   form,
   setForm,
@@ -916,6 +1025,18 @@ function SpaceFormFields({
         />
         Ativo
       </label>
+      <SpaceColorField
+        label="Cor customizada — ocupado"
+        defaultColor="#1E8A86"
+        value={form.colorOccupied}
+        onChange={(next) => setForm((f) => ({ ...f, colorOccupied: next }))}
+      />
+      <SpaceColorField
+        label="Cor customizada — higienizando"
+        defaultColor="#C9A44C"
+        value={form.colorCleaning}
+        onChange={(next) => setForm((f) => ({ ...f, colorCleaning: next }))}
+      />
     </>
   );
 }
@@ -932,7 +1053,14 @@ function SpacesTab() {
 
   function startEdit(s: SpaceAdmin) {
     setEditing(s);
-    setEditForm({ code: s.code, name: s.name, type: s.type, active: s.active });
+    setEditForm({
+      code: s.code,
+      name: s.name,
+      type: s.type,
+      active: s.active,
+      colorOccupied: s.colorOccupied,
+      colorCleaning: s.colorCleaning,
+    });
   }
 
   async function handleAdd() {

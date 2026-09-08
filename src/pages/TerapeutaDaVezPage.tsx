@@ -8,6 +8,7 @@ import {
   type AppointmentStatus,
   type AttendanceRecord,
   type CreateAppointmentInput,
+  type ExtendAttendanceInput,
   type HistoryPage,
   type PanelState,
   type PaymentAllocationInput,
@@ -19,6 +20,7 @@ import {
   type Shift,
   type SpacePanelView,
   type SpaceType,
+  type TherapistOption,
   type UpdateAppointmentInput,
   type WaitlistEntry,
 } from "../types/operations";
@@ -53,8 +55,15 @@ interface AgendaPrefill {
 }
 
 const SHIFT_ORDER: Shift[] = ["manha", "inter", "noturno"];
-const SHIFT_DOT: Record<Shift, string> = { manha: "#1E8A86", inter: "#C9A44C", noturno: "#0B4F4C" };
-const SPACE_DOT: Record<string, string> = { free: "#69C8AF", occupied: "#1E8A86", cleaning: "#C9A44C" };
+const SHIFT_DOT: Record<Shift, string> = { manha: "#2EA39D", inter: "#C9A44C", noturno: "#12615C" };
+// Tipo próprio (não `Record<string, string>`) pra acesso por propriedade
+// continuar `string` mesmo com `noUncheckedIndexedAccess` — vira `string |
+// undefined` com um índice genérico, o que quebraria `pickReadableTextColor`.
+const SPACE_DOT: { free: string; occupied: string; cleaning: string } = {
+  free: "#82D6C0",
+  occupied: "#2EA39D",
+  cleaning: "#C9A44C",
+};
 const SPACE_STATUS_LABEL: Record<string, string> = { free: "LIVRE", occupied: "OCUPADO", cleaning: "PREPARAÇÃO" };
 
 function formatClock(d: Date): string {
@@ -69,6 +78,21 @@ function formatDateLabel(d: Date): string {
 function formatHM(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Escolhe texto escuro ou claro pra ficar legível em cima de uma cor de
+ * fundo qualquer — usado nos cards de espaço quando a cor de "ocupado"/
+ * "higienizando" é customizada na gestão (pedido do usuário: a cor pinta
+ * o card INTEIRO, não só a borda, então uma cor clara escolhida por
+ * engano não pode deixar o texto branco ilegível). Luminância percebida
+ * (YIQ), limiar em 150/255. */
+function pickReadableTextColor(hex: string): string {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 150 ? "#012A2A" : "#F5F1E3";
 }
 
 function remainingMinutes(iso: string | null, now: Date): number | null {
@@ -106,7 +130,7 @@ const ROW_STATUS_COLOR: Record<RowStatus, string> = {
   reservado: "#C9A44C",
   pausa: "#7A7A7A",
   escolhendo_procedimento: "#9A7426",
-  atendendo: "#1E8A86",
+  atendendo: "#2EA39D",
 };
 
 function rowStatus(entry: QueueEntry, waitlistEntry: WaitlistEntry | undefined): RowStatus {
@@ -155,6 +179,7 @@ export function TerapeutaDaVezPage() {
     decline,
     start,
     finish,
+    extend,
     checkIn,
     pause,
     resume,
@@ -469,6 +494,35 @@ export function TerapeutaDaVezPage() {
     proceedToFinish(entry, true);
   }
 
+  // ---- Estender atendimento (botão 🕐 ao lado de Finalizar) ------------------
+  // Pedido do usuário: "o paciente pede pra ficar mais 30 min, ou então
+  // outro procedimento em seguida... se tem horário livre ele fica" — duas
+  // opções mutuamente exclusivas por clique, ver `ExtendAttendanceModal`.
+  const [extendTarget, setExtendTarget] = useState<QueueEntry | null>(null);
+  const [extending, setExtending] = useState(false);
+
+  function openExtend(entry: QueueEntry) {
+    setExtendTarget(entry);
+  }
+
+  async function handleExtend(input: ExtendAttendanceInput) {
+    if (!extendTarget?.attendanceId || extending) return;
+    setExtending(true);
+    try {
+      await extend(extendTarget.attendanceId, input);
+      showToast(
+        input.kind === "time_extension"
+          ? `${extendTarget.name}: tempo estendido.`
+          : `${extendTarget.name}: procedimento adicionado.`,
+      );
+      setExtendTarget(null);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Não foi possível estender o atendimento.");
+    } finally {
+      setExtending(false);
+    }
+  }
+
   // ---- Iniciar turno -------------------------------------------------------
   // Sem Saída manual (questão trabalhista: terapeutas são PJ) — a presença
   // termina sozinha quando a janela do turno passa. "Iniciar turno" só
@@ -735,9 +789,19 @@ export function TerapeutaDaVezPage() {
                           </button>
                         )}
                         {status === "atendendo" && (
-                          <button type="button" className={styles.smallBtn} onClick={() => finishTherapy(entry)}>
-                            Finalizar
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              className={styles.ghostBtn}
+                              title="Estender tempo ou adicionar procedimento"
+                              onClick={() => openExtend(entry)}
+                            >
+                              🕐
+                            </button>
+                            <button type="button" className={styles.smallBtn} onClick={() => finishTherapy(entry)}>
+                              Finalizar
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -755,7 +819,12 @@ export function TerapeutaDaVezPage() {
             />
           </div>
 
-          <InProgressSection entries={therapyEntries} now={now} onFinish={finishTherapy} />
+          <InProgressSection
+            entries={therapyEntries}
+            now={now}
+            onFinish={finishTherapy}
+            onExtend={openExtend}
+          />
           <SpacesSection spaces={state.spaces} now={now} onReleaseCleaning={handleReleaseCleaning} />
         </>
       )}
@@ -857,6 +926,17 @@ export function TerapeutaDaVezPage() {
           onConfirm={(payments) => void doFinish(paymentTarget.entry, paymentTarget.awardPoints, payments)}
         />
       )}
+
+      {extendTarget && (
+        <ExtendAttendanceModal
+          entry={extendTarget}
+          spaces={state.spaces}
+          procedures={allProcedures}
+          saving={extending}
+          onCancel={() => setExtendTarget(null)}
+          onConfirm={(input) => void handleExtend(input)}
+        />
+      )}
     </div>
   );
 }
@@ -908,7 +988,7 @@ function Header({ now }: { now: Date }) {
       </div>
       <div className={styles.headerSpacer} />
       <div className={styles.headerStatus}>
-        <div className={styles.dot} style={{ background: "#69C8AF" }} />
+        <div className={styles.dot} style={{ background: "#82D6C0" }} />
         <div className={styles.headerStatusText}>
           <span className={styles.headerStatusMain}>Sistema online</span>
           <span className={styles.headerStatusSub}>sincronizado agora</span>
@@ -960,10 +1040,12 @@ function InProgressSection({
   entries,
   now,
   onFinish,
+  onExtend,
 }: {
   entries: QueueEntry[];
   now: Date;
   onFinish: (entry: QueueEntry) => void;
+  onExtend: (entry: QueueEntry) => void;
 }) {
   if (entries.length === 0) return null;
   return (
@@ -989,9 +1071,19 @@ function InProgressSection({
                 ⚠ PAGAMENTO PENDENTE
               </span>
             )}
-            <button type="button" className={styles.smallBtn} style={{ alignSelf: "flex-start" }} onClick={() => onFinish(e)}>
-              Finalizar
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                title="Estender tempo ou adicionar procedimento"
+                onClick={() => onExtend(e)}
+              >
+                🕐
+              </button>
+              <button type="button" className={styles.smallBtn} onClick={() => onFinish(e)}>
+                Finalizar
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -1141,7 +1233,7 @@ function EscalaTab({ state, showToast }: { state: PanelState; showToast: (msg: s
               <div
                 key={i}
                 className={styles.escalaGridHeaderCell}
-                style={isoDate(d) === todayIso ? { color: "#0b4f4c" } : undefined}
+                style={isoDate(d) === todayIso ? { color: "#12615c" } : undefined}
               >
                 {WEEKDAY_SHORT[i]} · {d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
               </div>
@@ -2342,7 +2434,6 @@ function AgendaAppointmentModal({
   onDelete?: () => void;
 }) {
   const isCreate = form.mode === "create";
-  const selectedSpace = spaces.find((s) => s.id === form.spaceId) ?? null;
   const selectedProcedure = procedures.find((p) => p.id === form.procedureId) ?? null;
   const segments = selectedProcedure ? selectedProcedure.spaceRequirements : [];
   const isCombo = segments.length > 1;
@@ -2350,15 +2441,28 @@ function AgendaAppointmentModal({
   // `Appointment` próprio, ligados por `groupId` (ver `AgendaTab.openEdit`).
   const isEditGroup = !isCreate && !!form.groupMembers && form.groupMembers.length > 1;
 
-  // Pedido do usuário: só oferecer procedimento compatível com o ESPAÇO já
-  // escolhido (1º trecho) — mesma regra de tipo do combo do Terapeuta da
-  // Vez. No modo "edit" mantém o comportamento mais simples de antes (não
-  // dá pra trocar o procedimento de um combo já existente, só editar
-  // trecho/espaço/horário — então só oferece procedimento de trecho ÚNICO
-  // — mais o que já estava escolhido, pra não sumir da lista).
+  // Pedido do usuário: "primeiro selecionar terapia, e dependendo a
+  // terapia só aparece o espaço determinado, não maca de cara" — o
+  // procedimento vem PRIMEIRO, e o espaço do 1º trecho é filtrado pelo
+  // tipo que ele exige (mesma regra que os trechos 2+ já seguiam). No
+  // modo "edit" mantém o comportamento de antes (não dá pra trocar o
+  // procedimento de um combo já existente, só editar trecho/espaço/
+  // horário — só oferece procedimento de trecho ÚNICO, mais o que já
+  // estava escolhido, pra não sumir da lista).
   const procedureOptions = isCreate
-    ? procedures.filter((p) => !selectedSpace || p.spaceRequirements[0]?.type === selectedSpace.type)
+    ? procedures
     : procedures.filter((p) => p.spaceRequirements.length === 1 || p.id === form.procedureId);
+
+  const requiredSpaceType = selectedProcedure?.spaceRequirements[0]?.type ?? null;
+  // Sem procedimento escolhido ainda: no "create" a lista fica vazia (o
+  // usuário precisa escolher o procedimento primeiro); no "edit" sem
+  // procedimento definido, mantém o comportamento de antes (qualquer
+  // espaço, agendamento antigo sem procedimento vinculado).
+  const spaceOptions = requiredSpaceType
+    ? spaces.filter((s) => s.type === requiredSpaceType)
+    : isCreate
+      ? []
+      : spaces;
 
   // No "edit" (solo ou conjunto) os seletores de trecho já nascem
   // preenchidos com o espaço atual de cada trecho (`editAgendaForm`), então
@@ -2373,27 +2477,27 @@ function AgendaAppointmentModal({
     (!isCreate || form.procedureId !== "") &&
     segmentsReady;
 
-  function selectSpace(spaceId: string) {
-    const space = spaces.find((s) => s.id === spaceId);
+  function selectProcedure(procedureId: string) {
+    const procedure = procedures.find((p) => p.id === procedureId);
+    const newRequiredType = procedure?.spaceRequirements[0]?.type ?? null;
     setForm((f) => {
-      const current = procedures.find((p) => p.id === f.procedureId);
-      const stillCompatible = !current || current.spaceRequirements[0]?.type === space?.type;
-      if (stillCompatible) return { ...f, spaceId };
-      // Trocou pra um espaço de outro tipo — o procedimento escolhido não
-      // serve mais pro 1º trecho, limpa junto (duração e trechos seguintes
-      // também dependiam dele).
-      return { ...f, spaceId, procedureId: "", durationMinutes: 30, segmentSpaceIds: [] };
+      const currentSpaceType = spaces.find((s) => s.id === f.spaceId)?.type;
+      const stillCompatible = !newRequiredType || currentSpaceType === newRequiredType;
+      return {
+        ...f,
+        procedureId,
+        durationMinutes: procedure ? procedure.durationMinutes : 30,
+        segmentSpaceIds: procedure ? procedure.spaceRequirements.slice(1).map(() => "") : [],
+        spaceId: stillCompatible ? f.spaceId : "",
+        // Terapeuta qualificado/escalado muda com o procedimento — reseta
+        // pra recepção escolher de novo na lista já filtrada.
+        therapistId: "",
+      };
     });
   }
 
-  function selectProcedure(procedureId: string) {
-    const procedure = procedures.find((p) => p.id === procedureId);
-    setForm((f) => ({
-      ...f,
-      procedureId,
-      durationMinutes: procedure ? procedure.durationMinutes : 30,
-      segmentSpaceIds: procedure ? procedure.spaceRequirements.slice(1).map(() => "") : [],
-    }));
+  function selectSpace(spaceId: string) {
+    setForm((f) => ({ ...f, spaceId }));
   }
 
   function selectSegmentSpace(index: number, spaceId: string) {
@@ -2402,6 +2506,52 @@ function AgendaAppointmentModal({
       segmentSpaceIds: f.segmentSpaceIds.map((id, i) => (i === index ? spaceId : id)),
     }));
   }
+
+  // Select de terapeuta travado (pedido do usuário, sem exceção): só quem
+  // é qualificado pro procedimento escolhido E está escalado na data do
+  // agendamento aparece aqui. Sem procedimento ainda, o backend não trava
+  // nada (ver `CreateAppointmentUseCase`) — mantém a lista antiga
+  // (`therapists`, quem está na fila/ausente hoje) como aproximação.
+  const [availableTherapists, setAvailableTherapists] = useState<TherapistOption[]>([]);
+  const [loadingTherapists, setLoadingTherapists] = useState(false);
+
+  useEffect(() => {
+    if (!form.procedureId || !form.date) {
+      setAvailableTherapists([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingTherapists(true);
+    terapeutaDaVezPublicRepository
+      .listAvailableTherapists(form.procedureId, form.date)
+      .then((list) => {
+        if (!cancelled) setAvailableTherapists(list);
+      })
+      .catch(() => {
+        if (!cancelled) setAvailableTherapists([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTherapists(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.procedureId, form.date]);
+
+  // No "edit", o terapeuta já atribuído pode não estar mais na lista
+  // "disponível agora" (escala mudou desde que o agendamento foi criado) —
+  // mantém ele na lista mesmo assim, só pra não sumir da seleção atual.
+  const currentTherapistName = form.therapistId
+    ? (therapists.find((t) => t.id === form.therapistId)?.name ?? form.appointment?.therapistName)
+    : null;
+  const therapistOptions: TherapistOption[] = form.procedureId
+    ? [
+        ...availableTherapists,
+        ...(currentTherapistName && !availableTherapists.some((t) => t.id === form.therapistId)
+          ? [{ id: form.therapistId, name: currentTherapistName }]
+          : []),
+      ]
+    : therapists;
 
   return (
     <div className={styles.overlay}>
@@ -2438,37 +2588,6 @@ function AgendaAppointmentModal({
         </div>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>
-            ESPAÇO{isCombo || isEditGroup ? " — TRECHO 1" : ""}
-          </span>
-          <select
-            className={styles.fieldInput}
-            value={form.spaceId}
-            onChange={(e) => selectSpace(e.target.value)}
-          >
-            {spaces.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className={styles.field}>
-          <span className={styles.fieldLabel}>TERAPEUTA (OPCIONAL)</span>
-          <select
-            className={styles.fieldInput}
-            value={form.therapistId}
-            onChange={(e) => setForm((f) => ({ ...f, therapistId: e.target.value }))}
-          >
-            <option value="">Sem preferência</option>
-            {therapists.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className={styles.field}>
-          <span className={styles.fieldLabel}>
             PROCEDIMENTO{isCreate ? "" : " (OPCIONAL)"}
           </span>
           <select
@@ -2483,11 +2602,52 @@ function AgendaAppointmentModal({
               </option>
             ))}
           </select>
-          {isCreate && selectedSpace && procedureOptions.length === 0 && (
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>
+            ESPAÇO{isCombo || isEditGroup ? " — TRECHO 1" : ""}
+          </span>
+          <select
+            className={styles.fieldInput}
+            value={form.spaceId}
+            onChange={(e) => selectSpace(e.target.value)}
+            disabled={isCreate && !form.procedureId}
+          >
+            <option value="">
+              {form.procedureId ? "Selecione…" : "Escolha o procedimento primeiro"}
+            </option>
+            {spaceOptions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          {isCreate && selectedProcedure && spaceOptions.length === 0 && (
             <span className={styles.modalSub}>
-              Nenhum procedimento cadastrado pra esse tipo de espaço ({selectedSpace.name}).
+              Nenhum espaço cadastrado pra esse procedimento ({selectedProcedure.name}).
             </span>
           )}
+        </div>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>TERAPEUTA (OPCIONAL)</span>
+          <select
+            className={styles.fieldInput}
+            value={form.therapistId}
+            onChange={(e) => setForm((f) => ({ ...f, therapistId: e.target.value }))}
+          >
+            <option value="">Sem preferência</option>
+            {therapistOptions.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          {form.procedureId && !loadingTherapists && availableTherapists.length === 0 && (
+            <span className={styles.modalSub}>
+              Nenhum terapeuta habilitado e escalado pra esse procedimento nessa data.
+            </span>
+          )}
+          {loadingTherapists && <span className={styles.modalSub}>Carregando terapeutas…</span>}
         </div>
         {isEditGroup &&
           form.groupMembers!.slice(1).map((member, i) => {
@@ -2750,7 +2910,7 @@ function ShiftStrip({ chips }: { chips: ShiftChip[] }) {
           key={c.key}
           className={styles.shiftChip}
           style={{
-            background: c.active ? "#F5F1E3" : "transparent",
+            background: c.active ? "#F8F5EA" : "transparent",
             border: `1px solid ${c.active ? "#C6BFA6" : "#E0DCCC"}`,
             color: c.active ? "#012A2A" : "#5A5A5A",
           }}
@@ -2886,7 +3046,7 @@ function Sidebar({
           {occupiedSpaces.map((s) => (
             <div key={s.id} className={styles.sidebarLine}>
               <span>{s.name}</span>
-              <span style={{ color: s.state === "cleaning" ? "#C9A44C" : "#1E8A86" }}>
+              <span style={{ color: s.state === "cleaning" ? "#C9A44C" : "#2EA39D" }}>
                 {s.state === "cleaning" ? "preparação" : "ocupada"} · {remainingMinutes(s.availableAt, now)} min
               </span>
             </div>
@@ -2953,45 +3113,75 @@ function SpacesSection({
         </div>
       </div>
       <div className={styles.spacesGrid}>
-        {spaces.map((s) => (
-          <div key={s.id} className={styles.spaceCard} style={{ borderTopColor: SPACE_DOT[s.state], background: s.state === "occupied" ? "#0B4F4C" : "rgba(240,240,230,0.06)" }}>
-            <div className={styles.spaceCardTop}>
-              <span className={styles.spaceCardName}>{s.name}</span>
-              <span className={styles.spaceCardStatus} style={{ color: SPACE_DOT[s.state] }}>
-                {SPACE_STATUS_LABEL[s.state]}
-              </span>
-            </div>
-            {s.state === "free" && !s.occupiesAt && (
-              <span className={styles.spaceCardLine}>Pronto para uso</span>
-            )}
-            {s.state === "free" && s.occupiesAt && (
-              <span className={styles.spaceCardLine} style={{ color: "#C9A44C" }}>
-                Ocupada em {remainingMinutes(s.occupiesAt, now)} min
-              </span>
-            )}
-            {s.state === "occupied" && (
-              <span className={styles.spaceCardLine}>
-                {s.procedureName} · {s.therapistName} · libera às {formatHM(s.availableAt)} (faltam {remainingMinutes(s.availableAt, now)} min)
-              </span>
-            )}
-            {s.state === "cleaning" && (
-              <div className={styles.spaceCleaningRow}>
-                <span className={styles.spaceCardLine}>
-                  Higienização · disponível às {formatHM(s.availableAt)} (faltam {remainingMinutes(s.availableAt, now)} min)
+        {spaces.map((s) => {
+          // Cor efetiva do card — customizada por espaço (só ocupado/
+          // higienizando, pedido do usuário) com fallback pro padrão
+          // global; "livre" nunca é customizável. A cor escolhida pinta o
+          // card INTEIRO (fundo + borda + rótulo), por isso o texto usa
+          // contraste calculado em vez de branco fixo.
+          const dotColor =
+            s.state === "occupied"
+              ? (s.colorOccupied ?? SPACE_DOT.occupied)
+              : s.state === "cleaning"
+                ? (s.colorCleaning ?? SPACE_DOT.cleaning)
+                : SPACE_DOT.free;
+          const isCustomFill = s.state === "occupied" || s.state === "cleaning";
+          const textColor = isCustomFill ? pickReadableTextColor(dotColor) : undefined;
+          return (
+            <div
+              key={s.id}
+              className={styles.spaceCard}
+              style={{
+                borderTopColor: dotColor,
+                background: isCustomFill ? dotColor : "rgba(240,240,230,0.06)",
+                color: textColor,
+              }}
+            >
+              <div className={styles.spaceCardTop}>
+                <span className={styles.spaceCardName} style={{ color: textColor }}>
+                  {s.name}
                 </span>
-                <button
-                  type="button"
-                  className={styles.releaseCleaningBtn}
-                  title="Já limpei — liberar agora"
-                  aria-label={`Liberar ${s.name} agora`}
-                  onClick={() => onReleaseCleaning(s.id)}
+                <span
+                  className={styles.spaceCardStatus}
+                  style={{ color: isCustomFill ? textColor : dotColor }}
                 >
-                  ✓
-                </button>
+                  {SPACE_STATUS_LABEL[s.state]}
+                </span>
               </div>
-            )}
-          </div>
-        ))}
+              {s.state === "free" && !s.occupiesAt && (
+                <span className={styles.spaceCardLine}>Pronto para uso</span>
+              )}
+              {s.state === "free" && s.occupiesAt && (
+                <span className={styles.spaceCardLine} style={{ color: "#C9A44C" }}>
+                  Ocupada em {remainingMinutes(s.occupiesAt, now)} min
+                </span>
+              )}
+              {s.state === "occupied" && (
+                <span className={styles.spaceCardLine} style={{ color: textColor }}>
+                  {s.procedureName} · {s.therapistName} · libera às {formatHM(s.availableAt)} (faltam{" "}
+                  {remainingMinutes(s.availableAt, now)} min)
+                </span>
+              )}
+              {s.state === "cleaning" && (
+                <div className={styles.spaceCleaningRow}>
+                  <span className={styles.spaceCardLine} style={{ color: textColor }}>
+                    Higienização · disponível às {formatHM(s.availableAt)} (faltam{" "}
+                    {remainingMinutes(s.availableAt, now)} min)
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.releaseCleaningBtn}
+                    title="Já limpei — liberar agora"
+                    aria-label={`Liberar ${s.name} agora`}
+                    onClick={() => onReleaseCleaning(s.id)}
+                  >
+                    ✓
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -3313,6 +3503,181 @@ function PointsConfirmModal({
           >
             Sim, contabilizar
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Modal: estender atendimento / adicionar procedimento --------------------------
+// Botão 🕐 ao lado de "Finalizar" — pedido do usuário: "o paciente pede pra
+// ficar mais 30 min, ou então outro procedimento em seguida". Duas opções
+// mutuamente exclusivas por clique — "estender tempo" pede minutos + o novo
+// valor TOTAL (digitado, sem recálculo); "adicionar procedimento" soma
+// duração/valor automaticamente, só entre procedimentos de trecho único
+// compatíveis com o espaço onde o cliente já está (não troca de sala pra
+// "ficar mais um pouco").
+
+function ExtendAttendanceModal({
+  entry,
+  spaces,
+  procedures,
+  saving,
+  onCancel,
+  onConfirm,
+}: {
+  entry: QueueEntry;
+  spaces: SpacePanelView[];
+  procedures: ProcedureOption[];
+  saving: boolean;
+  onCancel: () => void;
+  onConfirm: (input: ExtendAttendanceInput) => void;
+}) {
+  const [mode, setMode] = useState<"menu" | "time" | "procedure">("menu");
+  const [minutes, setMinutes] = useState(30);
+  const [newTotalPrice, setNewTotalPrice] = useState(() => formatMoney(entry.price ?? 0));
+  const [procedureId, setProcedureId] = useState("");
+
+  const currentSpaceName = entry.spaceNames[entry.spaceNames.length - 1];
+  const currentSpaceType = spaces.find((s) => s.name === currentSpaceName)?.type ?? null;
+  const procedureOptions = procedures.filter(
+    (p) =>
+      p.spaceRequirements.length === 1 &&
+      (!currentSpaceType || p.spaceRequirements[0]?.type === currentSpaceType),
+  );
+  const selectedProcedure = procedureOptions.find((p) => p.id === procedureId) ?? null;
+
+  const timeOk = minutes > 0 && parseMoneyInput(newTotalPrice) > 0;
+  const procedureOk = procedureId !== "";
+
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
+        <div>
+          <div className={styles.modalEyebrow}>ESTENDER ATENDIMENTO</div>
+          <div className={styles.modalTitle}>{entry.name}</div>
+          <div className={styles.modalSub}>{entry.clientName ?? "Cliente"}</div>
+        </div>
+        <div className={styles.modalDivider} />
+
+        {mode === "menu" && (
+          <div className={styles.modalActions} style={{ flexDirection: "column" }}>
+            <button
+              type="button"
+              className={styles.smallBtn}
+              style={{ width: "100%" }}
+              onClick={() => setMode("time")}
+            >
+              Estender tempo
+            </button>
+            <button
+              type="button"
+              className={styles.smallBtn}
+              style={{ width: "100%" }}
+              disabled={procedureOptions.length === 0}
+              onClick={() => setMode("procedure")}
+            >
+              Adicionar procedimento
+            </button>
+            {procedureOptions.length === 0 && (
+              <span className={styles.modalSub}>
+                Nenhum procedimento compatível com o espaço atual pra adicionar.
+              </span>
+            )}
+          </div>
+        )}
+
+        {mode === "time" && (
+          <>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>MINUTOS A MAIS</span>
+              <input
+                className={styles.fieldInput}
+                type="number"
+                min={1}
+                value={minutes}
+                onChange={(e) => setMinutes(Math.max(0, Number(e.target.value)))}
+              />
+            </div>
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>NOVO VALOR TOTAL (R$)</span>
+              <input
+                className={styles.fieldInput}
+                inputMode="decimal"
+                value={newTotalPrice}
+                onChange={(e) => setNewTotalPrice(e.target.value)}
+                onBlur={() => setNewTotalPrice(formatMoney(parseMoneyInput(newTotalPrice)))}
+              />
+            </div>
+          </>
+        )}
+
+        {mode === "procedure" && (
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>PROCEDIMENTO A ADICIONAR</span>
+            <select
+              className={styles.fieldInput}
+              value={procedureId}
+              onChange={(e) => setProcedureId(e.target.value)}
+            >
+              <option value="">Selecione…</option>
+              {procedureOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.durationLabel} · {p.priceLabel})
+                </option>
+              ))}
+            </select>
+            {selectedProcedure && (
+              <span className={styles.modalSub}>
+                Soma {selectedProcedure.durationMinutes} min e R$ {formatMoney(selectedProcedure.price)} ao
+                total.
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.ghostBtn} onClick={onCancel} style={{ flex: 1 }}>
+            Cancelar
+          </button>
+          {mode !== "menu" && (
+            <button
+              type="button"
+              className={styles.ghostBtn}
+              onClick={() => setMode("menu")}
+              style={{ flex: 1 }}
+            >
+              Voltar
+            </button>
+          )}
+          {mode === "time" && (
+            <button
+              type="button"
+              className={styles.smallBtn}
+              disabled={!timeOk || saving}
+              style={{ flex: 2 }}
+              onClick={() =>
+                onConfirm({
+                  kind: "time_extension",
+                  addedMinutes: minutes,
+                  newTotalPrice: parseMoneyInput(newTotalPrice),
+                })
+              }
+            >
+              Estender
+            </button>
+          )}
+          {mode === "procedure" && (
+            <button
+              type="button"
+              className={styles.smallBtn}
+              disabled={!procedureOk || saving}
+              style={{ flex: 2 }}
+              onClick={() => onConfirm({ kind: "add_procedure", procedureId })}
+            >
+              Adicionar
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -3805,7 +4170,7 @@ function WizardModal({
             {chosenProcedure.spaceRequirements.length > 1 && mergeCandidate && (
               <div
                 className={styles.heroHint}
-                style={{ borderColor: mergeIntoSingleSpace ? "#1E8A86" : "#c9a44c" }}
+                style={{ borderColor: mergeIntoSingleSpace ? "#2EA39D" : "#c9a44c" }}
               >
                 {mergeIntoSingleSpace ? (
                   <>

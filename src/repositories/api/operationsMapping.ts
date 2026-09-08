@@ -10,6 +10,7 @@ import type {
   Appointment,
   AppointmentsForDay,
   AttendanceAction,
+  AttendanceExtension,
   AttendanceRecord,
   BusinessHoursEntry,
   HistoryPage,
@@ -34,6 +35,7 @@ import type {
   Therapist,
   TherapistAction,
   TherapistDailyPoints,
+  TherapistOption,
   TherapistPoints,
   WaitlistAction,
   WaitlistEntry,
@@ -55,6 +57,7 @@ export interface TherapistDto {
   points_noturno_today: number;
   created_at: string;
   updated_at: string;
+  procedure_ids: string[];
 }
 
 export interface TherapistPointsDto {
@@ -142,6 +145,8 @@ export interface SpaceAdminDto {
   name: string;
   type: string;
   active: boolean;
+  color_occupied: string | null;
+  color_cleaning: string | null;
 }
 
 export interface ClientDto {
@@ -192,12 +197,19 @@ export interface SpaceDto {
   procedure_name: string | null;
   available_at: string | null;
   occupies_at: string | null;
+  color_occupied: string | null;
+  color_cleaning: string | null;
 }
 
 export interface AlertDto {
   kind: string;
   text: string;
   dot: string;
+}
+
+export interface TherapistOptionDto {
+  id: string;
+  name: string;
 }
 
 export interface ProcedureOptionDto {
@@ -325,6 +337,18 @@ export interface AttendanceDto {
   price: string | null;
   payments: PaymentAllocationDto[];
   payment_pending: boolean;
+  extensions: AttendanceExtensionDto[];
+}
+
+export interface AttendanceExtensionDto {
+  kind: string;
+  added_minutes: number;
+  procedure_name: string | null;
+  previous_planned_end_at: string;
+  new_planned_end_at: string;
+  previous_price: string;
+  new_price: string;
+  created_at: string;
 }
 
 export interface AttendanceActionDto {
@@ -398,7 +422,12 @@ export function toTherapist(dto: TherapistDto): Therapist {
     pointsNoturnoToday: dto.points_noturno_today,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
+    procedureIds: dto.procedure_ids ?? [],
   };
+}
+
+export function toTherapistOption(dto: TherapistOptionDto): TherapistOption {
+  return { id: dto.id, name: dto.name };
 }
 
 export function toTherapistPoints(dto: TherapistPointsDto): TherapistPoints {
@@ -494,6 +523,8 @@ export function toSpaceAdmin(dto: SpaceAdminDto): SpaceAdmin {
     name: dto.name,
     type: dto.type as SpaceAdmin["type"],
     active: dto.active,
+    colorOccupied: dto.color_occupied,
+    colorCleaning: dto.color_cleaning,
   };
 }
 
@@ -550,6 +581,8 @@ function toSpace(dto: SpaceDto): SpacePanelView {
     procedureName: dto.procedure_name,
     availableAt: dto.available_at,
     occupiesAt: dto.occupies_at,
+    colorOccupied: dto.color_occupied,
+    colorCleaning: dto.color_cleaning,
   };
 }
 
@@ -684,6 +717,19 @@ export function toPanelState(dto: PanelStateDto): PanelState {
   };
 }
 
+export function toAttendanceExtension(dto: AttendanceExtensionDto): AttendanceExtension {
+  return {
+    kind: dto.kind as AttendanceExtension["kind"],
+    addedMinutes: dto.added_minutes,
+    procedureName: dto.procedure_name,
+    previousPlannedEndAt: dto.previous_planned_end_at,
+    newPlannedEndAt: dto.new_planned_end_at,
+    previousPrice: Number(dto.previous_price),
+    newPrice: Number(dto.new_price),
+    createdAt: dto.created_at,
+  };
+}
+
 export function toAttendance(dto: AttendanceDto): AttendanceRecord {
   return {
     id: dto.id,
@@ -701,6 +747,7 @@ export function toAttendance(dto: AttendanceDto): AttendanceRecord {
     price: dto.price === null ? null : Number(dto.price),
     payments: dto.payments.map(toPaymentAllocation),
     paymentPending: dto.payment_pending,
+    extensions: (dto.extensions ?? []).map(toAttendanceExtension),
   };
 }
 

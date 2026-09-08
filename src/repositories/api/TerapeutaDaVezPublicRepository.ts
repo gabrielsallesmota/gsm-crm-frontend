@@ -10,6 +10,7 @@ import {
   toReturnReservationAction,
   toScheduleEntry,
   toTherapistAction,
+  toTherapistOption,
   toWaitlistAction,
   type AppointmentDto,
   type AppointmentsForDayDto,
@@ -20,6 +21,7 @@ import {
   type ReturnReservationActionDto,
   type ScheduleEntryDto,
   type TherapistActionDto,
+  type TherapistOptionDto,
   type WaitlistActionDto,
 } from "./operationsMapping";
 import type {
@@ -31,6 +33,7 @@ import type {
   CreateReturnReservationInput,
   CreateScheduleEntryInput,
   CreateWaitlistEntryInput,
+  ExtendAttendanceInput,
   HistoryFilter,
   HistoryPage,
   PanelState,
@@ -40,6 +43,7 @@ import type {
   Shift,
   SubstituteScheduleEntryTherapistInput,
   TherapistAction,
+  TherapistOption,
   UpdateAppointmentInput,
   UpdateScheduleEntryHoursInput,
   WaitlistAction,
@@ -146,6 +150,23 @@ export class TerapeutaDaVezPublicRepository {
       body: JSON.stringify({
         award_points: awardPoints,
         payments: payments.map((p) => ({ method: p.method, amount: p.amount })),
+      }),
+    });
+    return toAttendanceAction(dto);
+  }
+
+  /** Botão 🕐 ao lado de "Finalizar" — estender o tempo de um atendimento
+   * em terapia, ou adicionar outro procedimento em seguida (pedido do
+   * usuário: "o paciente pede pra ficar mais 30 min, ou então outro
+   * procedimento em seguida"). */
+  async extend(attendanceId: string, input: ExtendAttendanceInput): Promise<AttendanceAction> {
+    const dto = await publicRequest<AttendanceActionDto>(`${BASE}/attendances/${attendanceId}/extend`, {
+      method: "POST",
+      body: JSON.stringify({
+        kind: input.kind,
+        added_minutes: input.addedMinutes ?? null,
+        new_total_price: input.newTotalPrice ?? null,
+        procedure_id: input.procedureId ?? null,
       }),
     });
     return toAttendanceAction(dto);
@@ -295,6 +316,17 @@ export class TerapeutaDaVezPublicRepository {
       body: JSON.stringify({ payments: payments.map((p) => ({ method: p.method, amount: p.amount })) }),
     });
     return toAttendance(dto);
+  }
+
+  /** Select de terapeuta do formulário de agendamento — já vem filtrado
+   * pelo backend (qualificado pro procedimento + escalado na data), trava
+   * dura sem exceção (pedido do usuário). `day` sempre "yyyy-mm-dd". */
+  async listAvailableTherapists(procedureId: string, day: string): Promise<TherapistOption[]> {
+    const params = new URLSearchParams({ procedure_id: procedureId, day });
+    const items = await publicRequest<TherapistOptionDto[]>(
+      `${BASE}/therapists/available?${params.toString()}`,
+    );
+    return items.map(toTherapistOption);
   }
 
   /** Agenda do dia — grade estilo Google Agenda, sem senha (mesmo critério

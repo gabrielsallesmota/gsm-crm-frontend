@@ -4,6 +4,7 @@ import type {
   AttendanceRecord,
   CreateReturnReservationInput,
   CreateWaitlistEntryInput,
+  ExtendAttendanceInput,
   PanelState,
   PaymentAllocationInput,
   ReturnReservation,
@@ -43,6 +44,9 @@ export interface TerapeutaDaVezPanel {
     awardPoints: boolean,
     payments?: PaymentAllocationInput[],
   ) => Promise<AttendanceRecord>;
+  /** Botão 🕐 ao lado de "Finalizar" — estender tempo ou adicionar
+   * procedimento a um atendimento em terapia. */
+  extend: (attendanceId: string, input: ExtendAttendanceInput) => Promise<AttendanceRecord>;
   /** "Iniciar turno" — sem `checkOut`: não existe Saída manual (questão
    * trabalhista, terapeutas são PJ). A presença termina sozinha quando a
    * janela do turno passa. */
@@ -189,6 +193,12 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     return result.attendance;
   }
 
+  async function extend(attendanceId: string, input: ExtendAttendanceInput) {
+    const result = await terapeutaDaVezPanelService.extend(attendanceId, input);
+    setState(result.state);
+    return result.attendance;
+  }
+
   async function checkIn(therapistId: string, shift?: Shift) {
     const result = await terapeutaDaVezPanelService.checkIn(therapistId, shift);
     setState(result.state);
@@ -249,6 +259,7 @@ export function useTerapeutaDaVezPanel(): TerapeutaDaVezPanel {
     decline,
     start,
     finish,
+    extend,
     checkIn,
     pause,
     resume,

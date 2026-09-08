@@ -3,6 +3,7 @@ import type {
   AttendanceAction,
   CreateReturnReservationInput,
   CreateWaitlistEntryInput,
+  ExtendAttendanceInput,
   PanelState,
   PaymentAllocationInput,
   ReturnReservationAction,
@@ -50,6 +51,10 @@ export class TerapeutaDaVezPanelService {
     payments: PaymentAllocationInput[] = [],
   ): Promise<AttendanceAction> {
     return terapeutaDaVezPublicRepository.finish(attendanceId, awardPoints, payments);
+  }
+
+  extend(attendanceId: string, input: ExtendAttendanceInput): Promise<AttendanceAction> {
+    return terapeutaDaVezPublicRepository.extend(attendanceId, input);
   }
 
   checkIn(therapistId: string, shift?: Shift): Promise<TherapistAction> {
