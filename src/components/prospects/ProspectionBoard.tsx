@@ -18,7 +18,7 @@ import { prospectsService } from "../../services/ProspectsService";
 import { ApiError } from "../../types/common";
 import { PRIORITY, PROSPECT_ORIGIN, WHATSAPP_STATUS } from "../../constants/prospectEnums";
 import type { Period } from "../../utils/periods";
-import { computeStageTargetDate } from "../../utils/prospectCadence";
+import { computeStageTargetDate, nextStageByOrder } from "../../utils/prospectCadence";
 import { formatPhone } from "../../utils/phone";
 import { BOARD_SORT_OPTIONS, sortBoardItems, type BoardSortOption } from "../../utils/boardSort";
 import type {
@@ -133,8 +133,15 @@ export function ProspectionBoard({ period }: { period: Period }) {
     if (!dragId) return;
     const prospectId = dragId;
     setDragId(null);
+    await attemptMoveStage(prospectId, targetStageId);
+  }
+
+  // Mesma lógica de sempre pro drag-and-drop, extraída pra reaproveitar
+  // também no "enviar e-mail → avança sozinho pro próximo estágio" (pedido
+  // do usuário) — sem duplicar as regras de motivo de perda/data alvo.
+  async function attemptMoveStage(prospectId: string, targetStageId: string) {
     const current = prospects.find((p) => p.id === prospectId);
-    if (!current || current.stageId === targetStageId) return; // solto na própria coluna — nada a fazer
+    if (!current || current.stageId === targetStageId) return; // já está lá — nada a fazer
     const targetStage = stages?.find((s) => s.id === targetStageId);
     // Estágio "perdido" pede o motivo ANTES de qualquer outra coisa — não
     // faz sentido também perguntar data de follow-up pra um prospect que
@@ -159,6 +166,15 @@ export function ProspectionBoard({ period }: { period: Period }) {
     }
     await move(prospectId, targetStageId);
     reload();
+  }
+
+  // Pedido do usuário: e-mail enviado com sucesso já avança o card pro
+  // próximo estágio sozinho — mesmos prompts de sempre (motivo de perda/
+  // data alvo) quando o estágio de destino pedir algo a mais.
+  function handleEmailSent(prospect: Prospect) {
+    const next = nextStageByOrder(stages ?? [], prospect.stageId);
+    if (!next) return;
+    void attemptMoveStage(prospect.id, next.id);
   }
 
   async function handleConfirmPendingMove(targetDate: string | null) {
@@ -347,6 +363,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
                       onDragStart={() => setDragId(prospect.id)}
                       onClick={() => setSelectedId(prospect.id)}
                       onToggleNoWhatsapp={() => void handleToggleNoWhatsapp(prospect)}
+                      onEmailSent={() => handleEmailSent(prospect)}
                     />
                   ))}
                   {stageProspects.length === 0 && !loading && (
@@ -551,6 +568,7 @@ function ProspectCard({
   onDragStart,
   onClick,
   onToggleNoWhatsapp,
+  onEmailSent,
 }: {
   prospect: Prospect;
   stage: ProspectStage;
@@ -558,6 +576,7 @@ function ProspectCard({
   onDragStart: () => void;
   onClick: () => void;
   onToggleNoWhatsapp: () => void;
+  onEmailSent: () => void;
 }) {
   const priority = PRIORITY[prospect.priority];
   const whatsapp = WHATSAPP_STATUS[prospect.whatsappStatus];
@@ -601,7 +620,13 @@ function ProspectCard({
         <Badge label={whatsapp.label} color={whatsapp.color} bg={whatsapp.bg} />
       </div>
       <div className={styles.cardActions}>
-        <ChannelTag prospect={prospect} stage={stage} templates={templates} size="small" />
+        <ChannelTag
+          prospect={prospect}
+          stage={stage}
+          templates={templates}
+          size="small"
+          onSent={onEmailSent}
+        />
         {/* Toggle direto do card — antes só dava pra marcar isso abrindo o
             prospect, "Editar" e "Salvar alterações" (pedido explícito do
             usuário). `stopPropagation` pra não abrir o drawer ao clicar. */}

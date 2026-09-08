@@ -286,6 +286,13 @@ export class ProspectsApiRepository implements ProspectsRepository {
     await apiRequest<void>(`/api/v1/prospects/${id}`, { method: "DELETE" });
   }
 
+  async sendEmail(id: string, subject: string, body: string): Promise<{ sent: boolean }> {
+    return apiRequest<{ sent: boolean }>(`/api/v1/prospects/${id}/send-email`, {
+      method: "POST",
+      body: JSON.stringify({ subject, body }),
+    });
+  }
+
   async checkDuplicate(phone: string): Promise<ProspectDuplicateCheck> {
     const dto = await apiRequest<{ exists: boolean; prospect: ProspectDto | null }>(
       `/api/v1/prospects/check-duplicate?${new URLSearchParams({ phone }).toString()}`,

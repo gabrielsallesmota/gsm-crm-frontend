@@ -16,6 +16,7 @@ import { EmptyState } from "../common/EmptyState";
 import { useToast } from "../../hooks/useToast";
 import { ApiError } from "../../types/common";
 import { formatPhone } from "../../utils/phone";
+import { nextStageByOrder } from "../../utils/prospectCadence";
 import {
   CONTACT_CHANNEL,
   PAGE_OBJECTIVE,
@@ -169,6 +170,16 @@ export function ProspectDrawer({
     }
   }
 
+  // Pedido do usuário: e-mail enviado com sucesso já avança o prospect pro
+  // próximo estágio sozinho — mesmo comportamento "sem prompt" que
+  // `handleMoveStage` já tem aqui no drawer (diferente do board, que
+  // pergunta motivo de perda/data alvo ao arrastar; aqui esses campos já
+  // são só mais um campo editável no próprio formulário).
+  function handleEmailSent() {
+    const next = nextStageByOrder(stages, prospect.stageId);
+    if (next) void handleMoveStage(next.id);
+  }
+
   async function handleDelete() {
     setDeleting(true);
     try {
@@ -220,7 +231,7 @@ export function ProspectDrawer({
           )}
           <Badge label={`Prioridade ${priority.label}`} color={priority.color} bg={priority.bg} />
           <Badge label={origin.label} color={origin.color} bg={origin.bg} />
-          <ChannelTag prospect={prospect} stage={stage} templates={templates} />
+          <ChannelTag prospect={prospect} stage={stage} templates={templates} onSent={handleEmailSent} />
           {!editing && (
             <button className={styles.editToggle} onClick={startEdit} type="button">
               ✎ Editar

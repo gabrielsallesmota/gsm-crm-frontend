@@ -33,6 +33,10 @@ export interface ProspectsRepository {
     lossReasonId?: string | null,
   ): Promise<Prospect>;
   delete(id: string): Promise<void>;
+  // Botão "Enviar" do `ChannelTag` (canal e-mail) — manda de verdade via
+  // Resend (backend), `sent: false` quando o provedor falhou (o card não
+  // avança de estágio nesse caso, ver `ChannelTag`/`ProspectionBoard`).
+  sendEmail(id: string, subject: string, body: string): Promise<{ sent: boolean }>;
   checkDuplicate(phone: string): Promise<ProspectDuplicateCheck>;
   bulkImport(
     rows: ImportRowInput[],

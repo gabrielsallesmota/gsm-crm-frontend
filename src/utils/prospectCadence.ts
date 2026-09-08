@@ -109,3 +109,17 @@ export function computeStageTargetDate(
   }
   return null;
 }
+
+/** Próximo estágio da pipeline por `order` (não pelo array bruto, que pode
+ * vir em qualquer ordem) — usado pra "enviar e-mail → avançar o prospect
+ * sozinho" (`ChannelTag`/`ProspectionBoard`/`ProspectDrawer`). `null`
+ * quando o estágio atual não existe na lista ou já é o último. */
+export function nextStageByOrder(
+  stages: ProspectStage[],
+  currentStageId: string,
+): ProspectStage | null {
+  const ordered = [...stages].sort((a, b) => a.order - b.order);
+  const index = ordered.findIndex((s) => s.id === currentStageId);
+  if (index === -1) return null;
+  return ordered[index + 1] ?? null;
+}

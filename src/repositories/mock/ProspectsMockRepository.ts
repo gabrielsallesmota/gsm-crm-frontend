@@ -65,6 +65,10 @@ export class ProspectsMockRepository implements ProspectsRepository {
     throw new NotImplementedError("Prospecção GSM", REASON);
   }
 
+  async sendEmail(_id: string, _subject: string, _body: string): Promise<{ sent: boolean }> {
+    throw new NotImplementedError("Prospecção GSM", REASON);
+  }
+
   async checkDuplicate(_phone: string): Promise<ProspectDuplicateCheck> {
     throw new NotImplementedError("Prospecção GSM", REASON);
   }

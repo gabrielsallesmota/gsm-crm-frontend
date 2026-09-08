@@ -94,3 +94,18 @@ export function resolveProspectMessage(
 export function buildWhatsappUrl(phoneNormalized: string, message: string): string {
   return `https://wa.me/${phoneNormalized}?text=${encodeURIComponent(message)}`;
 }
+
+/** `Prospect.instagram` é texto livre — pode vir como handle solto
+ * ("empresa", "@empresa"), URL sem protocolo ("instagram.com/empresa") ou
+ * URL completa, dependendo de quem cadastrou/importou. Normaliza pra uma
+ * URL `https://` pronta pra abrir; `null` quando o campo está vazio.
+ * Diferente do WhatsApp, o Instagram não tem parâmetro de URL pra
+ * pré-preencher a mensagem de um DM — só abre o perfil, a pessoa cola a
+ * mensagem copiada por `ChannelTag` na hora de mandar. */
+export function buildInstagramUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^(www\.)?instagram\.com\//i.test(trimmed)) return `https://${trimmed}`;
+  return `https://instagram.com/${trimmed.replace(/^@/, "")}`;
+}

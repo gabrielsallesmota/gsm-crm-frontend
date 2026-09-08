@@ -60,6 +60,10 @@ export class ProspectsService {
     return repo.delete(id);
   }
 
+  sendEmail(id: string, subject: string, body: string): Promise<{ sent: boolean }> {
+    return repo.sendEmail(id, subject, body);
+  }
+
   checkDuplicate(phone: string): Promise<ProspectDuplicateCheck> {
     return repo.checkDuplicate(phone);
   }

@@ -19,6 +19,7 @@ export interface ProspectActions {
     lossReasonId?: string | null,
   ): Promise<Prospect>;
   delete(id: string): Promise<void>;
+  sendEmail(id: string, subject: string, body: string): Promise<{ sent: boolean }>;
   checkDuplicate(phone: string): Promise<ProspectDuplicateCheck>;
   bulkImport(
     rows: ImportRowInput[],
@@ -38,6 +39,7 @@ export function useProspectActions(): ProspectActions {
     move: (id, stageId, targetDate, lossReasonId) =>
       prospectsService.move(id, stageId, targetDate, lossReasonId),
     delete: (id) => prospectsService.delete(id),
+    sendEmail: (id, subject, body) => prospectsService.sendEmail(id, subject, body),
     checkDuplicate: (phone) => prospectsService.checkDuplicate(phone),
     bulkImport: (rows, defaultStageId, dedupeStrategy) =>
       prospectsService.bulkImport(rows, defaultStageId, dedupeStrategy),
