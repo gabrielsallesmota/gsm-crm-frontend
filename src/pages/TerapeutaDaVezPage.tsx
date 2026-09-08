@@ -55,7 +55,7 @@ interface AgendaPrefill {
 }
 
 const SHIFT_ORDER: Shift[] = ["manha", "inter", "noturno"];
-const SHIFT_DOT: Record<Shift, string> = { manha: "#2EA39D", inter: "#C9A44C", noturno: "#12615C" };
+const SHIFT_DOT: Record<Shift, string> = { manha: "#2EA39D", inter: "#C9A44C", noturno: "#1A7A70" };
 // Tipo próprio (não `Record<string, string>`) pra acesso por propriedade
 // continuar `string` mesmo com `noUncheckedIndexedAccess` — vira `string |
 // undefined` com um índice genérico, o que quebraria `pickReadableTextColor`.
@@ -2910,7 +2910,7 @@ function ShiftStrip({ chips }: { chips: ShiftChip[] }) {
           key={c.key}
           className={styles.shiftChip}
           style={{
-            background: c.active ? "#F8F5EA" : "transparent",
+            background: c.active ? "#FBF8F1" : "transparent",
             border: `1px solid ${c.active ? "#C6BFA6" : "#E0DCCC"}`,
             color: c.active ? "#012A2A" : "#5A5A5A",
           }}

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Button } from "../common/Button";
 import { operationsApiRepository } from "../../repositories/api/OperationsApiRepository";
-import { parseCsv } from "../../utils/csv";
+import { parseCsv, readFileAsText } from "../../utils/csv";
 import {
   IMPORTABLE_THERAPIST_FIELDS,
   type DedupeStrategy,
@@ -72,7 +72,7 @@ export function TherapistImportModal({
     setSummary(null);
     setFileName(file.name);
     try {
-      const text = await file.text();
+      const text = await readFileAsText(file);
       const parsed = parseCsv(text);
       if (parsed.headers.length === 0) {
         setParseError("Não foi possível ler colunas nesse arquivo.");

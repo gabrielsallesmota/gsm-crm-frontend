@@ -1,4 +1,30 @@
 /**
+ * Lê um arquivo como texto tentando UTF-8 primeiro; se os bytes não forem
+ * UTF-8 válido, decodifica de novo como Windows-1252 (ANSI) em vez de usar
+ * `file.text()` puro. `file.text()` SEMPRE decodifica como UTF-8 (não tem
+ * como escolher outra codificação) — quando alguém exporta do Excel em
+ * português usando a opção comum "CSV (separado por vírgulas)" (em vez de
+ * "CSV UTF-8"), o Windows grava o arquivo em ANSI/Windows-1252, e um
+ * acento como "â" em "Crânio" vira um único byte (0xE2) que não é uma
+ * sequência UTF-8 válida. `file.text()` substitui esse byte pelo
+ * caractere de substituição "�" (U+FFFD) de forma silenciosa e
+ * IRREVERSÍVEL — o import salva "Cr�nio" no banco sem erro nenhum, sem
+ * como recuperar o "â" depois. `TextDecoder("utf-8", { fatal: true })`
+ * joga esse caso pra uma exceção em vez de mascarar com "�", permitindo
+ * cair pra Windows-1252 (que decodifica qualquer byte, nunca falha) —
+ * cobre tanto arquivo de verdade em UTF-8 (incl. com BOM, removido
+ * automaticamente pelo `TextDecoder`) quanto o caso comum de ANSI.
+ */
+export async function readFileAsText(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder("windows-1252").decode(buffer);
+  }
+}
+
+/**
  * Parser de CSV minimalista (RFC 4180: aspas duplas, campos com vírgula/
  * quebra de linha dentro de aspas, `""` como aspas escapada) — suficiente
  * para o import de prospecção, sem puxar uma lib externa só para isso.

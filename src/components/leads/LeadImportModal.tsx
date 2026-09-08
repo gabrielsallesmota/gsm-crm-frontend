@@ -3,7 +3,7 @@ import { Button } from "../common/Button";
 import { useAuth } from "../../hooks/useAuth";
 import { useLeadActions } from "../../hooks/useLeadActions";
 import { useToast } from "../../hooks/useToast";
-import { parseCsv } from "../../utils/csv";
+import { parseCsv, readFileAsText } from "../../utils/csv";
 import { ORIGIN_KEYS } from "../../constants/origins";
 import { stageKeyToId } from "../../repositories/api/stageMapping";
 import {
@@ -92,7 +92,7 @@ export function LeadImportModal({
     setSummary(null);
     setFileName(file.name);
     try {
-      const text = await file.text();
+      const text = await readFileAsText(file);
       const parsed = parseCsv(text);
       if (parsed.headers.length === 0) {
         setParseError("Não foi possível ler colunas nesse arquivo.");
