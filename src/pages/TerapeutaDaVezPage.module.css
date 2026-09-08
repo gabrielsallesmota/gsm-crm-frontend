@@ -46,13 +46,13 @@
 }
 
 .headerBrandTitle {
-  font-size: clamp(18px, 1.8vw, 25px);
+  font-size: clamp(20px, 1.8vw, 27px);
   font-weight: 800;
   color: #f5f1e3;
 }
 
 .headerBrandSub {
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 1.4px;
   color: #69c8af;
 }
@@ -73,12 +73,12 @@
 
 .headerSectionTitle {
   font-weight: 700;
-  font-size: clamp(17px, 1.6vw, 22px);
+  font-size: clamp(19px, 1.6vw, 24px);
   color: #f5f1e3;
 }
 
 .headerSectionSub {
-  font-size: 14px;
+  font-size: 16px;
   color: #8fb5ae;
 }
 
@@ -100,11 +100,11 @@
 }
 
 .headerStatusMain {
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .headerStatusSub {
-  font-size: 13.5px;
+  font-size: 15.5px;
   color: #7fa6a0;
 }
 
@@ -117,14 +117,14 @@
 
 .headerClockValue {
   font-variant-numeric: tabular-nums;
-  font-size: clamp(26px, 3vw, 42px);
+  font-size: clamp(28px, 3vw, 44px);
   font-weight: 500;
   line-height: 1;
   color: #f5f1e3;
 }
 
 .headerClockDate {
-  font-size: 13px;
+  font-size: 15px;
   color: #a9ccc6;
 }
 
@@ -142,7 +142,7 @@
   border: none;
   background: transparent;
   color: #8fb5ae;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 600;
   padding: 12px 16px 10px;
   cursor: pointer;
@@ -172,7 +172,7 @@
 }
 
 .shiftLabel {
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 1.4px;
   color: #5a5a5a;
 }
@@ -183,7 +183,7 @@
   gap: 7px;
   padding: 5px 12px;
   border-radius: 3px;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 /* ---- Corpo --------------------------------------------------------------- */
@@ -213,13 +213,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 2px;
   color: #8fb5ae;
 }
 
 .heroName {
-  font-size: clamp(34px, 3.8vw, 54px);
+  font-size: clamp(36px, 3.8vw, 56px);
   font-weight: 800;
   line-height: 1.05;
   color: #f5f1e3;
@@ -233,7 +233,7 @@
 }
 
 .heroShiftPill {
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 1.4px;
   color: #012a2a;
   background: #f0dda5;
@@ -242,7 +242,7 @@
 
 .heroPoints {
   font-variant-numeric: tabular-nums;
-  font-size: clamp(34px, 3.8vw, 54px);
+  font-size: clamp(36px, 3.8vw, 56px);
   font-weight: 600;
   color: #c9a44c;
 }
@@ -250,7 +250,7 @@
 .heroHint {
   border-left: 2px solid #c9a44c;
   padding-left: 13px;
-  font-size: 16.5px;
+  font-size: 18.5px;
   line-height: 1.55;
   color: #a9ccc6;
 }
@@ -261,7 +261,7 @@
   background: #c9a44c;
   color: #012a2a;
   font-weight: 700;
-  font-size: clamp(19px, 1.8vw, 24px);
+  font-size: clamp(21px, 1.8vw, 26px);
   padding: 16px;
   cursor: pointer;
 }
@@ -309,11 +309,11 @@
 
 .queueTitle {
   font-weight: 700;
-  font-size: clamp(20px, 2vw, 27px);
+  font-size: clamp(22px, 2vw, 29px);
 }
 
 .queueSubtitle {
-  font-size: 16px;
+  font-size: 18px;
   color: #5a5a5a;
 }
 
@@ -358,7 +358,7 @@
   background: #b23b3b;
   color: #fff;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 17px;
   letter-spacing: 0.4px;
   padding: 3px 9px;
   border-radius: 999px;
@@ -368,7 +368,7 @@
 
 .queuePos {
   font-variant-numeric: tabular-nums;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 600;
   color: #012a2a;
   text-align: center;
@@ -383,18 +383,18 @@
 
 .queueName {
   font-weight: 700;
-  font-size: 19px;
+  font-size: 21px;
   color: #012a2a;
 }
 
 .queueMeta {
-  font-size: 15px;
+  font-size: 17px;
   color: #5a5a5a;
 }
 
 .queuePoints {
   font-variant-numeric: tabular-nums;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 500;
   color: #012a2a;
   text-align: right;
@@ -409,7 +409,7 @@
 /* Um selo só por linha (texto + cor, nunca só cor) — funde o que antes eram
    dois lugares diferentes (status da fila + seção separada de reserva). */
 .statusBadge {
-  font-size: 13.5px;
+  font-size: 15.5px;
   font-weight: 700;
   letter-spacing: 0.4px;
   padding: 4px 9px;
@@ -433,12 +433,12 @@
 
 .emptyStateTitle {
   font-weight: 700;
-  font-size: 19px;
+  font-size: 21px;
   color: #012a2a;
 }
 
 .emptyStateHint {
-  font-size: 16px;
+  font-size: 18px;
   max-width: 360px;
   line-height: 1.5;
 }
@@ -466,7 +466,7 @@
 
 .inProgressTitle {
   font-weight: 700;
-  font-size: 17px;
+  font-size: 19px;
   color: #012a2a;
 }
 
@@ -497,7 +497,7 @@
   background: #c9a44c;
   color: #012a2a;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 18px;
   padding: 9px 14px;
   cursor: pointer;
   white-space: nowrap;
@@ -511,7 +511,7 @@
   border: 1px solid #d9d9d9;
   background: transparent;
   color: #5a5a5a;
-  font-size: 16px;
+  font-size: 18px;
   padding: 9px 14px;
   cursor: pointer;
   white-space: nowrap;
@@ -538,14 +538,14 @@
 
 .sidebarTitle {
   font-weight: 700;
-  font-size: 19px;
+  font-size: 21px;
 }
 
 .sidebarLine {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-size: 16px;
+  font-size: 18px;
   color: #5a5a5a;
   gap: 8px;
 }
@@ -559,13 +559,13 @@
 }
 
 .alertKind {
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 1.2px;
   color: #5a5a5a;
 }
 
 .alertText {
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.4;
   color: #012a2a;
 }
@@ -584,7 +584,7 @@
 
 .waitlistTitle {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 16px;
   letter-spacing: 0.4px;
   color: #5a5a5a;
   text-transform: uppercase;
@@ -613,7 +613,7 @@
 }
 
 .waitlistStatus {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   padding: 4px 10px;
   border-radius: 999px;
@@ -646,7 +646,7 @@
 
 .spacesTitle {
   font-weight: 700;
-  font-size: 20px;
+  font-size: 22px;
   color: #f5f1e3;
 }
 
@@ -654,7 +654,7 @@
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
-  font-size: 14px;
+  font-size: 16px;
   color: #a9ccc6;
 }
 
@@ -692,20 +692,20 @@
 
 .spaceCardName {
   font-weight: 700;
-  font-size: clamp(14.5px, 1.3vw, 17px);
+  font-size: clamp(16.5px, 1.3vw, 19px);
   line-height: 1.25;
   overflow-wrap: break-word;
 }
 
 .spaceCardStatus {
-  font-size: clamp(11px, 0.95vw, 12.5px);
+  font-size: clamp(13px, 0.95vw, 14.5px);
   letter-spacing: 0.8px;
   white-space: nowrap;
   flex: none;
 }
 
 .spaceCardLine {
-  font-size: clamp(11px, 1.05vw, 14px);
+  font-size: clamp(13px, 1.05vw, 16px);
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -737,7 +737,7 @@
   border: 1px solid rgba(240, 240, 230, 0.55);
   background: rgba(240, 240, 230, 0.16);
   color: #f0f0e6;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1;
   cursor: pointer;
   display: flex;
@@ -762,7 +762,7 @@
   color: #f5f1e3;
   padding: 14px 22px;
   border-left: 3px solid #c9a44c;
-  font-size: 18px;
+  font-size: 20px;
   /* Acima do `.overlay` (80) — a maioria das ações (chamar, iniciar,
      finalizar) roda com um modal aberto, e um erro precisa aparecer mesmo
      assim. Antes ficava atrás do modal, invisível: dava a impressão de que
@@ -801,19 +801,19 @@
 }
 
 .modalEyebrow {
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 1.6px;
   color: #5a5a5a;
 }
 
 .modalTitle {
   font-weight: 700;
-  font-size: clamp(20px, 2.2vw, 28px);
+  font-size: clamp(22px, 2.2vw, 30px);
   color: #012a2a;
 }
 
 .modalSub {
-  font-size: 16px;
+  font-size: 18px;
   color: #5a5a5a;
 }
 
@@ -825,7 +825,7 @@
 .modalHint {
   border-left: 2px solid #c9a44c;
   padding-left: 13px;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.55;
   color: #5a5a5a;
 }
@@ -834,7 +834,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
+  font-size: 18px;
   color: #012a2a;
 }
 
@@ -845,7 +845,7 @@
 }
 
 .fieldLabel {
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 1.2px;
   color: #5a5a5a;
 }
@@ -855,7 +855,7 @@
   border: 1px solid #d9d9d9;
   background: #fff;
   padding: 0 13px;
-  font-size: 17px;
+  font-size: 19px;
   color: #012a2a;
 }
 
@@ -884,7 +884,7 @@
   border: 1px solid #d9d9d9;
   background: transparent;
   color: #5a5a5a;
-  font-size: 14px;
+  font-size: 16px;
   padding: 8px 10px;
   cursor: pointer;
   white-space: nowrap;
@@ -895,7 +895,7 @@
   border: 1px dashed #c9a44c;
   background: transparent;
   color: #9a7426;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   padding: 8px 12px;
   cursor: pointer;
@@ -903,7 +903,7 @@
 
 .paymentSummary,
 .paymentSummaryOk {
-  font-size: 16px;
+  font-size: 18px;
   padding: 10px 12px;
   border-left: 3px solid;
 }
@@ -925,7 +925,7 @@
   border: none;
   background: transparent;
   color: #5a5a5a;
-  font-size: 16px;
+  font-size: 18px;
   text-decoration: underline;
   cursor: pointer;
   padding: 4px 8px;
@@ -938,7 +938,7 @@
   color: #9a4a26;
   background: #f7ead9;
   border: 1px solid #c9a44c;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   padding: 3px 8px;
   white-space: nowrap;
@@ -971,14 +971,14 @@
 
 .procedureCardName {
   font-weight: 700;
-  font-size: 17px;
+  font-size: 19px;
   color: #012a2a;
 }
 
 .procedureCardMeta {
   display: flex;
   gap: 10px;
-  font-size: 15.5px;
+  font-size: 17.5px;
   flex-wrap: wrap;
 }
 
@@ -1051,7 +1051,7 @@
 
 .escalaWeekLabel {
   font-weight: 700;
-  font-size: 17px;
+  font-size: 19px;
   color: #012a2a;
 }
 
@@ -1060,12 +1060,12 @@
   background: #f7ead9;
   border-left: 3px solid #c9a44c;
   padding: 10px 12px;
-  font-size: 14.5px;
+  font-size: 16.5px;
 }
 
 .escalaLoading {
   color: #5a5a5a;
-  font-size: 14.5px;
+  font-size: 16.5px;
 }
 
 /* Wrapper próprio pro scroll horizontal (telas estreitas) — não pode ser o
@@ -1087,7 +1087,7 @@
 }
 
 .escalaGridHeaderCell {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.4px;
   color: #5a5a5a;
@@ -1097,7 +1097,7 @@
 .escalaGridShiftCell {
   display: flex;
   align-items: center;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   color: #0b4f4c;
   background: #eee7d2;
@@ -1119,7 +1119,7 @@
   text-align: left;
   background: #eee7d2;
   color: #012a2a;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   padding: 6px 8px;
   cursor: pointer;
@@ -1144,7 +1144,7 @@
   border: 1px dashed #c9a44c;
   background: transparent;
   color: #9a7426;
-  font-size: 12.5px;
+  font-size: 14.5px;
   font-weight: 700;
   padding: 5px 8px;
   cursor: pointer;
@@ -1153,7 +1153,7 @@
 /* ---- Aba Histórico ---------------------------------------------------------- */
 
 .rowMeta {
-  font-size: 11.5px;
+  font-size: 13.5px;
   letter-spacing: 1px;
   color: #5a5a5a;
   margin-bottom: 4px;
@@ -1162,12 +1162,12 @@
 .historyTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .historyTable th {
   text-align: left;
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 0.6px;
   color: #5a5a5a;
   padding: 8px 10px;
@@ -1213,7 +1213,7 @@
   z-index: 2;
   background: #eee7d2;
   color: #0b4f4c;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   padding: 10px 8px;
   border-bottom: 1px solid #d8cfae;
@@ -1235,7 +1235,7 @@
   z-index: 1;
   background: #f6f2e6;
   color: #5a5a5a;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   padding: 2px 8px;
   border-top: 1px solid #ece6d4;
@@ -1262,7 +1262,7 @@
   background: #d7ece7;
   color: #012a2a;
   font: inherit;
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1.3;
   overflow: hidden;
   cursor: pointer;
