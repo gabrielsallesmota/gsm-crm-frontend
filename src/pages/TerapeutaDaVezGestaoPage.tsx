@@ -200,10 +200,16 @@ function TherapistProcedureChecklist({
   procedures,
   selectedIds,
   onToggle,
+  onSetAll,
 }: {
   procedures: Procedure[];
   selectedIds: string[];
   onToggle: (procedureId: string) => void;
+  /** "Marcar todos" — pedido do usuário: em vez de já vir tudo marcado por
+   * padrão (o que assumiria demais sobre um terapeuta novo), um atalho pra
+   * marcar (ou desmarcar) tudo de uma vez, e a pessoa tira o que não se
+   * aplica. */
+  onSetAll: (procedureIds: string[]) => void;
 }) {
   const byCategory = useMemo(() => {
     const map = new Map<string, Procedure[]>();
@@ -216,13 +222,26 @@ function TherapistProcedureChecklist({
     return [...map.entries()];
   }, [procedures]);
 
+  const activeIds = useMemo(() => procedures.filter((p) => p.active).map((p) => p.id), [procedures]);
+  const allSelected = activeIds.length > 0 && activeIds.every((id) => selectedIds.includes(id));
+
   if (byCategory.length === 0) {
     return <p className={styles.rowMeta}>Nenhum procedimento ativo cadastrado ainda.</p>;
   }
 
   return (
     <div className={styles.checklistGroup}>
-      <span className={styles.fieldLabel}>Procedimentos que realiza</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span className={styles.fieldLabel}>Procedimentos que realiza</span>
+        <label className={styles.checkboxGroup}>
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={(e) => onSetAll(e.target.checked ? activeIds : [])}
+          />
+          Marcar todos
+        </label>
+      </div>
       {byCategory.map(([category, items]) => (
         <div key={category}>
           <span className={styles.rowMeta}>{category}</span>
@@ -263,6 +282,10 @@ function TherapistFormFields({
     });
   }
 
+  function setAllProcedures(procedureIds: string[]) {
+    setForm((f) => ({ ...f, procedureIds }));
+  }
+
   return (
     <>
       <input
@@ -289,6 +312,7 @@ function TherapistFormFields({
         procedures={procedures}
         selectedIds={form.procedureIds ?? []}
         onToggle={toggleProcedure}
+        onSetAll={setAllProcedures}
       />
     </>
   );
@@ -1026,6 +1050,12 @@ function SpaceFormFields({
         Ativo
       </label>
       <SpaceColorField
+        label="Cor customizada — livre"
+        defaultColor="#82D6C0"
+        value={form.colorFree}
+        onChange={(next) => setForm((f) => ({ ...f, colorFree: next }))}
+      />
+      <SpaceColorField
         label="Cor customizada — ocupado"
         defaultColor="#1E8A86"
         value={form.colorOccupied}
@@ -1060,6 +1090,7 @@ function SpacesTab() {
       active: s.active,
       colorOccupied: s.colorOccupied,
       colorCleaning: s.colorCleaning,
+      colorFree: s.colorFree,
     });
   }
 

@@ -241,11 +241,12 @@ export interface SpaceAdmin {
   name: string;
   type: SpaceType;
   active: boolean;
-  /** Cor customizada do card no kanban — só "ocupado"/"higienizando" (pedido
-   * do usuário); "livre" nunca é customizável, sempre a cor padrão do
-   * sistema. `null` = usa o padrão global daquele estado. */
+  /** Cor customizada do card no kanban — pedido do usuário: "cada espaço
+   * pode ter uma cor personalizada". Os 3 estados são customizáveis;
+   * `null` = usa o padrão global daquele estado. */
   colorOccupied: string | null;
   colorCleaning: string | null;
+  colorFree: string | null;
 }
 
 export interface CreateSpaceInput {
@@ -257,6 +258,7 @@ export interface CreateSpaceInput {
    * `""` sinaliza "limpar, voltar pro padrão global" numa edição. */
   colorOccupied?: string | null;
   colorCleaning?: string | null;
+  colorFree?: string | null;
 }
 
 export type UpdateSpaceInput = Partial<CreateSpaceInput>;
@@ -322,11 +324,12 @@ export interface SpacePanelView {
    * andamento tem um trecho futuro reservado aqui (procedimento com mais
    * de um espaço, ex.: maca agora + esta poltrona daqui a pouco). */
   occupiesAt: string | null;
-  /** Cor customizada por espaço — só usada quando `state` é "occupied" ou
-   * "cleaning" (ver `SpaceAdmin.colorOccupied`/`colorCleaning`). `null` =
-   * usa a cor padrão global daquele estado. */
+  /** Cor customizada por espaço, uma por estado (ver `SpaceAdmin.
+   * colorOccupied`/`colorCleaning`/`colorFree`) — `null` = usa a cor
+   * padrão global daquele estado. */
   colorOccupied: string | null;
   colorCleaning: string | null;
+  colorFree: string | null;
 }
 
 export interface PanelAlert {

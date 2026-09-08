@@ -3119,37 +3119,37 @@ function SpacesSection({
           // global; "livre" nunca é customizável. A cor escolhida pinta o
           // card INTEIRO (fundo + borda + rótulo), por isso o texto usa
           // contraste calculado em vez de branco fixo.
+          // Pedido do usuário: "cada espaço pode ter uma cor
+          // personalizada" — os 3 estados são customizáveis por espaço
+          // agora (antes só ocupado/higienizando), sempre com fallback pro
+          // padrão global. O card inteiro é pintado (fundo + borda +
+          // rótulo), por isso o texto usa contraste calculado em vez de
+          // uma cor fixa.
           const dotColor =
             s.state === "occupied"
               ? (s.colorOccupied ?? SPACE_DOT.occupied)
               : s.state === "cleaning"
                 ? (s.colorCleaning ?? SPACE_DOT.cleaning)
-                : SPACE_DOT.free;
-          const isCustomFill = s.state === "occupied" || s.state === "cleaning";
-          const textColor = isCustomFill ? pickReadableTextColor(dotColor) : undefined;
+                : (s.colorFree ?? SPACE_DOT.free);
+          const textColor = pickReadableTextColor(dotColor);
           return (
             <div
               key={s.id}
               className={styles.spaceCard}
-              style={{
-                borderTopColor: dotColor,
-                background: isCustomFill ? dotColor : "rgba(240,240,230,0.06)",
-                color: textColor,
-              }}
+              style={{ borderTopColor: dotColor, background: dotColor, color: textColor }}
             >
               <div className={styles.spaceCardTop}>
                 <span className={styles.spaceCardName} style={{ color: textColor }}>
                   {s.name}
                 </span>
-                <span
-                  className={styles.spaceCardStatus}
-                  style={{ color: isCustomFill ? textColor : dotColor }}
-                >
+                <span className={styles.spaceCardStatus} style={{ color: textColor }}>
                   {SPACE_STATUS_LABEL[s.state]}
                 </span>
               </div>
               {s.state === "free" && !s.occupiesAt && (
-                <span className={styles.spaceCardLine}>Pronto para uso</span>
+                <span className={styles.spaceCardLine} style={{ color: textColor }}>
+                  Pronto para uso
+                </span>
               )}
               {s.state === "free" && s.occupiesAt && (
                 <span className={styles.spaceCardLine} style={{ color: "#C9A44C" }}>

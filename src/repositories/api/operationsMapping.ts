@@ -147,6 +147,7 @@ export interface SpaceAdminDto {
   active: boolean;
   color_occupied: string | null;
   color_cleaning: string | null;
+  color_free: string | null;
 }
 
 export interface ClientDto {
@@ -199,6 +200,7 @@ export interface SpaceDto {
   occupies_at: string | null;
   color_occupied: string | null;
   color_cleaning: string | null;
+  color_free: string | null;
 }
 
 export interface AlertDto {
@@ -525,6 +527,7 @@ export function toSpaceAdmin(dto: SpaceAdminDto): SpaceAdmin {
     active: dto.active,
     colorOccupied: dto.color_occupied,
     colorCleaning: dto.color_cleaning,
+    colorFree: dto.color_free,
   };
 }
 
@@ -583,6 +586,7 @@ function toSpace(dto: SpaceDto): SpacePanelView {
     occupiesAt: dto.occupies_at,
     colorOccupied: dto.color_occupied,
     colorCleaning: dto.color_cleaning,
+    colorFree: dto.color_free,
   };
 }
 

@@ -728,15 +728,19 @@
    (pedido do usuário): não pode competir visualmente com o resto do card,
    só fica ali disponível pra quem terminou a higienização mais rápido que o
    tempo padrão. */
+/* `currentColor` em vez de um tom claro fixo — o card agora pode ter
+   fundo customizado (claro ou escuro) em qualquer estado, e o botão
+   precisa acompanhar o contraste já calculado pro card (herdado via
+   `color` do `.spaceCard` pai). */
 .releaseCleaningBtn {
   flex: none;
   width: 16px;
   height: 16px;
   padding: 0;
   border-radius: 3px;
-  border: 1px solid rgba(240, 240, 230, 0.55);
-  background: rgba(240, 240, 230, 0.16);
-  color: #f0f0e6;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: currentColor;
   font-size: 12px;
   line-height: 1;
   cursor: pointer;

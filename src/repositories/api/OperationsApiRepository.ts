@@ -130,13 +130,15 @@ function spaceBody(input: CreateSpaceInput | UpdateSpaceInput) {
     type: input.type,
     active: input.active,
   };
-  // Convenção pra cor customizada (ocupado/higienizando): `undefined` = não
-  // mexe, string vazia `""` = "limpar, volta pro padrão global" (só faz
-  // sentido numa edição), hex de verdade = define a cor.
+  // Convenção pra cor customizada (ocupado/higienizando/livre): `undefined`
+  // = não mexe, string vazia `""` = "limpar, volta pro padrão global" (só
+  // faz sentido numa edição), hex de verdade = define a cor.
   if (input.colorOccupied === "") body.clear_color_occupied = true;
   else if (input.colorOccupied) body.color_occupied = input.colorOccupied;
   if (input.colorCleaning === "") body.clear_color_cleaning = true;
   else if (input.colorCleaning) body.color_cleaning = input.colorCleaning;
+  if (input.colorFree === "") body.clear_color_free = true;
+  else if (input.colorFree) body.color_free = input.colorFree;
   return body;
 }
 
