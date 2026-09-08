@@ -860,7 +860,6 @@ export function TerapeutaDaVezPage() {
             entries={therapyEntries}
             now={now}
             expanded={inProgressExpanded}
-            onToggleExpanded={() => setInProgressExpanded((v) => !v)}
             onFinish={finishTherapy}
             onExtend={openExtend}
           />
@@ -1098,68 +1097,60 @@ function InProgressSection({
   entries,
   now,
   expanded,
-  onToggleExpanded,
   onFinish,
   onExtend,
 }: {
   entries: QueueEntry[];
   now: Date;
   expanded: boolean;
-  onToggleExpanded: () => void;
   onFinish: (entry: QueueEntry) => void;
   onExtend: (entry: QueueEntry) => void;
 }) {
-  if (entries.length === 0) return null;
+  // Sem botão próprio aqui — o único controle é o atalho na faixa de abas
+  // (pedido do usuário: "não precisa do de baixo, só o de cima"). Oculto
+  // (`expanded === false`) some a seção inteira, sem barra nenhuma sobrando.
+  if (entries.length === 0 || !expanded) return null;
   return (
     <section className={styles.inProgressSection}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span className={styles.inProgressTitle}>
-          Atendimentos em andamento ({entries.length})
-        </span>
-        <button type="button" className={styles.ghostBtn} onClick={onToggleExpanded}>
-          {expanded ? "Ocultar" : "Mostrar"}
-        </button>
-      </div>
-      {expanded && (
-        <div className={styles.inProgressGrid}>
-          {entries.map((e) => (
-            <div
-              key={e.therapistId}
-              className={`${styles.inProgressCard} ${e.paymentPending ? styles.queueRowPaymentPending : ""}`}
-            >
-              <div className={styles.inProgressRow}>
-                <span className={styles.queueName}>{e.clientName ?? "Cliente"}</span>
-                <span style={{ color: "#C9A44C", fontWeight: 700 }}>
-                  restam {remainingMinutes(e.plannedEndAt, now)} min
-                </span>
-              </div>
-              <span className={styles.queueMeta}>
-                {e.name} · {e.procedureName} · {e.spaceNames.join(" + ")} · libera às{" "}
-                {formatHM(e.plannedEndAt)}
+      <span className={styles.inProgressTitle}>Atendimentos em andamento ({entries.length})</span>
+      <div className={styles.inProgressGrid}>
+        {entries.map((e) => (
+          <div
+            key={e.therapistId}
+            className={`${styles.inProgressCard} ${e.paymentPending ? styles.queueRowPaymentPending : ""}`}
+          >
+            <div className={styles.inProgressRow}>
+              <span className={styles.queueName}>{e.clientName ?? "Cliente"}</span>
+              <span style={{ color: "#C9A44C", fontWeight: 700 }}>
+                restam {remainingMinutes(e.plannedEndAt, now)} min
               </span>
-              {e.paymentPending && (
-                <span className={styles.paymentPendingBadgeInline} style={{ alignSelf: "flex-start" }}>
-                  ⚠ PAGAMENTO PENDENTE
-                </span>
-              )}
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  type="button"
-                  className={styles.ghostBtn}
-                  title="Estender tempo ou adicionar procedimento"
-                  style={{ display: "inline-flex", alignItems: "center" }}
-                  onClick={() => onExtend(e)}
-                >
-                  <ClockIcon />
-                </button>
-                <button type="button" className={styles.smallBtn} onClick={() => onFinish(e)}>
-                  Finalizar
-                </button>
-              </div>
             </div>
-          ))}
-        </div>
-      )}
+            <span className={styles.queueMeta}>
+              {e.name} · {e.procedureName} · {e.spaceNames.join(" + ")} · libera às{" "}
+              {formatHM(e.plannedEndAt)}
+            </span>
+            {e.paymentPending && (
+              <span className={styles.paymentPendingBadgeInline} style={{ alignSelf: "flex-start" }}>
+                ⚠ PAGAMENTO PENDENTE
+              </span>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                title="Estender tempo ou adicionar procedimento"
+                style={{ display: "inline-flex", alignItems: "center" }}
+                onClick={() => onExtend(e)}
+              >
+                <ClockIcon />
+              </button>
+              <button type="button" className={styles.smallBtn} onClick={() => onFinish(e)}>
+                Finalizar
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
