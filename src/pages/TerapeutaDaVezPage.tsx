@@ -95,6 +95,28 @@ function pickReadableTextColor(hex: string): string {
   return yiq >= 150 ? "#012A2A" : "#F5F1E3";
 }
 
+/** Relógio minimalista — só o contorno, sem o estilo "3D"/gradiente do
+ * emoji 🕐 padrão (pedido do usuário). `currentColor` acompanha a cor do
+ * botão onde entra. */
+function ClockIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12 7 12 12 15.5 14" />
+    </svg>
+  );
+}
+
 function remainingMinutes(iso: string | null, now: Date): number | null {
   if (!iso) return null;
   return Math.max(0, Math.round((new Date(iso).getTime() - now.getTime()) / 60000));
@@ -192,6 +214,13 @@ export function TerapeutaDaVezPage() {
   } = useTerapeutaDaVezPanel();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // "Atendimentos em andamento" começa oculto — pedido do usuário: o painel
+  // (Espaços de atendimento) precisa ficar SEMPRE visível, e com fonte maior
+  // esse bloco + a fila às vezes empurravam os espaços pra fora da tela
+  // (sem scroll geral, é um kiosk fixo). Fica escondido até quem estiver
+  // operando clicar em "Mostrar".
+  const [inProgressExpanded, setInProgressExpanded] = useState(false);
 
   // ---- Navegação em abas — Operação é a home, sem sincronizar com a URL
   // (fica tudo na mesma tela, sem recarregar nada ao trocar).
@@ -794,9 +823,10 @@ export function TerapeutaDaVezPage() {
                               type="button"
                               className={styles.ghostBtn}
                               title="Estender tempo ou adicionar procedimento"
+                              style={{ display: "inline-flex", alignItems: "center" }}
                               onClick={() => openExtend(entry)}
                             >
-                              🕐
+                              <ClockIcon />
                             </button>
                             <button type="button" className={styles.smallBtn} onClick={() => finishTherapy(entry)}>
                               Finalizar
@@ -822,6 +852,8 @@ export function TerapeutaDaVezPage() {
           <InProgressSection
             entries={therapyEntries}
             now={now}
+            expanded={inProgressExpanded}
+            onToggleExpanded={() => setInProgressExpanded((v) => !v)}
             onFinish={finishTherapy}
             onExtend={openExtend}
           />
@@ -1039,54 +1071,69 @@ function EmptyState({ title, hint }: { title: string; hint: string }) {
 function InProgressSection({
   entries,
   now,
+  expanded,
+  onToggleExpanded,
   onFinish,
   onExtend,
 }: {
   entries: QueueEntry[];
   now: Date;
+  expanded: boolean;
+  onToggleExpanded: () => void;
   onFinish: (entry: QueueEntry) => void;
   onExtend: (entry: QueueEntry) => void;
 }) {
   if (entries.length === 0) return null;
   return (
     <section className={styles.inProgressSection}>
-      <span className={styles.inProgressTitle}>Atendimentos em andamento</span>
-      <div className={styles.inProgressGrid}>
-        {entries.map((e) => (
-          <div
-            key={e.therapistId}
-            className={`${styles.inProgressCard} ${e.paymentPending ? styles.queueRowPaymentPending : ""}`}
-          >
-            <div className={styles.inProgressRow}>
-              <span className={styles.queueName}>{e.clientName ?? "Cliente"}</span>
-              <span style={{ color: "#C9A44C", fontWeight: 700 }}>
-                restam {remainingMinutes(e.plannedEndAt, now)} min
-              </span>
-            </div>
-            <span className={styles.queueMeta}>
-              {e.name} · {e.procedureName} · {e.spaceNames.join(" + ")} · libera às {formatHM(e.plannedEndAt)}
-            </span>
-            {e.paymentPending && (
-              <span className={styles.paymentPendingBadgeInline} style={{ alignSelf: "flex-start" }}>
-                ⚠ PAGAMENTO PENDENTE
-              </span>
-            )}
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="button"
-                className={styles.ghostBtn}
-                title="Estender tempo ou adicionar procedimento"
-                onClick={() => onExtend(e)}
-              >
-                🕐
-              </button>
-              <button type="button" className={styles.smallBtn} onClick={() => onFinish(e)}>
-                Finalizar
-              </button>
-            </div>
-          </div>
-        ))}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span className={styles.inProgressTitle}>
+          Atendimentos em andamento ({entries.length})
+        </span>
+        <button type="button" className={styles.ghostBtn} onClick={onToggleExpanded}>
+          {expanded ? "Ocultar" : "Mostrar"}
+        </button>
       </div>
+      {expanded && (
+        <div className={styles.inProgressGrid}>
+          {entries.map((e) => (
+            <div
+              key={e.therapistId}
+              className={`${styles.inProgressCard} ${e.paymentPending ? styles.queueRowPaymentPending : ""}`}
+            >
+              <div className={styles.inProgressRow}>
+                <span className={styles.queueName}>{e.clientName ?? "Cliente"}</span>
+                <span style={{ color: "#C9A44C", fontWeight: 700 }}>
+                  restam {remainingMinutes(e.plannedEndAt, now)} min
+                </span>
+              </div>
+              <span className={styles.queueMeta}>
+                {e.name} · {e.procedureName} · {e.spaceNames.join(" + ")} · libera às{" "}
+                {formatHM(e.plannedEndAt)}
+              </span>
+              {e.paymentPending && (
+                <span className={styles.paymentPendingBadgeInline} style={{ alignSelf: "flex-start" }}>
+                  ⚠ PAGAMENTO PENDENTE
+                </span>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className={styles.ghostBtn}
+                  title="Estender tempo ou adicionar procedimento"
+                  style={{ display: "inline-flex", alignItems: "center" }}
+                  onClick={() => onExtend(e)}
+                >
+                  <ClockIcon />
+                </button>
+                <button type="button" className={styles.smallBtn} onClick={() => onFinish(e)}>
+                  Finalizar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
