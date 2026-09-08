@@ -158,6 +158,28 @@
   border-bottom-color: #c9a44c;
 }
 
+/* Atalho pra mostrar/ocultar "Atendimentos em andamento" direto da faixa
+   de abas — sobra de espaço à direita das abas, sem precisar rolar até a
+   seção pra achar o botão. */
+.tabInProgressToggle {
+  margin-left: auto;
+  align-self: center;
+  border: 1px solid rgba(240, 240, 230, 0.35);
+  background: transparent;
+  color: #f5f1e3;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabInProgressToggle:hover {
+  border-color: #c9a44c;
+  color: #c9a44c;
+}
+
 /* ---- Faixa de turnos ------------------------------------------------------ */
 
 .shiftStrip {

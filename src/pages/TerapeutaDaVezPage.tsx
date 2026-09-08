@@ -695,7 +695,14 @@ export function TerapeutaDaVezPage() {
   return (
     <div className={styles.page}>
       <Header now={now} />
-      <TabStrip active={activeTab} onChange={setActiveTab} />
+      <TabStrip
+        active={activeTab}
+        onChange={setActiveTab}
+        showInProgressToggle={activeTab === "operacao" && therapyEntries.length > 0}
+        inProgressExpanded={inProgressExpanded}
+        inProgressCount={therapyEntries.length}
+        onToggleInProgress={() => setInProgressExpanded((v) => !v)}
+      />
       {activeTab === "operacao" && <ShiftStrip chips={shiftChips} />}
 
       {activeTab === "operacao" && (
@@ -1040,7 +1047,21 @@ function Header({ now }: { now: Date }) {
 
 const TAB_ORDER: Tab[] = ["operacao", "escala", "historico", "agenda"];
 
-function TabStrip({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
+function TabStrip({
+  active,
+  onChange,
+  showInProgressToggle,
+  inProgressExpanded,
+  inProgressCount,
+  onToggleInProgress,
+}: {
+  active: Tab;
+  onChange: (t: Tab) => void;
+  showInProgressToggle: boolean;
+  inProgressExpanded: boolean;
+  inProgressCount: number;
+  onToggleInProgress: () => void;
+}) {
   return (
     <div className={styles.tabStrip}>
       {TAB_ORDER.map((t) => (
@@ -1053,6 +1074,11 @@ function TabStrip({ active, onChange }: { active: Tab; onChange: (t: Tab) => voi
           {TAB_LABEL[t]}
         </button>
       ))}
+      {showInProgressToggle && (
+        <button type="button" className={styles.tabInProgressToggle} onClick={onToggleInProgress}>
+          {inProgressExpanded ? "Ocultar" : "Mostrar"} atendimentos em andamento ({inProgressCount})
+        </button>
+      )}
     </div>
   );
 }
