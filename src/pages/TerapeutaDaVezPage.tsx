@@ -41,6 +41,13 @@ const TAB_LABEL: Record<Tab, string> = {
 // rápida de "volta mais tarde"; mais longo que isso direciona pra Agenda.
 const QUICK_RETURN_MAX_DURATION_MINUTES = 25;
 
+// Espelha `CLEANING_MINUTES` do backend (`domain.entities`) — usado só pra
+// exibir, no card "OCUPADO", o horário em que o espaço fica de fato pronto
+// pro próximo cliente (já contando a higienização), em vez de duas contas
+// separadas (fim da terapia, depois fim da higienização) que o usuário
+// tinha que somar de cabeça.
+const CLEANING_MINUTES = 2;
+
 /** Dados já escolhidos na tentativa de "volta mais tarde" (nome, telefone,
  * procedimento) que não era rápido o suficiente — repassados pra Agenda,
  * que abre o modal de criar já com isto preenchido (pedido do usuário:
@@ -78,6 +85,11 @@ function formatDateLabel(d: Date): string {
 function formatHM(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function addMinutesIso(iso: string | null, minutes: number): string | null {
+  if (!iso) return null;
+  return new Date(new Date(iso).getTime() + minutes * 60000).toISOString();
 }
 
 /** Escolhe texto escuro ou claro pra ficar legível em cima de uma cor de
@@ -3217,20 +3229,19 @@ function SpacesSection({
               )}
               {s.state === "free" && s.occupiesAt && (
                 <span className={styles.spaceCardLine} style={{ color: "#C9A44C" }}>
-                  Ocupada em {remainingMinutes(s.occupiesAt, now)} min
+                  Reservado às {formatHM(s.occupiesAt)} (em {remainingMinutes(s.occupiesAt, now)} min)
                 </span>
               )}
               {s.state === "occupied" && (
                 <span className={styles.spaceCardLine} style={{ color: textColor }}>
-                  {s.procedureName} · {s.therapistName} · libera às {formatHM(s.availableAt)} (faltam{" "}
-                  {remainingMinutes(s.availableAt, now)} min)
+                  {s.procedureName} · {s.therapistName} · libera às{" "}
+                  {formatHM(addMinutesIso(s.availableAt, CLEANING_MINUTES))}
                 </span>
               )}
               {s.state === "cleaning" && (
                 <div className={styles.spaceCleaningRow}>
                   <span className={styles.spaceCardLine} style={{ color: textColor }}>
-                    Higienização · disponível às {formatHM(s.availableAt)} (faltam{" "}
-                    {remainingMinutes(s.availableAt, now)} min)
+                    Higienização · disponível às {formatHM(s.availableAt)}
                   </span>
                   <button
                     type="button"
@@ -4218,9 +4229,9 @@ function WizardModal({
                           {s.state === "free" && !s.occupiesAt && "Disponível agora"}
                           {s.state === "free" &&
                             conflictsWithReservation &&
-                            `✕ Não cabe — ocupada em ${minutesUntilOccupied} min`}
+                            `✕ Não cabe — reservado às ${formatHM(s.occupiesAt)} (em ${minutesUntilOccupied} min)`}
                           {reservedSoon &&
-                            `⚠ Ocupada em ${minutesUntilOccupied} min — confira o horário`}
+                            `⚠ Reservado às ${formatHM(s.occupiesAt)} (em ${minutesUntilOccupied} min) — confira o horário`}
                           {s.state !== "free" && `Ocupado até ${formatHM(s.availableAt)}`}
                         </div>
                       </button>
