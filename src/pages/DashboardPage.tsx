@@ -21,7 +21,7 @@ const SOURCE_FILTER_LABEL: Record<SourceFilter, string> = {
   passivo: "Passivo (leads)",
 };
 
-const PASSIVO_BADGE = { label: "Passivo", color: "#4aa3ff", bg: "rgba(74,163,255,.14)" };
+const PASSIVO_BADGE = { label: "Passivo", color: "var(--tone-blue)", bg: "var(--tone-blue-bg)" };
 
 export function DashboardPage() {
   // Prospecção (funil comercial próprio da GSM) é restrita a platform staff
@@ -93,22 +93,22 @@ function LeadsDashboardSection({
         <>
           <div className={styles.kpiGrid}>
             <KpiCard label="Total de leads" value={String(data.totalLeads)} hint="na empresa" icon="leads" highlight />
-            <KpiCard label="Leads hoje" value={String(data.today)} hint="entraram hoje" icon="today" valueColor="#4aa3ff" />
+            <KpiCard label="Leads hoje" value={String(data.today)} hint="entraram hoje" icon="today" valueColor="var(--tone-blue)" />
             <KpiCard label="Na semana" value={String(data.week)} hint="últimos 7 dias" icon="week" />
             <KpiCard label="No mês" value={String(data.month)} hint="últimos 30 dias" icon="month" />
-            <KpiCard label="Clientes fechados" value={String(data.closed)} hint="negócios ganhos" icon="closed" valueColor="#2ee66e" />
-            <KpiCard label="Taxa de conversão" value={`${data.conversionRate}%`} hint="ganhos / total" icon="conversion" valueColor="#f5b13d" />
-            <KpiCard label="Receita prevista" value={`R$ ${shortCurrency(Math.round(data.forecastRevenue))}`} hint="ponderada pela prob." icon="forecast" valueColor="#a78bfa" />
+            <KpiCard label="Clientes fechados" value={String(data.closed)} hint="negócios ganhos" icon="closed" valueColor="var(--tone-green)" />
+            <KpiCard label="Taxa de conversão" value={`${data.conversionRate}%`} hint="ganhos / total" icon="conversion" valueColor="var(--tone-amber)" />
+            <KpiCard label="Receita prevista" value={`R$ ${shortCurrency(Math.round(data.forecastRevenue))}`} hint="ponderada pela prob." icon="forecast" valueColor="var(--tone-purple)" />
             <KpiCard label="Receita fechada" value={`R$ ${shortCurrency(data.closedRevenue)}`} hint="já ganho" icon="revenue" highlight />
             <KpiCard
               label="1º atendimento"
               value={data.avgFirstContactHours < 1 ? `${Math.round(data.avgFirstContactHours * 60)}min` : `${data.avgFirstContactHours.toFixed(1)}h`}
               hint="tempo médio"
               icon="firstContact"
-              valueColor="#4aa3ff"
+              valueColor="var(--tone-blue)"
             />
             <KpiCard label="Até fechamento" value={data.avgCloseDays != null ? `${data.avgCloseDays.toFixed(0)}d` : "—"} hint="tempo médio" icon="closeTime" />
-            <KpiCard label="Em aberto" value={String(data.open)} hint="em negociação" icon="open" valueColor="#f5b13d" />
+            <KpiCard label="Em aberto" value={String(data.open)} hint="em negociação" icon="open" valueColor="var(--tone-amber)" />
             <KpiCard label="Perdidos" value={String(data.lost)} hint="no período" icon="lost" />
           </div>
 

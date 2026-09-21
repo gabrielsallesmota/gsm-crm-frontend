@@ -12,6 +12,7 @@ import { useTags } from "../../hooks/useTags";
 import { useLeadComments } from "../../hooks/useLeadComments";
 import { useLeadCommentActions } from "../../hooks/useLeadCommentActions";
 import { useToast } from "../../hooks/useToast";
+import { readableTextColor } from "../../utils/colors";
 import { formatPhone } from "../../utils/phone";
 import { WhatsappButton } from "./WhatsappButton";
 import styles from "./LeadDrawer.module.css";
@@ -105,7 +106,7 @@ export function LeadDrawer({
         </button>
 
         <div className={styles.header}>
-          <Avatar name={lead.name} bg="rgba(74,163,255,.14)" color="#4aa3ff" size={48} />
+          <Avatar name={lead.name} bg="var(--tone-blue-bg)" color="var(--tone-blue)" size={48} />
           <div style={{ flex: 1 }}>
             {editing ? (
               <>
@@ -133,7 +134,7 @@ export function LeadDrawer({
 
         <div className={styles.badges}>
           <Badge label={stage.label} color={stage.color} bg={stage.bg} />
-          <Badge label={temp.label} color={temp.color} bg="rgba(255,255,255,.06)" />
+          <Badge label={temp.label} color={temp.color} bg="var(--tone-gray-bg)" />
           <WhatsappButton lead={lead} templates={templates} />
           {!editing && (
             <button className={styles.editToggle} onClick={startEdit}>
@@ -208,7 +209,7 @@ export function LeadDrawer({
                       type="button"
                       key={tag.id}
                       className={active ? `${styles.tagOption} ${styles.tagOptionActive}` : styles.tagOption}
-                      style={active ? { color: tag.color, background: tag.bg } : undefined}
+                      style={active ? { color: readableTextColor(tag.color), background: tag.bg } : undefined}
                       onClick={() => toggleTag(tag.id)}
                     >
                       {tag.label}
@@ -316,7 +317,7 @@ export function LeadDrawer({
           {lead.timeline.length === 0 && <div className={styles.empty}>Sem atividades registradas ainda.</div>}
           {lead.timeline.map((t, i) => (
             <div key={i} className={styles.timelineRow}>
-              <span className={styles.timelineIcon} style={{ color: t.color }}>
+              <span className={styles.timelineIcon} style={{ color: readableTextColor(t.color) }}>
                 {t.icon}
               </span>
               <div>

@@ -4,6 +4,7 @@ import { ROUTES } from "../constants/routes";
 import { useAuth } from "../hooks/useAuth";
 import { Avatar } from "../components/common/Avatar";
 import { NavIcon } from "../components/common/NavIcon";
+import { ThemeToggle } from "../components/common/ThemeToggle";
 import { ToastHost } from "../components/common/ToastHost";
 import { useToast } from "../hooks/useToast";
 import { isDemoMode } from "../services/factory";
@@ -117,7 +118,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className={styles.shell}>
       {isDemoMode && (
-        <div className={styles.demoBanner}>
+        <div className={`${styles.demoBanner} theme-dark`}>
           <span>
             <b>● DEMONSTRAÇÃO</b> — dados fictícios, sem conexão com banco real.
           </span>
@@ -135,7 +136,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
         <aside
           id="app-sidebar"
-          className={[styles.sidebar, mobileNavOpen && styles.sidebarOpen, collapsed && styles.sidebarCollapsed]
+          className={["theme-dark", styles.sidebar, mobileNavOpen && styles.sidebarOpen, collapsed && styles.sidebarCollapsed]
             .filter(Boolean)
             .join(" ")}
         >
@@ -191,7 +192,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </button>
 
           <div className={styles.userBox}>
-            {user && <Avatar name={user.name} bg="rgba(46,230,110,.14)" color="#2ee66e" />}
+            {user && <Avatar name={user.name} bg="var(--tone-green-bg)" color="var(--tone-green)" />}
             <div className={styles.userInfo}>
               <div className={styles.userName}>{user?.name}</div>
               <div className={styles.userRole}>{roleLabel(user)}</div>
@@ -250,14 +251,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   <span className={styles.tenantChip}>
                     <Avatar
                       name={currentTenantName}
-                      bg={currentTenant?.avatarBg ?? "rgba(46,230,110,.14)"}
-                      color={currentTenant?.avatarColor ?? "#2ee66e"}
+                      bg={currentTenant?.avatarBg ?? "var(--tone-green-bg)"}
+                      color={currentTenant?.avatarColor ?? "var(--tone-green)"}
                       size={22}
                     />
                     {currentTenantName}
                   </span>
                 )
               )}
+              <ThemeToggle />
               <button className={styles.newLeadBtn} onClick={() => navigate(ROUTES.leads)}>
                 + Lead
               </button>

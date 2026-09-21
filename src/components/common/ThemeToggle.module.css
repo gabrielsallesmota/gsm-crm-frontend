@@ -1,0 +1,15 @@
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  padding: 9px;
+}
+
+.toggle:hover {
+  background: var(--hover-bg-2);
+}

@@ -15,11 +15,11 @@ export const PHONE_TYPE: Record<PhoneType, { label: string }> = {
 };
 
 export const WHATSAPP_STATUS: Record<WhatsappStatus, { label: string; color: string; bg: string }> = {
-  nao_verificado: { label: "Não verificado", color: "#9aa6b2", bg: "rgba(255,255,255,.06)" },
-  valido: { label: "Válido", color: "#2ee66e", bg: "rgba(46,230,110,.12)" },
-  invalido: { label: "Inválido", color: "#ff6b6b", bg: "rgba(255,107,107,.12)" },
-  contatado_sem_resposta: { label: "Contatado, sem resposta", color: "#f5b13d", bg: "rgba(245,177,61,.14)" },
-  respondeu: { label: "Respondeu", color: "#4aa3ff", bg: "rgba(74,163,255,.14)" },
+  nao_verificado: { label: "Não verificado", color: "var(--tone-gray)", bg: "var(--tone-gray-bg)" },
+  valido: { label: "Válido", color: "var(--tone-green)", bg: "var(--tone-green-bg)" },
+  invalido: { label: "Inválido", color: "var(--tone-red)", bg: "var(--tone-red-bg)" },
+  contatado_sem_resposta: { label: "Contatado, sem resposta", color: "var(--tone-amber)", bg: "var(--tone-amber-bg)" },
+  respondeu: { label: "Respondeu", color: "var(--tone-blue)", bg: "var(--tone-blue-bg)" },
 };
 
 export const SITE_STATUS: Record<SiteStatus, { label: string }> = {
@@ -39,9 +39,9 @@ export const PAGE_OBJECTIVE: Record<PageObjective, { label: string }> = {
 };
 
 export const PRIORITY: Record<ProspectPriority, { label: string; color: string; bg: string }> = {
-  a: { label: "A", color: "#ff6b6b", bg: "rgba(255,107,107,.14)" },
-  b: { label: "B", color: "#f5b13d", bg: "rgba(245,177,61,.14)" },
-  c: { label: "C", color: "#9aa6b2", bg: "rgba(255,255,255,.06)" },
+  a: { label: "A", color: "var(--tone-red)", bg: "var(--tone-red-bg)" },
+  b: { label: "B", color: "var(--tone-amber)", bg: "var(--tone-amber-bg)" },
+  c: { label: "C", color: "var(--tone-gray)", bg: "var(--tone-gray-bg)" },
 };
 
 /** Canal de abordagem recomendado — cores reaproveitadas das já existentes
@@ -50,16 +50,16 @@ export const PRIORITY: Record<ProspectPriority, { label: string; color: string; 
  * branca de propósito (pedido do usuário): texto escuro sobre quase-branco,
  * legível mesmo no tema escuro do resto do app. */
 export const CONTACT_CHANNEL: Record<ContactChannel, { label: string; color: string; bg: string }> = {
-  whatsapp: { label: "WhatsApp", color: "#2ee66e", bg: "rgba(46,230,110,.12)" },
-  instagram: { label: "Instagram", color: "#e1719c", bg: "rgba(225,48,108,.14)" },
-  email: { label: "E-mail", color: "#0a0e12", bg: "#e6edf2" },
+  whatsapp: { label: "WhatsApp", color: "var(--tone-green)", bg: "var(--tone-green-bg)" },
+  instagram: { label: "Instagram", color: "var(--tone-pink)", bg: "var(--tone-pink-bg)" },
+  email: { label: "E-mail", color: "var(--tone-email)", bg: "var(--tone-email-bg)" },
 };
 
 export const PROSPECT_ORIGIN: Record<ProspectOrigin, { label: string; color: string; bg: string }> = {
-  google_maps: { label: "Google Maps", color: "#f5b13d", bg: "rgba(245,177,61,.14)" },
-  indicacao: { label: "Indicação", color: "#2ee66e", bg: "rgba(46,230,110,.12)" },
-  instagram: { label: "Instagram", color: "#e1719c", bg: "rgba(225,48,108,.14)" },
-  site: { label: "Site", color: "#4aa3ff", bg: "rgba(74,163,255,.14)" },
-  evento: { label: "Evento", color: "#a78bfa", bg: "rgba(167,139,250,.16)" },
-  outro: { label: "Outro", color: "#9aa6b2", bg: "rgba(255,255,255,.06)" },
+  google_maps: { label: "Google Maps", color: "var(--tone-amber)", bg: "var(--tone-amber-bg)" },
+  indicacao: { label: "Indicação", color: "var(--tone-green)", bg: "var(--tone-green-bg)" },
+  instagram: { label: "Instagram", color: "var(--tone-pink)", bg: "var(--tone-pink-bg)" },
+  site: { label: "Site", color: "var(--tone-blue)", bg: "var(--tone-blue-bg)" },
+  evento: { label: "Evento", color: "var(--tone-purple)", bg: "var(--tone-purple-bg)" },
+  outro: { label: "Outro", color: "var(--tone-gray)", bg: "var(--tone-gray-bg)" },
 };

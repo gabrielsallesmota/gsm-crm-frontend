@@ -6,7 +6,7 @@
   font-family: var(--font-heading);
   font-size: 16px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
 }
 
 .sectionSubtitle {

@@ -9,7 +9,7 @@ import { shortDateLabel } from "../utils/dates";
 import type { TaskPriority } from "../types/task";
 import styles from "./TasksPage.module.css";
 
-const PRIORITY_COLOR: Record<string, string> = { alta: "#ff6b6b", media: "#f5b13d", baixa: "#9aa6b2" };
+const PRIORITY_COLOR: Record<string, string> = { alta: "var(--tone-red)", media: "var(--tone-amber)", baixa: "var(--tone-gray)" };
 
 export function TasksPage() {
   // Sem branch de `notImplemented` de propósito — mesma razão de

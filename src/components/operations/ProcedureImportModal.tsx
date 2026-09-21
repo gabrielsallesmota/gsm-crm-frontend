@@ -240,7 +240,7 @@ export function ProcedureImportModal({
                 ))}
               </>
             )}
-            {parseError && <p style={{ color: "#ff6b6b", fontSize: 12.5 }}>{parseError}</p>}
+            {parseError && <p style={{ color: "var(--tone-red)", fontSize: 12.5 }}>{parseError}</p>}
           </>
         )}
 

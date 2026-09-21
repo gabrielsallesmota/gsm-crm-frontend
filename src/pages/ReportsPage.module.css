@@ -3,7 +3,7 @@
   font-family: var(--font-heading);
   font-size: 22px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
 }
 
 .pageSubtitle {
@@ -38,7 +38,7 @@
   font-family: var(--font-heading);
   font-size: 15px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
 }
 
 .cardSubtitle {
@@ -69,7 +69,7 @@
 }
 
 .barTrack {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--hover-bg-2);
   border-radius: 6px;
   height: 10px;
   overflow: hidden;

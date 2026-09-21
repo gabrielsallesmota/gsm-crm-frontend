@@ -61,7 +61,7 @@ export function ChannelTag({
 
   const message = resolveProspectMessage(prospect, stage, templates);
   const meta = CONTACT_CHANNEL[channel];
-  const style = { color: meta.color, background: meta.bg, borderColor: `${meta.color}40` };
+  const style = { color: meta.color, background: meta.bg, borderColor: `color-mix(in srgb, ${meta.color} 25%, transparent)` };
 
   async function handleCopy(e: MouseEvent) {
     e.stopPropagation();

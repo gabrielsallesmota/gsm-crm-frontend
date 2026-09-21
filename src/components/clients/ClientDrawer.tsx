@@ -64,9 +64,9 @@ function emptyCustomRow(dueDate: string): CustomRow {
 }
 
 const STATUS_BADGE: Record<string, { color: string; bg: string }> = {
-  pago: { color: "#2ee66e", bg: "rgba(46,230,110,.14)" },
-  atrasado: { color: "#ff5c5c", bg: "rgba(255,92,92,.14)" },
-  pendente: { color: "#f5a623", bg: "rgba(245,166,35,.14)" },
+  pago: { color: "var(--tone-green)", bg: "var(--tone-green-bg)" },
+  atrasado: { color: "var(--tone-red)", bg: "var(--tone-red-bg)" },
+  pendente: { color: "var(--tone-amber)", bg: "var(--tone-amber-bg)" },
 };
 
 export function ClientDrawer({
@@ -361,12 +361,12 @@ export function ClientDrawer({
               <h2 className={styles.name}>{client.companyName}</h2>
             )}
             <div className={styles.badges}>
-              <Badge label={CLIENT_SOURCE_LABEL[client.source]} color="#4aa3ff" bg="rgba(74,163,255,.14)" />
+              <Badge label={CLIENT_SOURCE_LABEL[client.source]} color="var(--tone-blue)" bg="var(--tone-blue-bg)" />
               {client.paymentType && (
-                <Badge label={PAYMENT_TYPE_LABEL[client.paymentType]} color="#a780ff" bg="rgba(167,128,255,.14)" />
+                <Badge label={PAYMENT_TYPE_LABEL[client.paymentType]} color="var(--tone-purple)" bg="var(--tone-purple-bg)" />
               )}
               {client.hasOverdueInstallment && (
-                <Badge label="Parcela atrasada" color="#ff5c5c" bg="rgba(255,92,92,.14)" />
+                <Badge label="Parcela atrasada" color="var(--tone-red)" bg="var(--tone-red-bg)" />
               )}
             </div>
           </div>

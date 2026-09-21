@@ -6,8 +6,8 @@
 }
 
 .highlight {
-  background: linear-gradient(140deg, rgba(46, 230, 110, 0.14), var(--card-bg));
-  border-color: rgba(46, 230, 110, 0.22);
+  background: linear-gradient(140deg, var(--accent-bg), var(--card-bg));
+  border-color: var(--accent-border);
 }
 
 .top {
@@ -44,7 +44,7 @@
 }
 
 .highlight .value {
-  color: #fff;
+  color: var(--heading);
 }
 
 .hint {

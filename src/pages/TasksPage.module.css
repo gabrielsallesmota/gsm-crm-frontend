@@ -3,7 +3,7 @@
   font-family: var(--font-heading);
   font-size: 22px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
 }
 
 .pageSubtitle {
@@ -110,5 +110,5 @@
 }
 
 .deleteBtn:hover {
-  color: #ff6b6b;
+  color: var(--danger);
 }

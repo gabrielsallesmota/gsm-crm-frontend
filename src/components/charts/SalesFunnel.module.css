@@ -9,7 +9,7 @@
   font-family: var(--font-heading);
   font-size: 15px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
 }
 
 .subtitle {
@@ -37,7 +37,7 @@
 }
 
 .track {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--hover-bg-2);
   border-radius: 8px;
   overflow: hidden;
   height: 30px;
@@ -51,7 +51,7 @@
   padding-right: 10px;
   font-size: 12.5px;
   font-weight: 700;
-  color: #04130a;
+  color: var(--on-accent);
   border-radius: 8px;
   min-width: 30px;
 }

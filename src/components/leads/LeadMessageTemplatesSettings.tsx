@@ -13,7 +13,7 @@ import type { Pipeline, StageKey } from "../../types/pipeline";
 import type { LeadMessageTemplate } from "../../types/lead";
 import styles from "../prospects/MessageTemplatesSettings.module.css";
 
-const WILDCARD_BADGE = { label: "Qualquer origem", color: "#9aa6b2", bg: "rgba(255,255,255,.06)" };
+const WILDCARD_BADGE = { label: "Qualquer origem", color: "var(--tone-gray)", bg: "var(--tone-gray-bg)" };
 
 function submitButtonLabel(submitting: boolean, isEditing: boolean): string {
   if (submitting) return "Salvando…";

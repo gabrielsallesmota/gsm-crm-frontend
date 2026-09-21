@@ -35,7 +35,7 @@
   font-family: var(--font-mono);
   font-weight: 800;
   font-size: 22px;
-  color: #fff;
+  color: var(--heading);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -69,7 +69,7 @@
   font-size: clamp(30px, 4.4vw, 46px);
   line-height: 1.08;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
   letter-spacing: -0.02em;
 }
 
