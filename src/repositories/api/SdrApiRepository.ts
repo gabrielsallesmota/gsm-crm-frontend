@@ -9,6 +9,7 @@ import type {
   SdrCampaign,
   SdrCampaignCriterion,
   SdrCampaignLocation,
+  SdrCampaignRun,
   SdrCandidate,
   SdrCandidateAppearance,
   SdrCandidateDecision,
@@ -17,8 +18,12 @@ import type {
   SdrCriterion,
   SdrCriterionKind,
   SdrDiscardReason,
+  SdrDiscoveryJob,
+  SdrDiscoveryJobStatus,
   SdrIcpPreset,
   SdrLocation,
+  SdrProviderUsageEntry,
+  StartSdrCampaignRunInput,
   UpdateSdrCampaignInput,
   UpdateSdrCoverageInput,
   UpdateSdrIcpPresetInput,
@@ -285,6 +290,118 @@ function toSummary(dto: BulkSummaryDto): SdrBulkActionSummary {
   };
 }
 
+interface CampaignRunDto {
+  id: string;
+  tenant_id: string;
+  campaign_id: string;
+  mode: SdrCampaignRun["mode"];
+  status: SdrCampaignRun["status"];
+  target_quantity: number;
+  max_provider_calls: number | null;
+  found_count: number;
+  duplicate_count: number;
+  processed_count: number;
+  failure_count: number;
+  current_stage: string | null;
+  actor_user_id: string | null;
+  started_at: string | null;
+  paused_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DiscoveryJobDto {
+  id: string;
+  run_id: string;
+  campaign_id: string;
+  country: string | null;
+  state: string | null;
+  city: string | null;
+  locality: string | null;
+  search_term: string;
+  page_token: string | null;
+  status: SdrDiscoveryJob["status"];
+  attempts: number;
+  max_attempts: number;
+  last_error: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ProviderUsageEntryDto {
+  id: string;
+  campaign_id: string | null;
+  run_id: string | null;
+  provider: string;
+  sku: string;
+  field_mask: string;
+  units: number;
+  estimated_cost_cents: number | null;
+  created_at: string;
+}
+
+function toCampaignRun(dto: CampaignRunDto): SdrCampaignRun {
+  return {
+    id: dto.id,
+    tenantId: dto.tenant_id,
+    campaignId: dto.campaign_id,
+    mode: dto.mode,
+    status: dto.status,
+    targetQuantity: dto.target_quantity,
+    maxProviderCalls: dto.max_provider_calls,
+    foundCount: dto.found_count,
+    duplicateCount: dto.duplicate_count,
+    processedCount: dto.processed_count,
+    failureCount: dto.failure_count,
+    currentStage: dto.current_stage,
+    actorUserId: dto.actor_user_id,
+    startedAt: dto.started_at,
+    pausedAt: dto.paused_at,
+    finishedAt: dto.finished_at,
+    createdAt: dto.created_at,
+    updatedAt: dto.updated_at,
+  };
+}
+
+function toDiscoveryJob(dto: DiscoveryJobDto): SdrDiscoveryJob {
+  return {
+    id: dto.id,
+    runId: dto.run_id,
+    campaignId: dto.campaign_id,
+    country: dto.country,
+    state: dto.state,
+    city: dto.city,
+    locality: dto.locality,
+    searchTerm: dto.search_term,
+    pageToken: dto.page_token,
+    status: dto.status,
+    attempts: dto.attempts,
+    maxAttempts: dto.max_attempts,
+    lastError: dto.last_error,
+    startedAt: dto.started_at,
+    finishedAt: dto.finished_at,
+    createdAt: dto.created_at,
+    updatedAt: dto.updated_at,
+  };
+}
+
+function toProviderUsageEntry(dto: ProviderUsageEntryDto): SdrProviderUsageEntry {
+  return {
+    id: dto.id,
+    campaignId: dto.campaign_id,
+    runId: dto.run_id,
+    provider: dto.provider,
+    sku: dto.sku,
+    fieldMask: dto.field_mask,
+    units: dto.units,
+    estimatedCostCents: dto.estimated_cost_cents,
+    createdAt: dto.created_at,
+  };
+}
+
 function campaignBody(input: CreateSdrCampaignInput | UpdateSdrCampaignInput) {
   return {
     name: input.name,
@@ -543,5 +660,69 @@ export class SdrApiRepository implements SdrRepository {
         }),
       }),
     );
+  }
+
+  // Etapa 2 — execução real (worker + Google Places).
+
+  async startCampaignRun(
+    campaignId: string,
+    input: StartSdrCampaignRunInput,
+  ): Promise<SdrCampaignRun> {
+    return toCampaignRun(
+      await apiRequest<CampaignRunDto>(`/api/v1/sdr/campaigns/${campaignId}/runs`, {
+        method: "POST",
+        body: JSON.stringify({
+          mode: input.mode,
+          target_quantity: input.targetQuantity,
+          max_provider_calls: input.maxProviderCalls,
+        }),
+      }),
+    );
+  }
+
+  async listCampaignRuns(campaignId: string): Promise<SdrCampaignRun[]> {
+    const dto = await apiRequest<CampaignRunDto[]>(`/api/v1/sdr/campaigns/${campaignId}/runs`);
+    return dto.map(toCampaignRun);
+  }
+
+  async getCampaignRun(runId: string): Promise<SdrCampaignRun> {
+    return toCampaignRun(await apiRequest<CampaignRunDto>(`/api/v1/sdr/runs/${runId}`));
+  }
+
+  async listRunJobs(runId: string, status?: SdrDiscoveryJobStatus): Promise<SdrDiscoveryJob[]> {
+    const query = status ? `?status=${status}` : "";
+    const dto = await apiRequest<DiscoveryJobDto[]>(`/api/v1/sdr/runs/${runId}/jobs${query}`);
+    return dto.map(toDiscoveryJob);
+  }
+
+  async pauseCampaignRun(runId: string): Promise<SdrCampaignRun> {
+    return toCampaignRun(
+      await apiRequest<CampaignRunDto>(`/api/v1/sdr/runs/${runId}/pause`, { method: "POST" }),
+    );
+  }
+
+  async resumeCampaignRun(runId: string): Promise<SdrCampaignRun> {
+    return toCampaignRun(
+      await apiRequest<CampaignRunDto>(`/api/v1/sdr/runs/${runId}/resume`, { method: "POST" }),
+    );
+  }
+
+  async cancelCampaignRun(runId: string): Promise<SdrCampaignRun> {
+    return toCampaignRun(
+      await apiRequest<CampaignRunDto>(`/api/v1/sdr/runs/${runId}/cancel`, { method: "POST" }),
+    );
+  }
+
+  async reprocessFailedJobs(runId: string): Promise<{ reprocessed: number }> {
+    return await apiRequest<{ reprocessed: number }>(
+      `/api/v1/sdr/runs/${runId}/reprocess-failed`,
+      { method: "POST" },
+    );
+  }
+
+  async getUsageSummary(limit?: number): Promise<SdrProviderUsageEntry[]> {
+    const query = limit ? `?limit=${limit}` : "";
+    const dto = await apiRequest<ProviderUsageEntryDto[]>(`/api/v1/sdr/usage${query}`);
+    return dto.map(toProviderUsageEntry);
   }
 }

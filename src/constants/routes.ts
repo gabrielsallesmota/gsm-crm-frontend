@@ -12,6 +12,8 @@ export const ROUTES = {
   sdrCampanhas: "/sdr/campanhas",
   sdrCampanhaNova: "/sdr/campanhas/nova",
   sdrCampanhaEditar: (id: string) => `/sdr/campanhas/${id}`,
+  sdrCampanhaExecucao: (campaignId: string, runId: string) =>
+    `/sdr/campanhas/${campaignId}/execucoes/${runId}`,
   sdrPresets: "/sdr/presets",
   sdrCandidates: "/sdr/candidates",
   sdrCandidateDetail: (id: string) => `/sdr/candidates/${id}`,

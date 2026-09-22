@@ -7,13 +7,18 @@ import type {
   SdrBulkActionInput,
   SdrBulkActionSummary,
   SdrCampaign,
+  SdrCampaignRun,
   SdrCandidate,
   SdrCandidateAppearance,
   SdrCandidateDecision,
   SdrCandidateListFilter,
   SdrCoverage,
   SdrDiscardReason,
+  SdrDiscoveryJob,
+  SdrDiscoveryJobStatus,
   SdrIcpPreset,
+  SdrProviderUsageEntry,
+  StartSdrCampaignRunInput,
   UpdateSdrCampaignInput,
   UpdateSdrCoverageInput,
   UpdateSdrIcpPresetInput,
@@ -132,6 +137,47 @@ export class SdrMockRepository implements SdrRepository {
   }
 
   async bulkCandidateAction(_input: SdrBulkActionInput): Promise<SdrBulkActionSummary> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  // Etapa 2 — execução real (worker + Google Places).
+
+  async startCampaignRun(
+    _campaignId: string,
+    _input: StartSdrCampaignRunInput,
+  ): Promise<SdrCampaignRun> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async listCampaignRuns(): Promise<SdrCampaignRun[]> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async getCampaignRun(): Promise<SdrCampaignRun> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async listRunJobs(_runId: string, _status?: SdrDiscoveryJobStatus): Promise<SdrDiscoveryJob[]> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async pauseCampaignRun(): Promise<SdrCampaignRun> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async resumeCampaignRun(): Promise<SdrCampaignRun> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async cancelCampaignRun(): Promise<SdrCampaignRun> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async reprocessFailedJobs(): Promise<{ reprocessed: number }> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async getUsageSummary(): Promise<SdrProviderUsageEntry[]> {
     throw new NotImplementedError("SDR", REASON);
   }
 }

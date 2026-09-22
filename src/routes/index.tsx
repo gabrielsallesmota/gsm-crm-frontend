@@ -11,6 +11,7 @@ import { LeadsPage } from "../pages/LeadsPage";
 import { ClientsPage } from "../pages/ClientsPage";
 import { SdrCampaignsPage } from "../pages/SdrCampaignsPage";
 import { SdrCampaignFormPage } from "../pages/SdrCampaignFormPage";
+import { SdrCampaignRunPage } from "../pages/SdrCampaignRunPage";
 import { SdrIcpPresetsPage } from "../pages/SdrIcpPresetsPage";
 import { SdrCandidatesPage } from "../pages/SdrCandidatesPage";
 import { SdrCandidateDetailPage } from "../pages/SdrCandidateDetailPage";
@@ -49,6 +50,7 @@ export const router = createBrowserRouter([
       { path: ROUTES.sdrCampanhas, element: <SdrCampaignsPage /> },
       { path: ROUTES.sdrCampanhaNova, element: <SdrCampaignFormPage /> },
       { path: `${ROUTES.sdrCampanhas}/:id`, element: <SdrCampaignFormPage /> },
+      { path: `${ROUTES.sdrCampanhas}/:id/execucoes/:runId`, element: <SdrCampaignRunPage /> },
       { path: ROUTES.sdrPresets, element: <SdrIcpPresetsPage /> },
       { path: ROUTES.sdrCandidates, element: <SdrCandidatesPage /> },
       { path: `${ROUTES.sdrCandidates}/:id`, element: <SdrCandidateDetailPage /> },

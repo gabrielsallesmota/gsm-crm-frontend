@@ -10,13 +10,18 @@ import type {
   SdrBulkActionInput,
   SdrBulkActionSummary,
   SdrCampaign,
+  SdrCampaignRun,
   SdrCandidate,
   SdrCandidateAppearance,
   SdrCandidateDecision,
   SdrCandidateListFilter,
   SdrCoverage,
   SdrDiscardReason,
+  SdrDiscoveryJob,
+  SdrDiscoveryJobStatus,
   SdrIcpPreset,
+  SdrProviderUsageEntry,
+  StartSdrCampaignRunInput,
   UpdateSdrCampaignInput,
   UpdateSdrCoverageInput,
   UpdateSdrIcpPresetInput,
@@ -136,6 +141,44 @@ export class SdrService {
 
   bulkCandidateAction(input: SdrBulkActionInput): Promise<SdrBulkActionSummary> {
     return repo.bulkCandidateAction(input);
+  }
+
+  // Etapa 2 — execução real (worker + Google Places).
+
+  startCampaignRun(campaignId: string, input: StartSdrCampaignRunInput): Promise<SdrCampaignRun> {
+    return repo.startCampaignRun(campaignId, input);
+  }
+
+  listCampaignRuns(campaignId: string): Promise<SdrCampaignRun[]> {
+    return repo.listCampaignRuns(campaignId);
+  }
+
+  getCampaignRun(runId: string): Promise<SdrCampaignRun> {
+    return repo.getCampaignRun(runId);
+  }
+
+  listRunJobs(runId: string, status?: SdrDiscoveryJobStatus): Promise<SdrDiscoveryJob[]> {
+    return repo.listRunJobs(runId, status);
+  }
+
+  pauseCampaignRun(runId: string): Promise<SdrCampaignRun> {
+    return repo.pauseCampaignRun(runId);
+  }
+
+  resumeCampaignRun(runId: string): Promise<SdrCampaignRun> {
+    return repo.resumeCampaignRun(runId);
+  }
+
+  cancelCampaignRun(runId: string): Promise<SdrCampaignRun> {
+    return repo.cancelCampaignRun(runId);
+  }
+
+  reprocessFailedJobs(runId: string): Promise<{ reprocessed: number }> {
+    return repo.reprocessFailedJobs(runId);
+  }
+
+  getUsageSummary(limit?: number): Promise<SdrProviderUsageEntry[]> {
+    return repo.getUsageSummary(limit);
   }
 }
 

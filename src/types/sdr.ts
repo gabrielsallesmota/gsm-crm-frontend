@@ -243,3 +243,102 @@ export const SDR_DECISION_LABEL: Record<SdrDecisionType, string> = {
   discarded: "Descartado",
   reevaluated: "Reavaliado",
 };
+
+// ---------------------------------------------------------------------------
+// Etapa 2 — execução real (worker + Google Places).
+// ---------------------------------------------------------------------------
+
+/** O backend decide o que pular por modo (nunca o frontend): `reuse_known`
+ * nunca chama o provider (só reaproveita o que já existe), `find_new` pula
+ * combinações já `concluida` em `SdrCoverage`, `full_refresh` nunca pula. */
+export type SdrRunMode = "reuse_known" | "find_new" | "full_refresh";
+
+export type SdrRunStatus =
+  | "queued"
+  | "running"
+  | "paused"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type SdrDiscoveryJobStatus = "pending" | "running" | "succeeded" | "failed" | "dead";
+
+export const SDR_RUN_TERMINAL_STATUSES: ReadonlySet<SdrRunStatus> = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+export interface SdrCampaignRun {
+  id: string;
+  tenantId: string;
+  campaignId: string;
+  mode: SdrRunMode;
+  status: SdrRunStatus;
+  targetQuantity: number;
+  maxProviderCalls: number | null;
+  foundCount: number;
+  duplicateCount: number;
+  processedCount: number;
+  failureCount: number;
+  currentStage: string | null;
+  actorUserId: string | null;
+  startedAt: string | null;
+  pausedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StartSdrCampaignRunInput {
+  mode: SdrRunMode;
+  targetQuantity?: number;
+  maxProviderCalls?: number;
+}
+
+export interface SdrDiscoveryJob {
+  id: string;
+  runId: string;
+  campaignId: string;
+  country: string | null;
+  state: string | null;
+  city: string | null;
+  locality: string | null;
+  searchTerm: string;
+  pageToken: string | null;
+  status: SdrDiscoveryJobStatus;
+  attempts: number;
+  maxAttempts: number;
+  lastError: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SdrProviderUsageEntry {
+  id: string;
+  campaignId: string | null;
+  runId: string | null;
+  provider: string;
+  sku: string;
+  fieldMask: string;
+  units: number;
+  estimatedCostCents: number | null;
+  createdAt: string;
+}
+
+export const SDR_RUN_STATUS_LABEL: Record<SdrRunStatus, string> = {
+  queued: "Na fila",
+  running: "Em execução",
+  paused: "Pausada",
+  completed: "Concluída",
+  failed: "Falhou",
+  cancelled: "Cancelada",
+};
+
+export const SDR_RUN_MODE_LABEL: Record<SdrRunMode, string> = {
+  reuse_known: "Reutilizar base conhecida",
+  find_new: "Buscar novidades",
+  full_refresh: "Refazer busca completa",
+};
