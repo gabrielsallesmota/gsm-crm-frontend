@@ -91,7 +91,7 @@ export function ClientsPage() {
                 <tr key={client.id} className={styles.row} onClick={() => setSelectedId(client.id)}>
                   <td>{client.companyName}</td>
                   <td>
-                    <Badge label={CLIENT_SOURCE_LABEL[client.source]} color="#4aa3ff" bg="rgba(74,163,255,.14)" />
+                    <Badge label={CLIENT_SOURCE_LABEL[client.source]} color="var(--tone-blue)" bg="var(--tone-blue-bg)" />
                   </td>
                   <td>{client.paymentType ? PAYMENT_TYPE_LABEL[client.paymentType] : "—"}</td>
                   <td>{client.totalValueCents ? `R$ ${brl(client.totalValueCents / 100)}` : "—"}</td>
@@ -99,7 +99,7 @@ export function ClientsPage() {
                     {client.nextDueDate ? fmtDate(client.nextDueDate) : "—"}
                     {client.hasOverdueInstallment && (
                       <span className={styles.overdueBadge}>
-                        <Badge label="Atrasado" color="#ff5c5c" bg="rgba(255,92,92,.14)" />
+                        <Badge label="Atrasado" color="var(--tone-red)" bg="var(--tone-red-bg)" />
                       </span>
                     )}
                   </td>

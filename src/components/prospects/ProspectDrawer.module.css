@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay);
   z-index: 200;
   display: flex;
   justify-content: flex-end;
@@ -53,7 +53,7 @@
   font-family: var(--font-heading);
   font-size: 18px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
   margin: 2px 0 4px;
 }
 
@@ -219,8 +219,8 @@
 }
 
 .duplicateWarning {
-  background: rgba(255, 107, 107, 0.1);
-  border: 1px solid rgba(255, 107, 107, 0.3);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
   border-radius: 10px;
   padding: 12px 14px;
   font-size: 12.5px;

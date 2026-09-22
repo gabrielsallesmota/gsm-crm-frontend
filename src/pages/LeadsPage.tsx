@@ -22,8 +22,8 @@ import styles from "./LeadsPage.module.css";
 
 type SourceFilter = "todos" | "ativo" | "passivo";
 
-const PASSIVO_BADGE = { label: "Passivo", color: "#4aa3ff", bg: "rgba(74,163,255,.14)" };
-const ATIVO_BADGE = { label: "Ativo", color: "#a78bfa", bg: "rgba(167,139,250,.16)" };
+const PASSIVO_BADGE = { label: "Passivo", color: "var(--tone-blue)", bg: "var(--tone-blue-bg)" };
+const ATIVO_BADGE = { label: "Ativo", color: "var(--tone-purple)", bg: "var(--tone-purple-bg)" };
 
 const SOURCE_FILTER_LABEL: Record<SourceFilter, string> = {
   todos: "Todos",

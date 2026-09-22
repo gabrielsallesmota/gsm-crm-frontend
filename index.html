@@ -8,6 +8,16 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GSM CRM</title>
+    <!-- Aplica o tema salvo ANTES do primeiro paint (evita piscar escuro->claro).
+         Padrão: claro. A chave é a mesma usada por `contexts/ThemeProvider.tsx`. -->
+    <script>
+      try {
+        var saved = localStorage.getItem("gsm_theme");
+        document.documentElement.setAttribute("data-theme", saved === "dark" ? "dark" : "light");
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

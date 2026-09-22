@@ -31,7 +31,7 @@ import type {
 } from "../../types/prospect";
 import styles from "./ProspectionBoard.module.css";
 
-const ATIVO_BADGE = { label: "Ativo", color: "#a78bfa", bg: "rgba(167,139,250,.16)" };
+const ATIVO_BADGE = { label: "Ativo", color: "var(--tone-purple)", bg: "var(--tone-purple-bg)" };
 
 function isoInDays(days: number): string {
   const d = new Date();

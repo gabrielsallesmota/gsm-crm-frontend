@@ -10,9 +10,9 @@ import type { CalEvent, CalEventType } from "../types/event";
 import styles from "./AgendaPage.module.css";
 
 const TYPE_LABEL: Record<string, { label: string; color: string }> = {
-  reuniao: { label: "Reunião", color: "#a78bfa" },
-  retorno: { label: "Retorno", color: "#4aa3ff" },
-  visita: { label: "Visita", color: "#2ee66e" },
+  reuniao: { label: "Reunião", color: "var(--tone-purple)" },
+  retorno: { label: "Retorno", color: "var(--tone-blue)" },
+  visita: { label: "Visita", color: "var(--tone-green)" },
 };
 
 export function AgendaPage() {

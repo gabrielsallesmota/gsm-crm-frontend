@@ -17,7 +17,7 @@ body {
 
 ::selection {
   background: var(--accent);
-  color: #04130a;
+  color: var(--on-accent);
 }
 
 input,
@@ -31,7 +31,7 @@ input:focus,
 textarea:focus,
 select:focus {
   outline: none;
-  border-color: rgba(46, 230, 110, 0.5) !important;
+  border-color: var(--focus) !important;
 }
 
 a {
@@ -39,7 +39,7 @@ a {
 }
 
 a:hover {
-  color: #63f295;
+  color: var(--accent-hover);
 }
 
 button {
@@ -52,7 +52,7 @@ button {
 }
 
 .gsm-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--scrollbar);
   border-radius: 8px;
 }
 

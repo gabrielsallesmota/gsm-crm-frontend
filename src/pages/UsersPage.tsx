@@ -10,9 +10,9 @@ import type { UserRole } from "../types/user";
 import styles from "./UsersPage.module.css";
 
 const ROLE_BADGE: Record<UserRole, { label: string; color: string; bg: string }> = {
-  admin: { label: "Admin", color: "#2ee66e", bg: "rgba(46,230,110,.14)" },
-  gestor: { label: "Gestor", color: "#a78bfa", bg: "rgba(167,139,250,.16)" },
-  vendedor: { label: "Vendedor", color: "#4aa3ff", bg: "rgba(74,163,255,.14)" },
+  admin: { label: "Admin", color: "var(--tone-green)", bg: "var(--tone-green-bg)" },
+  gestor: { label: "Gestor", color: "var(--tone-purple)", bg: "var(--tone-purple-bg)" },
+  vendedor: { label: "Vendedor", color: "var(--tone-blue)", bg: "var(--tone-blue-bg)" },
 };
 
 const MIN_PASSWORD_LENGTH = 8;

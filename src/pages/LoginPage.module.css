@@ -9,7 +9,7 @@
   font-family: var(--font-heading);
   font-size: 26px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
 }
 
 .subtitle {
@@ -30,7 +30,7 @@
   background: var(--card-bg-alt);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-input);
-  color: #e6edf2;
+  color: var(--text);
   padding: 13px 15px;
   font-size: 14.5px;
   margin-bottom: 16px;

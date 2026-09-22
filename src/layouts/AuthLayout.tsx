@@ -3,7 +3,7 @@ import styles from "./AuthLayout.module.css";
 
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} theme-dark`}>
       <div className={styles.panel}>
         <div className={styles.glow} />
         <div className={styles.logo}>

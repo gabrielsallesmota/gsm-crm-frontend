@@ -35,7 +35,7 @@
 
 .sourceFilterBtnActive {
   background: var(--card-bg);
-  color: #fff;
+  color: var(--heading);
 }
 
 .sourceDivider {
@@ -55,7 +55,7 @@
   font-family: var(--font-heading);
   font-size: 22px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -124,7 +124,7 @@
 .columnCount {
   font-size: 11.5px;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--hover-bg-2);
   border-radius: var(--radius-pill);
   padding: 2px 8px;
 }

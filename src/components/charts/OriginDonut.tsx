@@ -11,7 +11,7 @@ export function OriginDonut({ legend, total }: { legend: OriginLegendItem[]; tot
   });
   const gradient = segments.length
     ? `conic-gradient(${segments.join(",")})`
-    : "conic-gradient(rgba(255,255,255,.08) 0deg 360deg)";
+    : "conic-gradient(var(--hover-bg-3) 0deg 360deg)";
 
   return (
     <div className={styles.card}>

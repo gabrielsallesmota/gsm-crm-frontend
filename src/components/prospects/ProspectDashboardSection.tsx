@@ -62,25 +62,25 @@ export function ProspectDashboardSection({ period }: { period: Period }) {
   return (
     <div>
       <h2 className={styles.sectionHeader}>
-        <Badge label="Ativo" color="#a78bfa" bg="rgba(167,139,250,.16)" />
+        <Badge label="Ativo" color="var(--tone-purple)" bg="var(--tone-purple-bg)" />
         Prospecção GSM
       </h2>
       <p className={styles.sectionSubtitle}>Carteira comercial interna</p>
 
       <div className={styles.kpiGrid}>
         <KpiCard label="Total de prospects" value={String(data.total)} hint="na carteira" icon="leads" highlight />
-        <KpiCard label="Hoje" value={String(data.today)} hint="entraram hoje" icon="today" valueColor="#4aa3ff" />
+        <KpiCard label="Hoje" value={String(data.today)} hint="entraram hoje" icon="today" valueColor="var(--tone-blue)" />
         <KpiCard label="Na semana" value={String(data.week)} hint="últimos 7 dias" icon="week" />
         <KpiCard label="No mês" value={String(data.month)} hint="últimos 30 dias" icon="month" />
-        <KpiCard label="Fechados" value={String(data.won)} hint="negócios ganhos" icon="closed" valueColor="#2ee66e" />
+        <KpiCard label="Fechados" value={String(data.won)} hint="negócios ganhos" icon="closed" valueColor="var(--tone-green)" />
         <KpiCard
           label="Taxa de conversão"
           value={`${Math.round(data.conversionRate)}%`}
           hint="ganhos / total"
           icon="conversion"
-          valueColor="#f5b13d"
+          valueColor="var(--tone-amber)"
         />
-        <KpiCard label="Em aberto" value={String(data.open)} hint="em prospecção" icon="open" valueColor="#f5b13d" />
+        <KpiCard label="Em aberto" value={String(data.open)} hint="em prospecção" icon="open" valueColor="var(--tone-amber)" />
         <KpiCard label="Perdidos" value={String(data.lost)} hint="sem retorno" icon="lost" />
       </div>
 

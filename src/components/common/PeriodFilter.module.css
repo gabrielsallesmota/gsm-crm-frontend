@@ -41,7 +41,7 @@
 
 .presetBtnActive {
   background: var(--card-bg);
-  color: #fff;
+  color: var(--heading);
 }
 
 .customRow {

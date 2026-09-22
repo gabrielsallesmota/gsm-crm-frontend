@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay);
   z-index: 200;
   display: flex;
   justify-content: flex-end;
@@ -47,7 +47,7 @@
   font-family: var(--font-heading);
   font-size: 18px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
   margin: 2px 0 8px;
 }
 
@@ -257,7 +257,7 @@
 
 .planModeBtnActive {
   background: var(--card-bg);
-  color: #fff;
+  color: var(--heading);
 }
 
 .customRows {
@@ -293,7 +293,7 @@
 }
 
 .customRowRemove:hover {
-  color: #ff5c5c;
+  color: var(--danger);
 }
 
 .customRowRemove:disabled {

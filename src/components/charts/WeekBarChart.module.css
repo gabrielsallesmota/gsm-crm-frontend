@@ -9,7 +9,7 @@
   font-family: var(--font-heading);
   font-size: 15px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
 }
 
 .subtitle {

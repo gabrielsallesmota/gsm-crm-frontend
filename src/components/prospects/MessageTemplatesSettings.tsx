@@ -10,7 +10,7 @@ import { ApiError } from "../../types/common";
 import type { MessageTemplate } from "../../types/prospect";
 import styles from "./MessageTemplatesSettings.module.css";
 
-const WILDCARD_BADGE = { label: "Qualquer área", color: "#9aa6b2", bg: "rgba(255,255,255,.06)" };
+const WILDCARD_BADGE = { label: "Qualquer área", color: "var(--tone-gray)", bg: "var(--tone-gray-bg)" };
 
 function submitButtonLabel(submitting: boolean, isEditing: boolean): string {
   if (submitting) return "Salvando…";
@@ -90,7 +90,7 @@ export function MessageTemplatesSettings() {
               <div className={styles.rowTop}>
                 <span className={styles.stageName}>{stageName(template.stageId)}</span>
                 {template.niche ? (
-                  <Badge label={template.niche} color="#4aa3ff" bg="rgba(74,163,255,.14)" />
+                  <Badge label={template.niche} color="var(--tone-blue)" bg="var(--tone-blue-bg)" />
                 ) : (
                   <Badge {...WILDCARD_BADGE} />
                 )}

@@ -17,7 +17,7 @@
   font-family: var(--font-heading);
   font-size: 16px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -85,7 +85,7 @@
 .columnCount {
   font-size: 11.5px;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--hover-bg-2);
   border-radius: var(--radius-pill);
   padding: 2px 8px;
 }
@@ -136,14 +136,14 @@
    app (ver `.duplicateNote`/`.duplicateWarning`), pra chamar atenção de
    que esse prospect está com follow-up atrasado. */
 .targetDateOverdue {
-  color: #ff6b6b;
+  color: var(--danger);
 }
 
 /* Follow-up é HOJE — mesmo verde de "ativo"/sucesso usado em outros badges
    do app (ver `constants/prospectEnums.ts`), pra destacar "é agora" sem
    confundir com "atrasado" (vermelho, acima). */
 .targetDateToday {
-  color: #2ee66e;
+  color: var(--accent);
 }
 
 .cardMeta {
@@ -207,14 +207,14 @@
 }
 
 .noWhatsappToggleActive {
-  background: rgba(255, 107, 107, 0.14);
-  border-color: rgba(255, 107, 107, 0.35);
-  color: #ff6b6b;
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger);
 }
 
 .noWhatsappToggleActive:hover {
-  background: rgba(255, 107, 107, 0.22);
-  color: #ff6b6b;
+  background: var(--danger-bg-strong);
+  color: var(--danger);
 }
 
 .empty {
@@ -227,7 +227,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay);
   z-index: 250;
   display: flex;
   align-items: center;
@@ -253,7 +253,7 @@
   margin: 0 0 16px;
   font-family: var(--font-heading);
   font-size: 17px;
-  color: #fff;
+  color: var(--heading);
 }
 
 .input,
@@ -270,7 +270,7 @@
 
 .duplicateNote {
   font-size: 12px;
-  color: #ff6b6b;
+  color: var(--danger);
   margin: -4px 0 11px;
 }
 

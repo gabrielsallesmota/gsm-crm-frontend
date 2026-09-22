@@ -14,7 +14,7 @@ export function LeadRow({ lead, onClick }: { lead: Lead; onClick: () => void }) 
     <tr className={styles.row} onClick={onClick}>
       <td>
         <div className={styles.name}>
-          <Avatar name={lead.name} bg="rgba(74,163,255,.14)" color="#4aa3ff" size={30} />
+          <Avatar name={lead.name} bg="var(--tone-blue-bg)" color="var(--tone-blue)" size={30} />
           <div>
             <div className={styles.nameText}>{lead.name}</div>
             <div className={styles.company}>{lead.company}</div>

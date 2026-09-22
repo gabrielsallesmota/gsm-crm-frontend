@@ -3,7 +3,7 @@
   font-family: var(--font-heading);
   font-size: 22px;
   font-weight: 700;
-  color: #fff;
+  color: var(--heading);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -41,7 +41,7 @@
 
 .sourceFilterBtnActive {
   background: var(--card-bg);
-  color: #fff;
+  color: var(--heading);
 }
 
 .sourceDivider {

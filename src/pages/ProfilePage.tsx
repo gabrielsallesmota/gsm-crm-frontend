@@ -35,7 +35,7 @@ export function ProfilePage() {
       <p className={styles.pageSubtitle}>Seus dados de acesso</p>
 
       <div className={styles.card}>
-        <Avatar name={user.name} bg="rgba(46,230,110,.14)" color="#2ee66e" size={56} />
+        <Avatar name={user.name} bg="var(--tone-green-bg)" color="var(--tone-green)" size={56} />
         <div>
           <div className={styles.name}>{user.name}</div>
           <div className={styles.email}>{user.email}</div>

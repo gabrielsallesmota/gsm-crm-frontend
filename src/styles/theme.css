@@ -1,4 +1,13 @@
-:root {
+/* Tema escuro é o conjunto "base" (`:root`) — identico ao que sempre existiu.
+   `.theme-dark` re-aplica o MESMO conjunto num elemento específico, mesmo
+   quando `<html data-theme="light">` está ativo: é o que mantém o menu
+   lateral e as telas de login pretos no tema claro (pedido do usuário). As
+   variáveis CSS herdam pela árvore, então tudo dentro de um `.theme-dark`
+   enxerga os valores escuros sem nenhum estilo extra. */
+:root,
+.theme-dark {
+  color-scheme: dark;
+
   --bg: #0a0e12;
   --card-bg: #10171d;
   --card-bg-alt: #0c1217;
@@ -7,7 +16,10 @@
 
   --accent: #2ee66e;
   --accent-bg: rgba(46, 230, 110, 0.14);
+  --accent-border: rgba(46, 230, 110, 0.22);
   --accent-soft: #bfeecd;
+  --accent-hover: #63f295;
+  --on-accent: #04130a;
   --blue: #4aa3ff;
   --amber: #f5b13d;
   --purple: #a78bfa;
@@ -20,6 +32,52 @@
   --muted-2: #7f8b96;
   --faint: #5f6b76;
 
+  /* Títulos de página/modal/card — branco puro no escuro, quase-preto no claro. */
+  --heading: #ffffff;
+
+  /* Superfícies interativas/decorativas sobre `--card-bg` (hover de linha,
+     trilha de barra, chips neutros). */
+  --hover-bg: rgba(255, 255, 255, 0.04);
+  --hover-bg-2: rgba(255, 255, 255, 0.07);
+  --hover-bg-3: rgba(255, 255, 255, 0.1);
+  --scrollbar: rgba(255, 255, 255, 0.1);
+  --overlay: rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 14px 34px rgba(0, 0, 0, 0.5);
+  --focus: rgba(46, 230, 110, 0.5);
+
+  --danger: #ff6b6b;
+  --danger-bg: rgba(255, 107, 107, 0.14);
+  --danger-bg-strong: rgba(255, 107, 107, 0.22);
+  --danger-border: rgba(255, 107, 107, 0.35);
+
+  /* Paleta de "tons" para badges/etiquetas (origem, status, prioridade,
+     canal…) — cor do texto + fundo translúcido, sempre como PAR. O tema
+     claro escurece o texto (o verde/azul/âmbar "neon" do escuro some sobre
+     branco) e mantém o fundo como um tint leve da mesma cor. */
+  --tone-green: #2ee66e;
+  --tone-green-bg: rgba(46, 230, 110, 0.12);
+  --tone-wa: #25d366;
+  --tone-wa-bg: rgba(37, 211, 102, 0.14);
+  --tone-wa-border: rgba(37, 211, 102, 0.35);
+  --tone-blue: #4aa3ff;
+  --tone-blue-bg: rgba(74, 163, 255, 0.14);
+  --tone-amber: #f5b13d;
+  --tone-amber-bg: rgba(245, 177, 61, 0.14);
+  --tone-purple: #a78bfa;
+  --tone-purple-bg: rgba(167, 139, 250, 0.16);
+  --tone-pink: #e1719c;
+  --tone-pink-bg: rgba(225, 48, 108, 0.14);
+  --tone-red: #ff6b6b;
+  --tone-red-bg: rgba(255, 107, 107, 0.14);
+  --tone-gray: #9aa6b2;
+  --tone-gray-bg: rgba(255, 255, 255, 0.06);
+  --tone-gray-2: #7f8b96;
+  --tone-gray-2-bg: rgba(255, 255, 255, 0.05);
+  /* E-mail (canal de abordagem) — chip invertido, texto escuro em fundo claro. */
+  --tone-email: #0a0e12;
+  --tone-email-bg: #e6edf2;
+  --badge-mix: 0%;
+
   --font-body: "Sora", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
   --font-heading: "Space Grotesk", sans-serif;
@@ -27,4 +85,73 @@
   --radius-card: 15px;
   --radius-input: 11px;
   --radius-pill: 100px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f2f5f7;
+  --card-bg: #ffffff;
+  --card-bg-alt: #f5f7f9;
+  --border: rgba(16, 24, 32, 0.11);
+  --border-strong: rgba(16, 24, 32, 0.24);
+
+  /* Verde um pouco mais fechado que o do escuro: `#2ee66e` como TEXTO sobre
+     branco não passa de ~1.6:1 de contraste. Como os botões de destaque usam
+     texto escuro (`--on-accent`), esse verde também serve de fundo. */
+  --accent: #12a550;
+  --accent-bg: rgba(18, 165, 80, 0.12);
+  --accent-border: rgba(18, 165, 80, 0.3);
+  --accent-soft: #0b6b34;
+  --accent-hover: #0d8a41;
+  --on-accent: #04130a;
+  --blue: #1d78d8;
+  --amber: #b26a00;
+  --purple: #6d4fd6;
+  --pink: #c2336f;
+  --red: #d63b3b;
+
+  --text: #0f1720;
+  --text-dim: #2a3540;
+  --muted: #56626e;
+  --muted-2: #6b7682;
+  --faint: #8d98a3;
+
+  --heading: #0b1218;
+
+  --hover-bg: rgba(16, 24, 32, 0.045);
+  --hover-bg-2: rgba(16, 24, 32, 0.07);
+  --hover-bg-3: rgba(16, 24, 32, 0.11);
+  --scrollbar: rgba(16, 24, 32, 0.22);
+  --overlay: rgba(15, 23, 32, 0.42);
+  --shadow-pop: 0 14px 34px rgba(15, 23, 32, 0.18);
+  --focus: rgba(18, 165, 80, 0.55);
+
+  --danger: #d63b3b;
+  --danger-bg: rgba(214, 59, 59, 0.1);
+  --danger-bg-strong: rgba(214, 59, 59, 0.16);
+  --danger-border: rgba(214, 59, 59, 0.35);
+
+  --tone-green: #0f8f45;
+  --tone-green-bg: rgba(18, 165, 80, 0.12);
+  --tone-wa: #128c4a;
+  --tone-wa-bg: rgba(37, 211, 102, 0.14);
+  --tone-wa-border: rgba(18, 140, 74, 0.4);
+  --tone-blue: #1d6fc4;
+  --tone-blue-bg: rgba(29, 120, 216, 0.11);
+  --tone-amber: #a35f00;
+  --tone-amber-bg: rgba(178, 106, 0, 0.12);
+  --tone-purple: #6a4bd0;
+  --tone-purple-bg: rgba(109, 79, 214, 0.11);
+  --tone-pink: #bd2f6b;
+  --tone-pink-bg: rgba(194, 51, 111, 0.11);
+  --tone-red: #d03535;
+  --tone-red-bg: rgba(214, 59, 59, 0.1);
+  --tone-gray: #56626e;
+  --tone-gray-bg: rgba(16, 24, 32, 0.07);
+  --tone-gray-2: #6b7682;
+  --tone-gray-2-bg: rgba(16, 24, 32, 0.05);
+  --tone-email: #ffffff;
+  --tone-email-bg: #24303b;
+  --badge-mix: 40%;
 }

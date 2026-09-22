@@ -13,7 +13,7 @@ import { LeadMessageTemplatesSettings } from "../components/leads/LeadMessageTem
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { ORIGIN } from "../constants/origins";
-import { hexToRgba } from "../utils/colors";
+import { hexToRgba, readableTextColor } from "../utils/colors";
 import type { Pipeline, PipelineStage, StageKey } from "../types/pipeline";
 import type { ProspectStage } from "../types/prospect";
 import styles from "./SettingsPage.module.css";
@@ -340,7 +340,7 @@ export function SettingsPage() {
                       type="button"
                       key={stage.id}
                       className={styles.stageChip}
-                      style={{ color: stage.color }}
+                      style={{ color: readableTextColor(stage.color) }}
                       onClick={() => startEditStage(pipeline.id, stage)}
                       title="Clique para editar"
                     >
@@ -552,7 +552,7 @@ export function SettingsPage() {
                     type="button"
                     key={stage.id}
                     className={styles.stageChip}
-                    style={{ color: stage.color }}
+                    style={{ color: readableTextColor(stage.color) }}
                     onClick={() => startEditProspectStage(stage)}
                     title="Clique para editar"
                   >
