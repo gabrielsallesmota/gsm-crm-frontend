@@ -22,6 +22,7 @@ import { computeStageTargetDate, nextStageByOrder } from "../../utils/prospectCa
 import { formatPhone } from "../../utils/phone";
 import { BOARD_SORT_OPTIONS, sortBoardItems, type BoardSortOption } from "../../utils/boardSort";
 import type {
+  ContactChannel,
   CreateProspectInput,
   MessageTemplate,
   Prospect,
@@ -56,12 +57,15 @@ function isToday(targetDateIso: string): boolean {
   return targetDateIso === new Date().toISOString().slice(0, 10);
 }
 
-/** Âncora efetiva da cadência pro prospect: `initialContactDate` quando
- * existe, senão a data de criação (P0 implícito pra quem foi cadastrado
- * antes dessa feature existir — ver `MoveProspectUseCase` no backend,
- * mesma regra espelhada aqui pra decidir se pergunta a data no move). */
-function effectiveAnchor(prospect: Prospect): string {
-  return prospect.initialContactDate ?? prospect.createdAt.slice(0, 10);
+/** Âncora efetiva da cadência pro prospect: só `initialContactDate` —
+ * NUNCA a data de criação. Criar/aprovar um prospect não significa que já
+ * foi contatado (Etapa 0 — "A prospectar"); sem confirmar o primeiro
+ * contato, `null` aqui é o valor certo (`computeStageTargetDate` já trata,
+ * devolve `null` também). Legado (prospects de antes dessa regra existir,
+ * sem `initialContactDate`) continua coberto pelo fallback do PRÓPRIO
+ * backend em `MoveProspectUseCase` — só não simulado aqui no front. */
+function effectiveAnchor(prospect: Prospect): string | null {
+  return prospect.initialContactDate;
 }
 
 /**
@@ -77,7 +81,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
     notImplemented,
     reload: reloadStages,
   } = useProspectStages();
-  const { move, update, backfillCadence } = useProspectActions();
+  const { move, update, backfillCadence, confirmFirstContact } = useProspectActions();
   const { reorder: reorderStages } = useProspectStageActions();
   const { toast } = useToast();
   const { data: templates } = useMessageTemplates();
@@ -106,6 +110,16 @@ export function ProspectionBoard({ period }: { period: Period }) {
   // Move pendente aguardando o motivo da perda (estágio de destino
   // `isLost`) — some assim que confirma ou pula (`LossReasonPrompt`).
   const [pendingLossMove, setPendingLossMove] = useState<{
+    prospectId: string;
+    stageId: string;
+    stageName: string;
+  } | null>(null);
+  // Move pendente saindo do estágio de entrada ("A prospectar") sem
+  // primeiro contato confirmado ainda — precisa do canal antes de liberar o
+  // move (backend bloqueia com 422 até confirmar, ver
+  // `blocks_move_without_confirmed_contact`). Não aparece indo pra `isLost`
+  // (descartar sem contatar é permitido, ver `pendingLossMove` acima).
+  const [pendingFirstContact, setPendingFirstContact] = useState<{
     prospectId: string;
     stageId: string;
     stageName: string;
@@ -148,6 +162,15 @@ export function ProspectionBoard({ period }: { period: Period }) {
     // acabou de ser marcado como perdido.
     if (targetStage?.isLost) {
       setPendingLossMove({ prospectId, stageId: targetStageId, stageName: targetStage.name });
+      return;
+    }
+    // Saindo do estágio de entrada sem ter confirmado contato ainda — pede
+    // o canal antes (não indo pra `isLost`, já tratado acima). Mesmo gate
+    // que o backend aplica (`blocks_move_without_confirmed_contact`), só
+    // que perguntando ANTES de tentar o move e tomar 422.
+    const currentStage = stages?.find((s) => s.id === current.stageId);
+    if (currentStage?.isProspectingEntry && current.initialContactDate == null) {
+      setPendingFirstContact({ prospectId, stageId: targetStageId, stageName: targetStage?.name ?? "" });
       return;
     }
     // Se a cadência automática já cobre o caminho até `targetStageId` (todo
@@ -200,6 +223,32 @@ export function ProspectionBoard({ period }: { period: Period }) {
       toast(err instanceof Error ? err.message : "Não foi possível mover o prospect");
     }
   }
+
+  async function handleConfirmPendingFirstContact(channel: ContactChannel) {
+    if (!pendingFirstContact) return;
+    const { prospectId, stageId, stageName } = pendingFirstContact;
+    setPendingFirstContact(null);
+    try {
+      await confirmFirstContact(prospectId, channel);
+      // Repete o move original, agora que o P0 existe — mesma checagem de
+      // cadência automática vs. pergunta manual de `attemptMoveStage`,
+      // ancorada em hoje (é a data que `confirmFirstContact` acabou de
+      // gravar quando não passa uma data explícita).
+      const targetStage = stages?.find((s) => s.id === stageId);
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const autoComputed = computeStageTargetDate(stages ?? [], stageId, todayIso);
+      if (targetStage?.asksTargetDate && autoComputed === null) {
+        setPendingMove({ prospectId, stageId, stageName });
+      } else {
+        await move(prospectId, stageId);
+      }
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível confirmar o primeiro contato");
+    }
+  }
+  // ^ `reload()` acima também cobre o caminho `setPendingMove` (refresca o
+  // `initialContactDate` recém-confirmado antes do próximo move acontecer).
 
   // Toggle direto do card — antes só dava pra marcar "sem WhatsApp" abrindo
   // o prospect, clicando "Editar" e "Salvar alterações" (pedido explícito
@@ -447,6 +496,14 @@ export function ProspectionBoard({ period }: { period: Period }) {
           onSkip={() => void handleConfirmPendingLossMove(null)}
         />
       )}
+
+      {pendingFirstContact && (
+        <FirstContactPrompt
+          stageName={pendingFirstContact.stageName}
+          onConfirm={(channel) => void handleConfirmPendingFirstContact(channel)}
+          onCancel={() => setPendingFirstContact(null)}
+        />
+      )}
     </div>
   );
 }
@@ -554,6 +611,61 @@ function LossReasonPrompt({
           <Button onClick={onSkip}>Pular</Button>
           <Button variant="primary" onClick={() => reasonId && onConfirm(reasonId)} disabled={!reasonId}>
             Confirmar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const CONTACT_CHANNEL_LABEL: Record<ContactChannel, string> = {
+  whatsapp: "WhatsApp",
+  instagram: "Instagram",
+  email: "E-mail",
+};
+
+/** Aparece ao tentar mover um card pra fora do estágio de entrada ("A
+ * prospectar") sem confirmar o primeiro contato ainda — diferente dos
+ * outros prompts deste arquivo, NÃO tem "Pular": aprovar não é contatar, o
+ * backend recusa o move (422) até confirmar (ver
+ * `blocks_move_without_confirmed_contact`), então cancelar aqui deixa o
+ * card onde estava. */
+function FirstContactPrompt({
+  stageName,
+  onConfirm,
+  onCancel,
+}: {
+  stageName: string;
+  onConfirm: (channel: ContactChannel) => void;
+  onCancel: () => void;
+}) {
+  const [channel, setChannel] = useState<ContactChannel>("whatsapp");
+
+  return (
+    <div className={styles.overlay} onClick={onCancel}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <h2 className={styles.modalTitle}>Confirmar primeiro contato</h2>
+        <p className={styles.modalSubtitle}>
+          Antes de mover pra <strong>{stageName}</strong>, confirme que a primeira mensagem foi
+          REALMENTE enviada — só abrir o WhatsApp não conta. Isso inicia o follow-up automático.
+        </p>
+        <select
+          className={styles.select}
+          value={channel}
+          onChange={(e) => setChannel(e.target.value as ContactChannel)}
+        >
+          {(Object.entries(CONTACT_CHANNEL_LABEL) as [ContactChannel, string][]).map(
+            ([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ),
+          )}
+        </select>
+        <div className={styles.modalActions}>
+          <Button onClick={onCancel}>Cancelar</Button>
+          <Button variant="primary" onClick={() => onConfirm(channel)}>
+            Confirmar contato
           </Button>
         </div>
       </div>

@@ -76,12 +76,18 @@ export function ProspectDashboardSection({ period }: { period: Period }) {
         <KpiCard
           label="Taxa de conversão"
           value={`${Math.round(data.conversionRate)}%`}
-          hint="ganhos / total"
+          hint="ganhos / contatados"
           icon="conversion"
           valueColor="var(--tone-amber)"
         />
         <KpiCard label="Em aberto" value={String(data.open)} hint="em prospecção" icon="open" valueColor="var(--tone-amber)" />
         <KpiCard label="Perdidos" value={String(data.lost)} hint="sem retorno" icon="lost" />
+        <KpiCard
+          label="Aguardando 1º contato"
+          value={String(data.awaitingFirstContact)}
+          hint="ainda em 'A prospectar', sem P0"
+          icon="today"
+        />
       </div>
 
       <div className={styles.chartsGrid}>

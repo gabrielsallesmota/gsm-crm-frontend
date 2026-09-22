@@ -59,7 +59,11 @@ export function ManageStagesModal({
     return stage.followupBusinessDays != null ? String(stage.followupBusinessDays) : "";
   }
 
-  async function handleToggleFlag(stage: ProspectStage, flag: "isWon" | "isLost", value: boolean) {
+  async function handleToggleFlag(
+    stage: ProspectStage,
+    flag: "isWon" | "isLost" | "isProspectingEntry",
+    value: boolean,
+  ) {
     try {
       await update(stage.id, { [flag]: value });
       onChanged();
@@ -148,7 +152,9 @@ export function ManageStagesModal({
           ANTERIOR a data alvo deste deve cair — deixe em branco pra continuar perguntando a data
           manualmente ao mover pra ele. "Mensagem" escolhe qual campo de mensagem do PRÓPRIO
           prospect (ex.: vindo do CSV) esse estágio usa no botão de WhatsApp, em vez do template
-          padrão por área.
+          padrão por área. "Estágio inicial" marca onde os prospects entram antes de qualquer
+          contato — só 1 por vez (marcar outro desmarca o anterior); nesse estágio, sair sem
+          confirmar o primeiro contato fica bloqueado (exceto indo direto pra "Perdido").
         </p>
 
         <div className={styles.list}>
@@ -183,6 +189,19 @@ export function ManageStagesModal({
                     onChange={(e) => void handleToggleFlag(stage, "isLost", e.target.checked)}
                   />
                   <span>Perdido</span>
+                </label>
+                <label
+                  style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}
+                  title='Estágio de entrada do funil — prospects criados aqui ficam sem P0 até confirmar o primeiro contato'
+                >
+                  <input
+                    type="checkbox"
+                    checked={stage.isProspectingEntry}
+                    onChange={(e) =>
+                      void handleToggleFlag(stage, "isProspectingEntry", e.target.checked)
+                    }
+                  />
+                  <span>Estágio inicial</span>
                 </label>
                 <input
                   className={styles.input}

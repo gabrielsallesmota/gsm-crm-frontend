@@ -1,4 +1,5 @@
 import type {
+  ContactChannel,
   CreateMessageTemplateInput,
   CreateProspectInput,
   CreateProspectLossReasonInput,
@@ -32,6 +33,11 @@ export interface ProspectsRepository {
     targetDate?: string | null,
     lossReasonId?: string | null,
   ): Promise<Prospect>;
+  // Confirma que a 1ª mensagem foi REALMENTE enviada (P0) — abrir o
+  // WhatsApp não conta, só isto inicia a cadência. Não muda o estágio; só
+  // uma vez por prospect (backend rejeita a 2ª chamada). Ver
+  // `ProspectStage.isProspectingEntry`.
+  confirmFirstContact(id: string, channel: ContactChannel, contactDate?: string): Promise<Prospect>;
   delete(id: string): Promise<void>;
   // Botão "Enviar" do `ChannelTag` (canal e-mail) — manda de verdade via
   // Resend (backend), `sent: false` quando o provedor falhou (o card não

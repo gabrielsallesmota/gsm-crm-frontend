@@ -55,6 +55,13 @@ export interface ProspectStage {
   // do template padrão — `null` = comportamento antigo (template por
   // estágio/área, ver `utils/messageTemplates.ts::resolveProspectMessage`).
   messageField: ProspectMessageField | null;
+  // Estágio de entrada do funil ("A prospectar") — no máximo 1 por tenant
+  // (marcar um novo desmarca o anterior sozinho, ver `ManageStagesModal.tsx`).
+  // Um prospect aprovado/criado neste estágio ainda NÃO foi contatado:
+  // `Prospect.initialContactDate` fica `null` até confirmar o primeiro
+  // contato (`confirmFirstContact`), e sair deste estágio é bloqueado até
+  // lá (exceto indo direto pra um estágio `isLost`).
+  isProspectingEntry: boolean;
 }
 
 /** Anotação datada de alguém sobre o prospect — histórico append-only,
@@ -194,8 +201,10 @@ export interface CreateProspectInput {
   message2?: string;
   message3?: string;
   message4?: string;
-  // P0 — data do primeiro contato. Não informado = hoje (ver backend
-  // `CreateProspectUseCase`).
+  // P0 — data do primeiro contato. Não informado = ainda sem contato
+  // registrado (`initialContactDate` fica `null` — "aprovar não significa
+  // contatar", ver backend `CreateProspectUseCase`). Confirmar depois via
+  // `confirmFirstContact`, não reenviando este campo num PATCH.
   initialContactDate?: string;
   targetDate?: string;
   force?: boolean;
@@ -207,7 +216,12 @@ export type CreateProspectStageInput = Pick<ProspectStage, "name" | "color"> &
   Partial<
     Pick<
       ProspectStage,
-      "isWon" | "isLost" | "asksTargetDate" | "followupBusinessDays" | "messageField"
+      | "isWon"
+      | "isLost"
+      | "asksTargetDate"
+      | "followupBusinessDays"
+      | "messageField"
+      | "isProspectingEntry"
     >
   >;
 
@@ -221,6 +235,7 @@ export type UpdateProspectStageInput = Partial<
     | "asksTargetDate"
     | "followupBusinessDays"
     | "messageField"
+    | "isProspectingEntry"
   >
 > & {
   // Ver backend `UpdateProspectStageCommand.clear_followup_business_days` —
@@ -267,7 +282,8 @@ export interface ImportRowInput {
   message3?: string;
   message4?: string;
   // P0 — data do primeiro contato dessa linha ("YYYY-MM-DD"). Não mapeado
-  // = hoje no momento do import (ver backend `BulkImportProspectsUseCase`).
+  // = sem contato registrado (fica `null`, ver backend
+  // `BulkImportProspectsUseCase`).
   initialContactDate?: string;
 }
 
@@ -348,6 +364,11 @@ export interface ProspectDashboardMetrics {
   won: number;
   open: number;
   lost: number;
+  // Ainda no estágio de entrada, sem `initialContactDate` — excluído do
+  // denominador de `conversionRate` (ver backend
+  // `GetProspectDashboardMetricsUseCase`), senão "A prospectar" acumulando
+  // volume do futuro SDR diluiria a conversão artificialmente.
+  awaitingFirstContact: number;
   conversionRate: number;
   priorityBreakdown: ProspectPriorityBreakdown[];
   funnel: ProspectFunnelStage[];

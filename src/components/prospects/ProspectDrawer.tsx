@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type {
+  ContactChannel,
   MessageTemplate,
   Prospect,
   ProspectLossReason,
@@ -48,7 +49,7 @@ export function ProspectDrawer({
   onDeleted?: () => void;
 }) {
   const { toast } = useToast();
-  const { update, move, delete: deleteProspect } = useProspectActions();
+  const { update, move, confirmFirstContact, delete: deleteProspect } = useProspectActions();
   const { data: comments, notImplemented: commentsNotImplemented, reload: reloadComments } =
     useProspectComments(prospect.id);
   const { create: createComment } = useProspectCommentActions();
@@ -79,6 +80,11 @@ export function ProspectDrawer({
   const [duplicateBlock, setDuplicateBlock] = useState<{ companyName: string } | null>(null);
   const [form, setForm] = useState<FormState>(() => fromProspect(prospect));
   const [togglingNoWhatsapp, setTogglingNoWhatsapp] = useState(false);
+  // Confirmar primeiro contato direto pelo drawer — caso de quem abre o
+  // card em vez de arrastar no board (ver `ProspectionBoard.tsx`, mesma
+  // regra: aprovar/criar não é contatar, só isto inicia o P0).
+  const [confirmingFirstContact, setConfirmingFirstContact] = useState(false);
+  const [firstContactChannel, setFirstContactChannel] = useState<ContactChannel>("whatsapp");
 
   // Marca/desmarca "sem WhatsApp" na hora, sem precisar entrar em "Editar" e
   // "Salvar alterações" (pedido explícito do usuário: "muito chato ficar
@@ -161,6 +167,19 @@ export function ProspectDrawer({
     }
   }
 
+  async function handleConfirmFirstContact() {
+    setConfirmingFirstContact(true);
+    try {
+      const updated = await confirmFirstContact(prospect.id, firstContactChannel);
+      toast("Primeiro contato confirmado");
+      onSaved?.(updated);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível confirmar o primeiro contato");
+    } finally {
+      setConfirmingFirstContact(false);
+    }
+  }
+
   async function handleMoveStage(stageId: string) {
     try {
       const updated = await move(prospect.id, stageId);
@@ -232,6 +251,30 @@ export function ProspectDrawer({
           <Badge label={`Prioridade ${priority.label}`} color={priority.color} bg={priority.bg} />
           <Badge label={origin.label} color={origin.color} bg={origin.bg} />
           <ChannelTag prospect={prospect} stage={stage} templates={templates} onSent={handleEmailSent} />
+          {prospect.initialContactDate === null && (
+            <>
+              <select
+                className={styles.stageSelect}
+                value={firstContactChannel}
+                onChange={(e) => setFirstContactChannel(e.target.value as ContactChannel)}
+                aria-label="Canal do primeiro contato"
+                title="Canal do primeiro contato"
+              >
+                <option value="whatsapp">WhatsApp</option>
+                <option value="instagram">Instagram</option>
+                <option value="email">E-mail</option>
+              </select>
+              <button
+                className={styles.editToggle}
+                type="button"
+                onClick={() => void handleConfirmFirstContact()}
+                disabled={confirmingFirstContact}
+                title="Confirme só depois de ter REALMENTE enviado a primeira mensagem — abrir o WhatsApp não conta"
+              >
+                {confirmingFirstContact ? "Confirmando…" : "Confirmar primeiro contato"}
+              </button>
+            </>
+          )}
           {!editing && (
             <button className={styles.editToggle} onClick={startEdit} type="button">
               ✎ Editar

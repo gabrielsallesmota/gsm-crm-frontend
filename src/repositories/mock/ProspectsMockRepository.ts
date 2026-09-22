@@ -1,5 +1,6 @@
 import type { ProspectsRepository } from "../ProspectsRepository";
 import type {
+  ContactChannel,
   CreateMessageTemplateInput,
   CreateProspectInput,
   CreateProspectLossReasonInput,
@@ -57,6 +58,14 @@ export class ProspectsMockRepository implements ProspectsRepository {
     _stageId: string,
     _targetDate?: string | null,
     _lossReasonId?: string | null,
+  ): Promise<Prospect> {
+    throw new NotImplementedError("Prospecção GSM", REASON);
+  }
+
+  async confirmFirstContact(
+    _id: string,
+    _channel: ContactChannel,
+    _contactDate?: string,
   ): Promise<Prospect> {
     throw new NotImplementedError("Prospecção GSM", REASON);
   }

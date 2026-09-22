@@ -56,7 +56,8 @@ function parseFlexibleBoolean(raw: string): boolean | undefined {
  * devolve sempre ISO — o que o backend espera (`date` do Pydantic). Datas
  * fora desses dois formatos, ou inválidas (ex. "31/02"), são ignoradas em
  * vez de quebrar a linha (mesmo espírito do resto do import — ver
- * `buildRow`); nesse caso o backend assume "hoje" no lugar do P0. */
+ * `buildRow`); nesse caso a linha entra sem P0 (sem contato ainda, ver
+ * `ProspectStage.isProspectingEntry`), não assume "hoje". */
 function parseFlexibleDate(raw: string): string | undefined {
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
   if (iso) return raw;
@@ -205,9 +206,10 @@ export function ProspectImportModal({
           fazer quando a linha já existir cadastrada — duplicidade é checada por telefone, nome da
           empresa OU link do Google Maps (basta bater em um desses pra contar como já existente,
           contra a base inteira, de qualquer época). Mapeie "Data do primeiro contato (P0)" pra
-          cada linha ter sua própria data — sem essa coluna, todas entram com a data de hoje. As
-          datas dos follow-ups seguintes são calculadas sozinhas a partir daí (configure a cadência
-          em "Estágios"). Mapeie "Mensagem 1".."Mensagem 4" pra cada prospect ter sua própria
+          cada linha ter sua própria data — sem essa coluna, todas entram SEM contato registrado
+          (ficam sem follow-up até alguém confirmar o primeiro contato de cada uma). As datas dos
+          follow-ups seguintes são calculadas sozinhas a partir daí (configure a cadência em
+          "Estágios"). Mapeie "Mensagem 1".."Mensagem 4" pra cada prospect ter sua própria
           mensagem de WhatsApp por etapa — configure em "Estágios" qual campo cada uma usa. "Sem
           WhatsApp" aceita sim/não, true/false ou 1/0.
         </p>

@@ -3,6 +3,7 @@ import { ProspectsApiRepository } from "../repositories/api/ProspectsApiReposito
 import { ProspectsMockRepository } from "../repositories/mock/ProspectsMockRepository";
 import { selectRepository } from "./factory";
 import type {
+  ContactChannel,
   CreateMessageTemplateInput,
   CreateProspectInput,
   CreateProspectLossReasonInput,
@@ -54,6 +55,10 @@ export class ProspectsService {
     lossReasonId?: string | null,
   ): Promise<Prospect> {
     return repo.move(id, stageId, targetDate, lossReasonId);
+  }
+
+  confirmFirstContact(id: string, channel: ContactChannel, contactDate?: string): Promise<Prospect> {
+    return repo.confirmFirstContact(id, channel, contactDate);
   }
 
   delete(id: string): Promise<void> {

@@ -82,6 +82,7 @@ interface ProspectStageDto {
   asks_target_date: boolean;
   followup_business_days: number | null;
   message_field: ProspectMessageField | null;
+  is_prospecting_entry: boolean;
 }
 
 function toProspect(dto: ProspectDto): Prospect {
@@ -140,6 +141,7 @@ function toProspectStage(dto: ProspectStageDto): ProspectStage {
     asksTargetDate: dto.asks_target_date,
     followupBusinessDays: dto.followup_business_days,
     messageField: dto.message_field,
+    isProspectingEntry: dto.is_prospecting_entry,
   };
 }
 
@@ -282,6 +284,19 @@ export class ProspectsApiRepository implements ProspectsRepository {
     );
   }
 
+  async confirmFirstContact(
+    id: string,
+    channel: ContactChannel,
+    contactDate?: string,
+  ): Promise<Prospect> {
+    return toProspect(
+      await apiRequest<ProspectDto>(`/api/v1/prospects/${id}/confirm-first-contact`, {
+        method: "POST",
+        body: JSON.stringify({ channel, contact_date: contactDate ?? null }),
+      }),
+    );
+  }
+
   async delete(id: string): Promise<void> {
     await apiRequest<void>(`/api/v1/prospects/${id}`, { method: "DELETE" });
   }
@@ -363,6 +378,7 @@ export class ProspectsApiRepository implements ProspectsRepository {
           asks_target_date: input.asksTargetDate ?? false,
           followup_business_days: input.followupBusinessDays ?? null,
           message_field: input.messageField ?? null,
+          is_prospecting_entry: input.isProspectingEntry ?? false,
         }),
       }),
     );
@@ -382,6 +398,7 @@ export class ProspectsApiRepository implements ProspectsRepository {
           clear_followup_business_days: input.clearFollowupBusinessDays ?? false,
           message_field: input.messageField,
           clear_message_field: input.clearMessageField ?? false,
+          is_prospecting_entry: input.isProspectingEntry,
         }),
       }),
     );
@@ -413,6 +430,7 @@ export class ProspectsApiRepository implements ProspectsRepository {
       won: dto.won,
       open: dto.open,
       lost: dto.lost,
+      awaitingFirstContact: dto.awaiting_first_contact,
       conversionRate: dto.conversion_rate,
       priorityBreakdown: dto.priority_breakdown.map((p) => ({
         priority: p.priority,
@@ -534,6 +552,7 @@ interface ProspectDashboardMetricsDto {
   won: number;
   open: number;
   lost: number;
+  awaiting_first_contact: number;
   conversion_rate: number;
   priority_breakdown: { priority: ProspectPriority; count: number; pct: number }[];
   funnel: { stage_id: string; label: string; color: string; count: number; pct: number }[];

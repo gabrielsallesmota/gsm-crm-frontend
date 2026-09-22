@@ -1,5 +1,6 @@
 import { prospectsService } from "../services/ProspectsService";
 import type {
+  ContactChannel,
   CreateProspectInput,
   DedupeStrategy,
   ImportRowInput,
@@ -18,6 +19,7 @@ export interface ProspectActions {
     targetDate?: string | null,
     lossReasonId?: string | null,
   ): Promise<Prospect>;
+  confirmFirstContact(id: string, channel: ContactChannel, contactDate?: string): Promise<Prospect>;
   delete(id: string): Promise<void>;
   sendEmail(id: string, subject: string, body: string): Promise<{ sent: boolean }>;
   checkDuplicate(phone: string): Promise<ProspectDuplicateCheck>;
@@ -38,6 +40,8 @@ export function useProspectActions(): ProspectActions {
     update: (id, input) => prospectsService.update(id, input),
     move: (id, stageId, targetDate, lossReasonId) =>
       prospectsService.move(id, stageId, targetDate, lossReasonId),
+    confirmFirstContact: (id, channel, contactDate) =>
+      prospectsService.confirmFirstContact(id, channel, contactDate),
     delete: (id) => prospectsService.delete(id),
     sendEmail: (id, subject, body) => prospectsService.sendEmail(id, subject, body),
     checkDuplicate: (phone) => prospectsService.checkDuplicate(phone),
