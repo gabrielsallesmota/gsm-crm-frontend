@@ -34,6 +34,11 @@ const NAV_ITEMS: {
   { to: ROUTES.pipeline, icon: "pipeline", label: "Pipeline" },
   { to: ROUTES.leads, icon: "leads", label: "Leads" },
   { to: ROUTES.clientes, icon: "clients", label: "Clientes", platformStaffOnly: true },
+  // SDR (Etapa 1) — pré-prospecção interna da GSM, mesmo gate de "Clientes"
+  // acima. Reaproveita o ícone "prospects" (alvo/crosshair) — hoje sem uso
+  // real em NAV_ITEMS (Prospecção GSM fica embutida em Pipeline, ver
+  // comentário acima), e "pré-prospecção" é exatamente a ideia de um alvo.
+  { to: ROUTES.sdrCampanhas, icon: "prospects", label: "SDR", platformStaffOnly: true },
   { to: ROUTES.tarefas, icon: "tasks", label: "Tarefas" },
   { to: ROUTES.agenda, icon: "agenda", label: "Agenda" },
   { to: ROUTES.relatorios, icon: "reports", label: "Relatórios" },
