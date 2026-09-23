@@ -13,9 +13,12 @@ import { ChannelTag } from "./ChannelTag";
 import { useProspectActions } from "../../hooks/useProspectActions";
 import { useProspectComments } from "../../hooks/useProspectComments";
 import { useProspectCommentActions } from "../../hooks/useProspectCommentActions";
+import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { EmptyState } from "../common/EmptyState";
 import { useToast } from "../../hooks/useToast";
 import { ApiError } from "../../types/common";
+import { sdrService } from "../../services/SdrService";
+import { SDR_PRIORITY_LABEL, type SdrPriority } from "../../types/sdr";
 import { formatPhone } from "../../utils/phone";
 import { nextStageByOrder } from "../../utils/prospectCadence";
 import {
@@ -30,6 +33,12 @@ import {
 import styles from "./ProspectDrawer.module.css";
 
 type FormState = ReturnType<typeof fromProspect>;
+
+const SDR_PRIORITY_COLOR: Record<SdrPriority, { color: string; bg: string }> = {
+  a: { color: "var(--tone-green)", bg: "var(--tone-green-bg)" },
+  b: { color: "var(--tone-amber)", bg: "var(--tone-amber-bg)" },
+  c: { color: "var(--tone-gray)", bg: "var(--tone-gray-bg)" },
+};
 
 export function ProspectDrawer({
   prospect,
@@ -55,6 +64,13 @@ export function ProspectDrawer({
   const { create: createComment } = useProspectCommentActions();
   const [newComment, setNewComment] = useState("");
   const [postingComment, setPostingComment] = useState(false);
+  // Etapa 7 — contexto SDR (Score/IA), quando este Prospect veio de um
+  // SdrCandidate aprovado. `candidateId=null` pra cadastro manual/import —
+  // nunca é erro, só ausência de dado (ver `GetProspectSdrContextUseCase`).
+  const { data: sdrContext } = useAsyncResource(
+    () => sdrService.getProspectOutreachContext(prospect.id),
+    [prospect.id],
+  );
 
   async function handlePostComment() {
     if (!newComment.trim()) return;
@@ -294,6 +310,45 @@ export function ProspectDrawer({
                 Salvar mesmo assim
               </Button>
             </div>
+          </div>
+        )}
+
+        {sdrContext?.candidateId && (
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>Análise comercial (SDR)</div>
+            {sdrContext.scorePriority && (
+              <p style={{ marginBottom: 8 }}>
+                <Badge
+                  label={`Score ${sdrContext.scoreTotal}/100 — ${SDR_PRIORITY_LABEL[sdrContext.scorePriority]}`}
+                  {...SDR_PRIORITY_COLOR[sdrContext.scorePriority]}
+                />
+              </p>
+            )}
+            {sdrContext.outreachOpportunities && sdrContext.outreachOpportunities.length > 0 && (
+              <p>
+                <strong>Oportunidade:</strong> {sdrContext.outreachOpportunities.join("; ")}
+              </p>
+            )}
+            {sdrContext.outreachHook && (
+              <p>
+                <strong>Gancho:</strong> {sdrContext.outreachHook}
+              </p>
+            )}
+            {sdrContext.outreachMessage && (
+              <>
+                <p>
+                  <strong>Mensagem sugerida:</strong> {sdrContext.outreachMessage}
+                </p>
+                <Button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(sdrContext.outreachMessage ?? "");
+                    toast("Mensagem copiada");
+                  }}
+                >
+                  Copiar mensagem sugerida
+                </Button>
+              </>
+            )}
           </div>
         )}
 

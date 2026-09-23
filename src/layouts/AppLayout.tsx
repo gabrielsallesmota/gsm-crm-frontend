@@ -38,7 +38,7 @@ const NAV_ITEMS: {
   // acima. Reaproveita o ícone "prospects" (alvo/crosshair) — hoje sem uso
   // real em NAV_ITEMS (Prospecção GSM fica embutida em Pipeline, ver
   // comentário acima), e "pré-prospecção" é exatamente a ideia de um alvo.
-  { to: ROUTES.sdrCampanhas, icon: "prospects", label: "SDR", platformStaffOnly: true },
+  { to: ROUTES.sdrDashboard, icon: "prospects", label: "SDR", platformStaffOnly: true },
   { to: ROUTES.tarefas, icon: "tasks", label: "Tarefas" },
   { to: ROUTES.agenda, icon: "agenda", label: "Agenda" },
   { to: ROUTES.relatorios, icon: "reports", label: "Relatórios" },

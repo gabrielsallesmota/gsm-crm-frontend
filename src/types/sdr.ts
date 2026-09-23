@@ -103,6 +103,19 @@ export interface SdrCandidate {
   approvedProspectId: string | null;
   createdAt: string;
   updatedAt: string;
+  // Etapa 3 — enriquecimento (CNPJ) + deduplicação forte.
+  providerRef: string | null;
+  cnpj: string | null;
+  domain: string | null;
+  email: string | null;
+  instagramHandle: string | null;
+  razaoSocial: string | null;
+  nomeFantasia: string | null;
+  cnae: string | null;
+  situacaoCadastral: string | null;
+  dataAbertura: string | null;
+  capitalSocialCents: number | null;
+  lastEnrichmentAt: string | null;
 }
 
 export interface SdrCandidateAppearance {
@@ -342,3 +355,344 @@ export const SDR_RUN_MODE_LABEL: Record<SdrRunMode, string> = {
   find_new: "Buscar novidades",
   full_refresh: "Refazer busca completa",
 };
+
+// ---------------------------------------------------------------------------
+// Etapa 3 — enriquecimento (CNPJ) + deduplicação forte. Enriquecimento é
+// sempre opcional/não-bloqueante — nunca inventa CNPJ a partir do nome, só
+// consulta quando um humano já anexou um. Deduplicação por sinal fraco
+// (nome+cidade) NUNCA funde nada sozinha — só sugere pra um humano decidir.
+// ---------------------------------------------------------------------------
+
+export type SdrEnrichmentSource = "cnpj_receitaws";
+
+export type SdrEnrichmentStatus =
+  | "success"
+  | "not_found"
+  | "unavailable"
+  | "not_configured"
+  | "skipped";
+
+export type SdrMatchConfidence = "strong" | "weak";
+
+export type SdrDuplicateSignal =
+  | "google_place_id"
+  | "cnpj"
+  | "maps_url"
+  | "domain"
+  | "phone"
+  | "email"
+  | "instagram"
+  | "name_location";
+
+export type SdrDuplicateTargetType = "candidate" | "prospect" | "client";
+
+export type SdrDuplicateSuggestionStatus = "pending" | "confirmed" | "dismissed";
+
+export interface SdrCandidateEnrichment {
+  id: string;
+  candidateId: string;
+  source: SdrEnrichmentSource;
+  status: SdrEnrichmentStatus;
+  confidence: SdrMatchConfidence | null;
+  cnpjQueried: string | null;
+  razaoSocial: string | null;
+  nomeFantasia: string | null;
+  cnae: string | null;
+  situacaoCadastral: string | null;
+  dataAbertura: string | null;
+  capitalSocialCents: number | null;
+  email: string | null;
+  errorDetail: string | null;
+  fetchedAt: string;
+  createdAt: string;
+}
+
+export interface SdrDuplicateSuggestion {
+  id: string;
+  candidateId: string;
+  targetType: SdrDuplicateTargetType;
+  targetId: string;
+  signal: SdrDuplicateSignal;
+  confidence: SdrMatchConfidence;
+  status: SdrDuplicateSuggestionStatus;
+  detectedAt: string;
+  resolvedAt: string | null;
+  resolvedByUserId: string | null;
+  createdAt: string;
+}
+
+export interface SetCandidateCnpjResult {
+  candidate: SdrCandidate;
+  checkDigitsValid: boolean;
+}
+
+export const SDR_ENRICHMENT_SOURCE_LABEL: Record<SdrEnrichmentSource, string> = {
+  cnpj_receitaws: "ReceitaWS",
+};
+
+export const SDR_ENRICHMENT_STATUS_LABEL: Record<SdrEnrichmentStatus, string> = {
+  success: "Sucesso",
+  not_found: "CNPJ não encontrado",
+  unavailable: "Fonte indisponível",
+  not_configured: "Não configurado",
+  skipped: "Pulado (sem CNPJ)",
+};
+
+export const SDR_DUPLICATE_SIGNAL_LABEL: Record<SdrDuplicateSignal, string> = {
+  google_place_id: "Place ID do Google",
+  cnpj: "CNPJ",
+  maps_url: "URL do Maps",
+  domain: "Domínio",
+  phone: "Telefone",
+  email: "E-mail",
+  instagram: "Instagram",
+  name_location: "Nome + cidade (sinal fraco)",
+};
+
+export const SDR_DUPLICATE_TARGET_TYPE_LABEL: Record<SdrDuplicateTargetType, string> = {
+  candidate: "Candidate",
+  prospect: "Prospect",
+  client: "Cliente",
+};
+
+// ---------------------------------------------------------------------------
+// Etapa 4 — auditoria determinística de sites (sem análise comercial, sem
+// IA). Cada sinal é um FATO com evidência de onde veio — nunca diagnóstico
+// comercial (isso é scoring/IA, fora desta etapa).
+// ---------------------------------------------------------------------------
+
+export type SdrAuditStatus = "success" | "partial" | "failed" | "skipped";
+
+export interface SdrAuditSignalValue {
+  value: unknown;
+  evidence: string;
+  sourceUrl: string;
+}
+
+export interface SdrAuditPageCheck {
+  url: string;
+  pageKind: string;
+  ok: boolean;
+  httpStatus: number | null;
+  error: string | null;
+}
+
+export interface SdrCandidateAudit {
+  id: string;
+  candidateId: string;
+  auditorVersion: number;
+  status: SdrAuditStatus;
+  signals: Record<string, SdrAuditSignalValue>;
+  pagesChecked: SdrAuditPageCheck[];
+  pagespeed: Record<string, unknown> | null;
+  startedAt: string;
+  finishedAt: string;
+  createdAt: string;
+}
+
+export const SDR_AUDIT_STATUS_LABEL: Record<SdrAuditStatus, string> = {
+  success: "Sucesso — todas as páginas verificadas responderam",
+  partial: "Parcial — pelo menos uma página falhou",
+  failed: "Falhou — o site não respondeu",
+  skipped: "Sem site anexado ainda",
+};
+
+export const SDR_AUDIT_PAGE_KIND_LABEL: Record<string, string> = {
+  home: "Home",
+  contact: "Contato",
+  services: "Serviços",
+  scheduling: "Agendamento",
+  about: "Sobre",
+};
+
+export const SDR_AUDIT_SIGNAL_LABEL: Record<string, string> = {
+  https: "HTTPS",
+  availability: "Disponibilidade",
+  title: "Título da página",
+  meta_description: "Meta description",
+  viewport: "Viewport (responsividade)",
+  h1: "H1",
+  forms: "Formulários",
+  whatsapp: "WhatsApp",
+  instagram: "Instagram",
+  phone: "Telefone",
+  ctas: "Chamadas para ação",
+  analytics: "Analytics/Pixel",
+  contact_page_found: "Página de contato",
+  services_page_found: "Página de serviços",
+  scheduling_page_found: "Página de agendamento",
+  about_page_found: "Página sobre",
+};
+
+// ---------------------------------------------------------------------------
+// Etapa 5 — Score GSM determinístico (SEM IA/LLM). Regras/pesos vivem só no
+// backend (`scoring_rules.py`) — o frontend só exibe o breakdown já
+// calculado, nunca recalcula nem interpreta nada.
+// ---------------------------------------------------------------------------
+
+export type SdrPriority = "a" | "b" | "c";
+
+export interface SdrScoreBreakdownEntry {
+  rule: string;
+  component: "commercial_potential" | "digital_gap" | "gsm_fit";
+  points: number;
+  matched: boolean;
+  description: string;
+  evidence: string;
+}
+
+export interface SdrCandidateScore {
+  id: string;
+  candidateId: string;
+  ruleSet: string;
+  total: number;
+  commercialPotential: number;
+  digitalGap: number;
+  gsmFit: number;
+  priority: SdrPriority;
+  breakdown: SdrScoreBreakdownEntry[];
+  computedAt: string;
+  createdAt: string;
+}
+
+export const SDR_PRIORITY_LABEL: Record<SdrPriority, string> = {
+  a: "A — Prioridade alta",
+  b: "B — Prioridade média",
+  c: "C — Prioridade baixa",
+};
+
+// ---------------------------------------------------------------------------
+// Etapa 6 — IA Comercial. A IA só INTERPRETA fatos já coletados (nunca
+// calcula/altera Score, nunca aprova/descarta, nunca envia mensagem — isso
+// é Etapa 7). O frontend só exibe/edita localmente a sugestão.
+// ---------------------------------------------------------------------------
+
+export type SdrOutreachChannel = "whatsapp" | "instagram" | "email";
+export type SdrOutreachTone = "standard" | "shorter" | "consultative";
+export type SdrOutreachStatus = "success" | "invalid_output" | "provider_error" | "not_configured";
+
+export interface SdrOutreachAnalysis {
+  positive_signals: string[];
+  opportunities: string[];
+  recommended_solution: string;
+  commercial_hook: string;
+  initial_message: string;
+  alternative_message: string | null;
+}
+
+export interface SdrCandidateOutreachGeneration {
+  id: string;
+  candidateId: string;
+  scoreId: string | null;
+  promptVersion: string;
+  model: string;
+  channel: SdrOutreachChannel;
+  tone: SdrOutreachTone;
+  status: SdrOutreachStatus;
+  analysis: SdrOutreachAnalysis | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  estimatedCostCents: number | null;
+  errorDetail: string | null;
+  createdAt: string;
+}
+
+export const SDR_OUTREACH_CHANNEL_LABEL: Record<SdrOutreachChannel, string> = {
+  whatsapp: "WhatsApp",
+  instagram: "Instagram",
+  email: "E-mail",
+};
+
+export const SDR_OUTREACH_TONE_LABEL: Record<SdrOutreachTone, string> = {
+  standard: "Tom padrão GSM",
+  shorter: "Mais curto",
+  consultative: "Mais consultivo",
+};
+
+export const SDR_OUTREACH_STATUS_LABEL: Record<SdrOutreachStatus, string> = {
+  success: "Sucesso",
+  invalid_output: "Resposta inválida da IA",
+  provider_error: "Falha ao consultar a IA",
+  not_configured: "IA não configurada",
+};
+
+// ---------------------------------------------------------------------------
+// Etapa 7 — operação comercial. Composto (Prospect + Score/IA do SDR) —
+// só leitura; confirmar contato/mover estágio continuam nos fluxos já
+// existentes de Prospect (não duplicados aqui).
+// ---------------------------------------------------------------------------
+
+export interface SdrProspectingQueueFilter {
+  niche?: string;
+  minPriority?: SdrPriority;
+}
+
+export interface SdrProspectSdrContext {
+  prospectId: string;
+  companyName: string;
+  phoneRaw: string | null;
+  city: string | null;
+  niche: string | null;
+  googleMapsUrl: string | null;
+  candidateId: string | null;
+  scoreTotal: number | null;
+  scorePriority: SdrPriority | null;
+  outreachChannel: SdrOutreachChannel | null;
+  outreachMessage: string | null;
+  outreachHook: string | null;
+  outreachOpportunities: string[] | null;
+}
+
+// ---------------------------------------------------------------------------
+// Etapa 8 — dashboard, funil real e Score×resultado. Estágios além de
+// contatados/ganhos/perdidos vêm do nome REAL configurado pelo tenant
+// (`stageDistribution`) — nunca um rótulo fixo tipo "Respondeu"/"Reunião"
+// que o histórico não comprova.
+// ---------------------------------------------------------------------------
+
+export interface SdrFunnelStageDistribution {
+  stageId: string;
+  stageName: string;
+  order: number;
+  isWon: boolean;
+  isLost: boolean;
+  count: number;
+}
+
+export interface SdrFunnelSummary {
+  encontrados: number;
+  qualificados: number;
+  aprovados: number;
+  contatados: number;
+  ganhos: number;
+  perdidos: number;
+  stageDistribution: SdrFunnelStageDistribution[];
+}
+
+export interface SdrScoreOutcomeBucket {
+  priority: SdrPriority;
+  aprovados: number;
+  contatados: number;
+  ganhos: number;
+  perdidos: number;
+  taxaContato: number | null;
+  taxaGanho: number | null;
+}
+
+export interface SdrInsight {
+  text: string;
+  sampleSize: number;
+}
+
+export interface SdrDashboardOverview {
+  funnel: SdrFunnelSummary;
+  scoreOutcome: SdrScoreOutcomeBucket[];
+  insights: SdrInsight[];
+}
+
+export interface SdrProviderCostSummary {
+  provider: string;
+  totalUnits: number;
+  totalCostCents: number;
+  callsCount: number;
+}

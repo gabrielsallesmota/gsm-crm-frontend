@@ -18,6 +18,8 @@ export const ROUTES = {
   sdrCandidates: "/sdr/candidates",
   sdrCandidateDetail: (id: string) => `/sdr/candidates/${id}`,
   sdrCobertura: "/sdr/cobertura",
+  sdrProspectarHoje: "/sdr/prospectar-hoje",
+  sdrDashboard: "/sdr/dashboard",
   tarefas: "/tarefas",
   agenda: "/agenda",
   relatorios: "/relatorios",

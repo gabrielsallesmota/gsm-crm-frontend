@@ -10,14 +10,26 @@ import type {
   SdrCampaignRun,
   SdrCandidate,
   SdrCandidateAppearance,
+  SdrCandidateAudit,
   SdrCandidateDecision,
+  SdrCandidateEnrichment,
   SdrCandidateListFilter,
+  SdrCandidateOutreachGeneration,
+  SdrCandidateScore,
+  SdrOutreachChannel,
+  SdrOutreachTone,
+  SdrProspectSdrContext,
+  SdrDashboardOverview,
+  SdrProviderCostSummary,
   SdrCoverage,
   SdrDiscardReason,
   SdrDiscoveryJob,
   SdrDiscoveryJobStatus,
+  SdrDuplicateSuggestion,
+  SdrDuplicateSuggestionStatus,
   SdrIcpPreset,
   SdrProviderUsageEntry,
+  SetCandidateCnpjResult,
   StartSdrCampaignRunInput,
   UpdateSdrCampaignInput,
   UpdateSdrCoverageInput,
@@ -178,6 +190,97 @@ export class SdrMockRepository implements SdrRepository {
   }
 
   async getUsageSummary(): Promise<SdrProviderUsageEntry[]> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  // Etapa 3 — enriquecimento (CNPJ) + deduplicação forte.
+
+  async setCandidateCnpj(_id: string, _cnpj: string): Promise<SetCandidateCnpjResult> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async refreshCandidateEnrichment(_id: string, _force?: boolean): Promise<SdrCandidate> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async listCandidateEnrichments(): Promise<SdrCandidateEnrichment[]> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async listDuplicateSuggestions(
+    _id: string,
+    _status?: SdrDuplicateSuggestionStatus,
+  ): Promise<SdrDuplicateSuggestion[]> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async confirmDuplicateSuggestion(): Promise<SdrDuplicateSuggestion> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async dismissDuplicateSuggestion(): Promise<SdrDuplicateSuggestion> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  // Etapa 4 — auditoria determinística de sites (sem análise comercial, sem IA).
+
+  async setCandidateWebsite(_id: string, _website: string): Promise<SdrCandidate> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async refreshCandidateAudit(_id: string, _force?: boolean): Promise<SdrCandidate> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async listCandidateAudits(): Promise<SdrCandidateAudit[]> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  // Etapa 5 — Score GSM determinístico (sem IA/LLM).
+
+  async computeCandidateScore(_id: string, _ruleSet?: string): Promise<SdrCandidateScore> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async listCandidateScores(): Promise<SdrCandidateScore[]> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async computeCampaignScores(): Promise<{ enqueued: boolean }> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  // Etapa 6 — IA Comercial.
+
+  async generateCandidateOutreach(
+    _id: string,
+    _channel: SdrOutreachChannel,
+    _tone?: SdrOutreachTone,
+  ): Promise<{ enqueued: boolean }> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async listCandidateOutreachGenerations(): Promise<SdrCandidateOutreachGeneration[]> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  // Etapa 7 — operação comercial ("Prospectar hoje").
+
+  async listProspectingQueue(): Promise<SdrProspectSdrContext[]> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async getProspectOutreachContext(): Promise<SdrProspectSdrContext> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  // Etapa 8 — dashboard, funil real e custos.
+
+  async getDashboardOverview(): Promise<SdrDashboardOverview> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async getDashboardCosts(): Promise<SdrProviderCostSummary[]> {
     throw new NotImplementedError("SDR", REASON);
   }
 }

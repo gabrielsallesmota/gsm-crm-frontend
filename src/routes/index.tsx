@@ -16,6 +16,8 @@ import { SdrIcpPresetsPage } from "../pages/SdrIcpPresetsPage";
 import { SdrCandidatesPage } from "../pages/SdrCandidatesPage";
 import { SdrCandidateDetailPage } from "../pages/SdrCandidateDetailPage";
 import { SdrCoveragePage } from "../pages/SdrCoveragePage";
+import { SdrProspectingQueuePage } from "../pages/SdrProspectingQueuePage";
+import { SdrDashboardPage } from "../pages/SdrDashboardPage";
 import { TasksPage } from "../pages/TasksPage";
 import { AgendaPage } from "../pages/AgendaPage";
 import { ReportsPage } from "../pages/ReportsPage";
@@ -55,6 +57,8 @@ export const router = createBrowserRouter([
       { path: ROUTES.sdrCandidates, element: <SdrCandidatesPage /> },
       { path: `${ROUTES.sdrCandidates}/:id`, element: <SdrCandidateDetailPage /> },
       { path: ROUTES.sdrCobertura, element: <SdrCoveragePage /> },
+      { path: ROUTES.sdrProspectarHoje, element: <SdrProspectingQueuePage /> },
+      { path: ROUTES.sdrDashboard, element: <SdrDashboardPage /> },
       { path: ROUTES.tarefas, element: <TasksPage /> },
       { path: ROUTES.agenda, element: <AgendaPage /> },
       { path: ROUTES.relatorios, element: <ReportsPage /> },

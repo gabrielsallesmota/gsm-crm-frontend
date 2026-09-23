@@ -8,10 +8,12 @@ import styles from "../../pages/SdrPages.module.css";
  * componente comum). */
 export function SdrSubNav() {
   const items = [
+    { to: ROUTES.sdrDashboard, label: "Dashboard" },
     { to: ROUTES.sdrCampanhas, label: "Campanhas" },
     { to: ROUTES.sdrPresets, label: "Presets de ICP" },
     { to: ROUTES.sdrCandidates, label: "Candidates" },
     { to: ROUTES.sdrCobertura, label: "Cobertura" },
+    { to: ROUTES.sdrProspectarHoje, label: "Prospectar hoje" },
   ];
   return (
     <nav className={styles.subnav}>

@@ -13,14 +13,27 @@ import type {
   SdrCampaignRun,
   SdrCandidate,
   SdrCandidateAppearance,
+  SdrCandidateAudit,
   SdrCandidateDecision,
+  SdrCandidateEnrichment,
   SdrCandidateListFilter,
+  SdrCandidateOutreachGeneration,
+  SdrCandidateScore,
+  SdrOutreachChannel,
+  SdrOutreachTone,
+  SdrProspectSdrContext,
+  SdrProspectingQueueFilter,
+  SdrDashboardOverview,
+  SdrProviderCostSummary,
   SdrCoverage,
   SdrDiscardReason,
   SdrDiscoveryJob,
   SdrDiscoveryJobStatus,
+  SdrDuplicateSuggestion,
+  SdrDuplicateSuggestionStatus,
   SdrIcpPreset,
   SdrProviderUsageEntry,
+  SetCandidateCnpjResult,
   StartSdrCampaignRunInput,
   UpdateSdrCampaignInput,
   UpdateSdrCoverageInput,
@@ -179,6 +192,97 @@ export class SdrService {
 
   getUsageSummary(limit?: number): Promise<SdrProviderUsageEntry[]> {
     return repo.getUsageSummary(limit);
+  }
+
+  // Etapa 3 — enriquecimento (CNPJ) + deduplicação forte.
+
+  setCandidateCnpj(id: string, cnpj: string): Promise<SetCandidateCnpjResult> {
+    return repo.setCandidateCnpj(id, cnpj);
+  }
+
+  refreshCandidateEnrichment(id: string, force?: boolean): Promise<SdrCandidate> {
+    return repo.refreshCandidateEnrichment(id, force);
+  }
+
+  listCandidateEnrichments(id: string): Promise<SdrCandidateEnrichment[]> {
+    return repo.listCandidateEnrichments(id);
+  }
+
+  listDuplicateSuggestions(
+    id: string,
+    status?: SdrDuplicateSuggestionStatus,
+  ): Promise<SdrDuplicateSuggestion[]> {
+    return repo.listDuplicateSuggestions(id, status);
+  }
+
+  confirmDuplicateSuggestion(candidateId: string, suggestionId: string): Promise<SdrDuplicateSuggestion> {
+    return repo.confirmDuplicateSuggestion(candidateId, suggestionId);
+  }
+
+  dismissDuplicateSuggestion(candidateId: string, suggestionId: string): Promise<SdrDuplicateSuggestion> {
+    return repo.dismissDuplicateSuggestion(candidateId, suggestionId);
+  }
+
+  // Etapa 4 — auditoria determinística de sites (sem análise comercial, sem IA).
+
+  setCandidateWebsite(id: string, website: string): Promise<SdrCandidate> {
+    return repo.setCandidateWebsite(id, website);
+  }
+
+  refreshCandidateAudit(id: string, force?: boolean): Promise<SdrCandidate> {
+    return repo.refreshCandidateAudit(id, force);
+  }
+
+  listCandidateAudits(id: string): Promise<SdrCandidateAudit[]> {
+    return repo.listCandidateAudits(id);
+  }
+
+  // Etapa 5 — Score GSM determinístico (sem IA/LLM).
+
+  computeCandidateScore(id: string, ruleSet?: string): Promise<SdrCandidateScore> {
+    return repo.computeCandidateScore(id, ruleSet);
+  }
+
+  listCandidateScores(id: string): Promise<SdrCandidateScore[]> {
+    return repo.listCandidateScores(id);
+  }
+
+  computeCampaignScores(campaignId: string): Promise<{ enqueued: boolean }> {
+    return repo.computeCampaignScores(campaignId);
+  }
+
+  // Etapa 6 — IA Comercial.
+
+  generateCandidateOutreach(
+    id: string,
+    channel: SdrOutreachChannel,
+    tone?: SdrOutreachTone,
+  ): Promise<{ enqueued: boolean }> {
+    return repo.generateCandidateOutreach(id, channel, tone);
+  }
+
+  listCandidateOutreachGenerations(id: string): Promise<SdrCandidateOutreachGeneration[]> {
+    return repo.listCandidateOutreachGenerations(id);
+  }
+
+  // Etapa 7 — operação comercial ("Prospectar hoje").
+
+  listProspectingQueue(filter?: SdrProspectingQueueFilter): Promise<SdrProspectSdrContext[]> {
+    return repo.listProspectingQueue(filter);
+  }
+
+  getProspectOutreachContext(prospectId: string): Promise<SdrProspectSdrContext> {
+    return repo.getProspectOutreachContext(prospectId);
+  }
+
+  // Etapa 8 — dashboard, funil real e custos.
+
+  getDashboardOverview(): Promise<SdrDashboardOverview> {
+    return repo.getDashboardOverview();
+  }
+
+  getDashboardCosts(): Promise<SdrProviderCostSummary[]> {
+    return repo.getDashboardCosts();
   }
 }
 
