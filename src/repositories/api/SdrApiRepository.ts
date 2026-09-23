@@ -532,7 +532,7 @@ interface AuditDto {
   status: SdrCandidateAudit["status"];
   signals: Record<string, AuditSignalValueDto>;
   pages_checked: AuditPageCheckDto[];
-  pagespeed: Record<string, unknown> | null;
+  pagespeed: SdrCandidateAudit["pagespeed"];
   started_at: string;
   finished_at: string;
   created_at: string;

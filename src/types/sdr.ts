@@ -484,7 +484,7 @@ export interface SdrCandidateAudit {
   status: SdrAuditStatus;
   signals: Record<string, SdrAuditSignalValue>;
   pagesChecked: SdrAuditPageCheck[];
-  pagespeed: Record<string, unknown> | null;
+  pagespeed: SdrPerformanceReport | null;
   startedAt: string;
   finishedAt: string;
   createdAt: string;
@@ -495,6 +495,34 @@ export const SDR_AUDIT_STATUS_LABEL: Record<SdrAuditStatus, string> = {
   partial: "Parcial — pelo menos uma página falhou",
   failed: "Falhou — o site não respondeu",
   skipped: "Sem site anexado ainda",
+};
+
+// ---------------------------------------------------------------------------
+// Performance (PageSpeed) — dois providers possíveis por baixo do mesmo
+// campo `pagespeed` (Google PageSpeed só pede a categoria Performance, por
+// custo/quota; Lighthouse local roda as 4 categorias) — o frontend nunca
+// inventa um campo que o provider em questão não devolveu.
+// ---------------------------------------------------------------------------
+
+export type SdrPerformanceProvider = "pagespeed_google" | "lighthouse_local";
+
+export interface SdrPerformanceReport {
+  provider?: SdrPerformanceProvider;
+  url_analyzed?: string;
+  performance_score?: number | null;
+  accessibility_score?: number | null;
+  best_practices_score?: number | null;
+  seo_score?: number | null;
+  first_contentful_paint?: string | null;
+  largest_contentful_paint?: string | null;
+  cumulative_layout_shift?: string | null;
+  total_blocking_time?: string | null;
+  speed_index?: string | null;
+}
+
+export const SDR_PERFORMANCE_PROVIDER_LABEL: Record<SdrPerformanceProvider, string> = {
+  pagespeed_google: "Google PageSpeed",
+  lighthouse_local: "Lighthouse local",
 };
 
 export const SDR_AUDIT_PAGE_KIND_LABEL: Record<string, string> = {

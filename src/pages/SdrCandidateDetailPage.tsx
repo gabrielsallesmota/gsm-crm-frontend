@@ -31,11 +31,13 @@ import {
   SDR_OUTREACH_CHANNEL_LABEL,
   SDR_OUTREACH_STATUS_LABEL,
   SDR_OUTREACH_TONE_LABEL,
+  SDR_PERFORMANCE_PROVIDER_LABEL,
   SDR_PRIORITY_LABEL,
   type SdrAuditStatus,
   type SdrCandidateStatus,
   type SdrOutreachChannel,
   type SdrOutreachTone,
+  type SdrPerformanceReport,
   type SdrPriority,
 } from "../types/sdr";
 import { formatCnpj } from "../utils/cnpj";
@@ -60,6 +62,26 @@ const PRIORITY_COLOR: Record<SdrPriority, { color: string; bg: string }> = {
   b: { color: "var(--tone-amber)", bg: "var(--tone-amber-bg)" },
   c: { color: "var(--tone-gray)", bg: "var(--tone-gray-bg)" },
 };
+
+// Cada provider de performance devolve um subconjunto diferente destes
+// campos (Google PageSpeed só pede a categoria Performance, por custo —
+// nunca tem accessibility/best-practices/seo/FCP/Speed Index; Lighthouse
+// local tem as 4 categorias) — o grid só renderiza o que veio preenchido,
+// nunca mostra "—" pra campo que o provider em questão nunca devolve.
+const PERFORMANCE_SCORE_FIELDS: { key: keyof SdrPerformanceReport; label: string }[] = [
+  { key: "performance_score", label: "Performance" },
+  { key: "accessibility_score", label: "Acessibilidade" },
+  { key: "best_practices_score", label: "Boas práticas" },
+  { key: "seo_score", label: "SEO" },
+];
+
+const PERFORMANCE_METRIC_FIELDS: { key: keyof SdrPerformanceReport; label: string }[] = [
+  { key: "first_contentful_paint", label: "First Contentful Paint" },
+  { key: "largest_contentful_paint", label: "Largest Contentful Paint" },
+  { key: "cumulative_layout_shift", label: "Cumulative Layout Shift" },
+  { key: "total_blocking_time", label: "Total Blocking Time" },
+  { key: "speed_index", label: "Speed Index" },
+];
 
 function fmtSignalValue(value: unknown): string {
   if (typeof value === "boolean") return value ? "Sim" : "Não";
@@ -694,8 +716,34 @@ export function SdrCandidateDetailPage() {
 
                   {latest.pagespeed && (
                     <>
-                      <p className={styles.fieldLabel}>PageSpeed</p>
-                      <p className={styles.pageSubtitle}>{JSON.stringify(latest.pagespeed)}</p>
+                      <p className={styles.fieldLabel}>
+                        Performance
+                        {latest.pagespeed.provider && (
+                          <span className={styles.historyMeta} style={{ marginLeft: 8 }}>
+                            {SDR_PERFORMANCE_PROVIDER_LABEL[latest.pagespeed.provider]}
+                          </span>
+                        )}
+                      </p>
+                      <div className={styles.performanceGrid}>
+                        {PERFORMANCE_SCORE_FIELDS.map(
+                          ({ key, label }) =>
+                            latest.pagespeed![key] != null && (
+                              <div key={key} className={styles.performanceMetric}>
+                                <span className={styles.historyMeta}>{label}</span>
+                                <span>{latest.pagespeed![key]}/100</span>
+                              </div>
+                            ),
+                        )}
+                        {PERFORMANCE_METRIC_FIELDS.map(
+                          ({ key, label }) =>
+                            latest.pagespeed![key] != null && (
+                              <div key={key} className={styles.performanceMetric}>
+                                <span className={styles.historyMeta}>{label}</span>
+                                <span>{latest.pagespeed![key]}</span>
+                              </div>
+                            ),
+                        )}
+                      </div>
                     </>
                   )}
                 </div>

@@ -288,6 +288,23 @@
   margin-top: 2px;
 }
 
+.performanceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.performanceMetric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-input);
+  background: var(--card-bg-alt);
+  font-size: 13px;
+}
+
 .duplicateWarning {
   background: var(--tone-red-bg);
   color: var(--tone-red);
