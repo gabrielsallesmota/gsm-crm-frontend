@@ -41,7 +41,7 @@ export function SdrCampaignFormPage() {
   const [name, setName] = useState("");
   const [niche, setNiche] = useState("");
   const [status, setStatus] = useState<SdrCampaignStatus>("draft");
-  const [provider, setProvider] = useState("manual");
+  const [provider, setProvider] = useState("google_places");
   const [targetQuantity, setTargetQuantity] = useState(0);
   const [searchTerms, setSearchTerms] = useState<string[]>([]);
   const [gsmOffers, setGsmOffers] = useState<string[]>([]);
@@ -201,12 +201,15 @@ export function SdrCampaignFormPage() {
               </select>
             </label>
             <label className={styles.fieldLabel}>
-              Provider (referência, sem busca real ainda)
-              <input
-                className={styles.input}
+              Provider de descoberta
+              <select
+                className={styles.select}
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}
-              />
+              >
+                <option value="google_places">Google Places</option>
+                <option value="geoapify">Geoapify</option>
+              </select>
             </label>
             <label className={styles.fieldLabel}>
               Quantidade alvo
