@@ -47,6 +47,7 @@
   font-weight: 600;
   color: var(--muted);
   border-radius: var(--radius-pill);
+  text-decoration: none;
 }
 
 .subnavLink:hover {
