@@ -298,6 +298,17 @@
   margin-top: 2px;
 }
 
+.linkButton {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--tone-purple);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .performanceGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

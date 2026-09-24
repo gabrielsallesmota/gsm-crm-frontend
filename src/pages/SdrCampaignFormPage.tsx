@@ -2,23 +2,42 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { SdrSubNav } from "../components/sdr/SdrSubNav";
 import { SdrChipInput } from "../components/sdr/SdrChipInput";
+import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
 import { EmptyState } from "../components/common/EmptyState";
 import { ROUTES } from "../constants/routes";
 import { useSdrCampaignActions } from "../hooks/useSdrCampaignActions";
+import { useSdrCampaignRuns } from "../hooks/useSdrCampaignRuns";
 import { useSdrIcpPresets } from "../hooks/useSdrIcpPresets";
 import { useToast } from "../hooks/useToast";
 import {
   SDR_CAMPAIGN_STATUS_LABEL,
+  SDR_RUN_MODE_LABEL,
+  SDR_RUN_STATUS_LABEL,
   type SdrCampaign,
   type SdrCampaignStatus,
   type SdrCriterion,
   type SdrCriterionKind,
   type SdrLocation,
+  type SdrRunStatus,
 } from "../types/sdr";
 import styles from "./SdrPages.module.css";
 
 const STATUS_OPTIONS: SdrCampaignStatus[] = ["draft", "active", "paused", "archived"];
+
+const RUN_STATUS_COLOR: Record<SdrRunStatus, { color: string; bg: string }> = {
+  queued: { color: "var(--muted)", bg: "var(--card-bg-alt)" },
+  running: { color: "var(--tone-blue)", bg: "var(--tone-blue-bg)" },
+  paused: { color: "var(--tone-amber)", bg: "var(--tone-amber-bg)" },
+  completed: { color: "var(--tone-green)", bg: "var(--tone-green-bg)" },
+  failed: { color: "var(--tone-red)", bg: "var(--tone-red-bg)" },
+  cancelled: { color: "var(--muted)", bg: "var(--card-bg-alt)" },
+};
+
+function fmtRunDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("pt-BR");
+}
 
 function emptyLocation(): SdrLocation {
   return { country: "", state: "", city: "", locality: "" };
@@ -35,6 +54,7 @@ export function SdrCampaignFormPage() {
   const { toast } = useToast();
   const { get, create, update } = useSdrCampaignActions();
   const { data: presets } = useSdrIcpPresets();
+  const { data: runs, loading: runsLoading } = useSdrCampaignRuns(isEditing ? (id ?? null) : null);
 
   const [loading, setLoading] = useState(isEditing);
   const [notFound, setNotFound] = useState(false);
@@ -153,6 +173,39 @@ export function SdrCampaignFormPage() {
       </div>
 
       <SdrSubNav />
+
+      {isEditing && id && (
+        <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Execuções</h2>
+          {runsLoading && <p className={styles.pageSubtitle}>Carregando…</p>}
+          {!runsLoading && (!runs || runs.length === 0) && (
+            <p className={styles.pageSubtitle}>
+              Nenhum garimpo iniciado ainda pra esta campanha.
+            </p>
+          )}
+          {!runsLoading &&
+            runs &&
+            runs.map((run) => (
+              <div key={run.id} className={styles.historyItem}>
+                <Badge label={SDR_RUN_STATUS_LABEL[run.status]} {...RUN_STATUS_COLOR[run.status]} />{" "}
+                {SDR_RUN_MODE_LABEL[run.mode]} · {run.processedCount}/{run.targetQuantity}{" "}
+                processados · {run.foundCount} encontrados
+                <div className={styles.historyMeta}>
+                  Iniciado em {fmtRunDateTime(run.startedAt)}
+                  {run.finishedAt && <> · Finalizado em {fmtRunDateTime(run.finishedAt)}</>}
+                  {" · "}
+                  <button
+                    type="button"
+                    className={styles.linkButton}
+                    onClick={() => navigate(ROUTES.sdrCampanhaExecucao(id, run.id))}
+                  >
+                    Ver execução
+                  </button>
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
 
       {loading ? (
         <div className={styles.empty}>Carregando…</div>
