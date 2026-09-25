@@ -6,6 +6,7 @@ import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
 import { EmptyState } from "../components/common/EmptyState";
 import { ROUTES } from "../constants/routes";
+import { SDR_NICHE_SUGGESTIONS } from "../constants/sdrNiches";
 import { useSdrCampaignActions } from "../hooks/useSdrCampaignActions";
 import { useSdrCampaignRuns } from "../hooks/useSdrCampaignRuns";
 import { useSdrIcpPresets } from "../hooks/useSdrIcpPresets";
@@ -237,7 +238,21 @@ export function SdrCampaignFormPage() {
             </label>
             <label className={styles.fieldLabel}>
               Nicho
-              <input className={styles.input} value={niche} onChange={(e) => setNiche(e.target.value)} />
+              <input
+                className={styles.input}
+                list="sdr-niche-suggestions"
+                placeholder="Digite ou clique pra escolher da lista"
+                value={niche}
+                onChange={(e) => setNiche(e.target.value)}
+              />
+              <datalist id="sdr-niche-suggestions">
+                {SDR_NICHE_SUGGESTIONS.map((suggestion) => (
+                  <option key={suggestion} value={suggestion} />
+                ))}
+              </datalist>
+              <span className={styles.historyMeta}>
+                Pode digitar livremente, mas no provider Geoapify só funcionam os nichos da lista.
+              </span>
             </label>
             <label className={styles.fieldLabel}>
               Status
