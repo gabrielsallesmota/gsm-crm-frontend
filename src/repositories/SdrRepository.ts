@@ -19,6 +19,7 @@ import type {
   SdrProspectingQueueFilter,
   SdrDashboardOverview,
   SdrProviderCostSummary,
+  SdrSearchTermCatalog,
   SdrCandidateEnrichment,
   SdrCandidateListFilter,
   SdrCoverage,
@@ -48,6 +49,8 @@ export interface SdrRepository {
   deleteCampaign(id: string): Promise<void>;
 
   listIcpPresets(): Promise<SdrIcpPreset[]>;
+
+  listSearchTerms(provider: string): Promise<SdrSearchTermCatalog>;
   createIcpPreset(input: CreateSdrIcpPresetInput): Promise<SdrIcpPreset>;
   updateIcpPreset(id: string, input: UpdateSdrIcpPresetInput): Promise<SdrIcpPreset>;
   deleteIcpPreset(id: string): Promise<void>;

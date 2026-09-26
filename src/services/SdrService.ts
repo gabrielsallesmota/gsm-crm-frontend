@@ -25,6 +25,7 @@ import type {
   SdrProspectingQueueFilter,
   SdrDashboardOverview,
   SdrProviderCostSummary,
+  SdrSearchTermCatalog,
   SdrCoverage,
   SdrDiscardReason,
   SdrDiscoveryJob,
@@ -65,6 +66,10 @@ export class SdrService {
 
   deleteCampaign(id: string): Promise<void> {
     return repo.deleteCampaign(id);
+  }
+
+  listSearchTerms(provider: string): Promise<SdrSearchTermCatalog> {
+    return repo.listSearchTerms(provider);
   }
 
   listIcpPresets(): Promise<SdrIcpPreset[]> {

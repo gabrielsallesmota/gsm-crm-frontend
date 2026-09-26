@@ -26,6 +26,7 @@ import type {
   SdrDashboardOverview,
   SdrScoreOutcomeBucket,
   SdrProviderCostSummary,
+  SdrSearchTermCatalog,
   SdrCoverage,
   SdrCriterion,
   SdrCriterionKind,
@@ -806,6 +807,13 @@ export class SdrApiRepository implements SdrRepository {
 
   async deleteCampaign(id: string): Promise<void> {
     await apiRequest<void>(`/api/v1/sdr/campaigns/${id}`, { method: "DELETE" });
+  }
+
+  async listSearchTerms(provider: string): Promise<SdrSearchTermCatalog> {
+    const dto = await apiRequest<{ provider: string; free_text: boolean; terms: string[] }>(
+      `/api/v1/sdr/search-terms?provider=${encodeURIComponent(provider)}`,
+    );
+    return { provider: dto.provider, freeText: dto.free_text, terms: dto.terms };
   }
 
   async listIcpPresets(): Promise<SdrIcpPreset[]> {

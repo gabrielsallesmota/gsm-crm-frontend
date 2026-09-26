@@ -6,10 +6,10 @@ import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
 import { EmptyState } from "../components/common/EmptyState";
 import { ROUTES } from "../constants/routes";
-import { SDR_NICHE_SUGGESTIONS } from "../constants/sdrNiches";
 import { useSdrCampaignActions } from "../hooks/useSdrCampaignActions";
 import { useSdrCampaignRuns } from "../hooks/useSdrCampaignRuns";
 import { useSdrIcpPresets } from "../hooks/useSdrIcpPresets";
+import { useSdrSearchTerms } from "../hooks/useSdrSearchTerms";
 import { useToast } from "../hooks/useToast";
 import {
   SDR_CAMPAIGN_STATUS_LABEL,
@@ -22,6 +22,7 @@ import {
   type SdrLocation,
   type SdrRunStatus,
 } from "../types/sdr";
+import { findSuggestion } from "../utils/searchTerms";
 import styles from "./SdrPages.module.css";
 
 const STATUS_OPTIONS: SdrCampaignStatus[] = ["draft", "active", "paused", "archived"];
@@ -70,6 +71,15 @@ export function SdrCampaignFormPage() {
   const [criteria, setCriteria] = useState<SdrCriterion[]>([]);
   const [fromPresetId, setFromPresetId] = useState("");
   const [saving, setSaving] = useState(false);
+  const { data: termCatalog } = useSdrSearchTerms(provider);
+  // Vocabulário FECHADO do provider (Geoapify) — `null` = texto livre ou
+  // ainda carregando o catálogo do provider selecionado.
+  const allowedTerms =
+    termCatalog && termCatalog.provider === provider && !termCatalog.freeText
+      ? termCatalog.terms
+      : null;
+  // Sem termos, a execução busca pelo NICHO (mesma regra do backend).
+  const nicheIsSearched = searchTerms.length === 0;
 
   useEffect(() => {
     if (!id) return;
@@ -118,6 +128,17 @@ export function SdrCampaignFormPage() {
     if (cleanLocations.length === 0) {
       toast("Preencha pelo menos uma localidade (país, estado, cidade ou bairro/região).");
       return;
+    }
+    if (allowedTerms) {
+      const searched = nicheIsSearched ? [niche] : searchTerms;
+      const unsupported = searched.filter((t) => !findSuggestion(t, allowedTerms));
+      if (unsupported.length > 0) {
+        toast(
+          `Termo(s) fora da lista suportada por este provider: ${unsupported.join(", ")}. ` +
+            "Escolha um termo da lista.",
+        );
+        return;
+      }
     }
     setSaving(true);
     try {
@@ -240,18 +261,32 @@ export function SdrCampaignFormPage() {
               Nicho
               <input
                 className={styles.input}
-                list="sdr-niche-suggestions"
-                placeholder="Digite ou clique pra escolher da lista"
+                list={allowedTerms ? "sdr-niche-suggestions" : undefined}
+                placeholder={allowedTerms ? "Digite ou clique pra escolher da lista" : "Ex.: Odontologia"}
                 value={niche}
                 onChange={(e) => setNiche(e.target.value)}
+                onBlur={() => {
+                  // Grava a grafia oficial quando o texto bate com um item da lista.
+                  const match = allowedTerms ? findSuggestion(niche, allowedTerms) : null;
+                  if (match) setNiche(match);
+                }}
               />
-              <datalist id="sdr-niche-suggestions">
-                {SDR_NICHE_SUGGESTIONS.map((suggestion) => (
-                  <option key={suggestion} value={suggestion} />
-                ))}
-              </datalist>
+              {allowedTerms && (
+                <datalist id="sdr-niche-suggestions">
+                  {allowedTerms.map((suggestion) => (
+                    <option key={suggestion} value={suggestion} />
+                  ))}
+                </datalist>
+              )}
               <span className={styles.historyMeta}>
-                Pode digitar livremente, mas no provider Geoapify só funcionam os nichos da lista.
+                {!allowedTerms && "Texto livre — este provider busca por qualquer termo."}
+                {allowedTerms &&
+                  nicheIsSearched &&
+                  !findSuggestion(niche, allowedTerms) &&
+                  "Sem termos de busca, o nicho é o que será buscado — escolha um da lista."}
+                {allowedTerms &&
+                  (!nicheIsSearched || findSuggestion(niche, allowedTerms)) &&
+                  "Neste provider só são aceitos termos da lista."}
               </span>
             </label>
             <label className={styles.fieldLabel}>
@@ -336,7 +371,19 @@ export function SdrCampaignFormPage() {
 
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Termos de busca</h2>
-            <SdrChipInput values={searchTerms} onChange={setSearchTerms} placeholder="Ex.: dentista" />
+            {allowedTerms && (
+              <p className={styles.pageSubtitle}>
+                O termo é o que você quer prospectar (ex.: "Seguro de vida" = empresas que vendem
+                seguro de vida). Neste provider, só entram termos da lista.
+              </p>
+            )}
+            <SdrChipInput
+              values={searchTerms}
+              onChange={setSearchTerms}
+              placeholder="Ex.: dentista"
+              suggestions={allowedTerms ?? undefined}
+              restrictToSuggestions={allowedTerms !== null}
+            />
           </div>
 
           <div className={styles.card}>

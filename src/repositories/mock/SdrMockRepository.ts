@@ -34,6 +34,7 @@ import type {
   UpdateSdrCampaignInput,
   UpdateSdrCoverageInput,
   UpdateSdrIcpPresetInput,
+  SdrSearchTermCatalog,
 } from "../../types/sdr";
 import type { Page } from "../../types/common";
 import { NotImplementedError } from "../../utils/errors";
@@ -62,6 +63,10 @@ export class SdrMockRepository implements SdrRepository {
   }
 
   async deleteCampaign(): Promise<void> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async listSearchTerms(_provider: string): Promise<SdrSearchTermCatalog> {
     throw new NotImplementedError("SDR", REASON);
   }
 

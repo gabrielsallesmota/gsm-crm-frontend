@@ -718,6 +718,15 @@ export interface SdrDashboardOverview {
   insights: SdrInsight[];
 }
 
+/** Termos de busca aceitos por um provider (`GET /api/v1/sdr/search-terms`).
+ * `freeText=true` = qualquer termo serve (Google Places); `false` = só os
+ * termos de `terms` — o backend recusa (422) criar/editar/iniciar com outro. */
+export interface SdrSearchTermCatalog {
+  provider: string;
+  freeText: boolean;
+  terms: string[];
+}
+
 export interface SdrProviderCostSummary {
   provider: string;
   totalUnits: number;
