@@ -17,12 +17,11 @@ import { ReportsPage } from "../pages/ReportsPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { UsersPage } from "../pages/UsersPage";
 import { ProfilePage } from "../pages/ProfilePage";
-import { KioskGate } from "../components/operations/KioskGate";
 
 /**
  * Carrega uma página sob demanda (chunk próprio). Usado para tudo que NÃO
- * é produto do cliente: SDR, Clientes GSM e o painel legado Terapeuta da
- * Vez — quem não chega nessas rotas nunca baixa esse código. Isso reduz
+ * é produto do cliente: SDR e Clientes GSM — quem não chega nessas rotas
+ * nunca baixa esse código. Isso reduz
  * superfície e bundle; NÃO é controle de acesso (o backend é quem nega).
  */
 function lazyPage<K extends string>(
@@ -57,15 +56,6 @@ const SdrProspectingQueuePage = lazyPage(
   "SdrProspectingQueuePage",
 );
 const SdrDashboardPage = lazyPage(() => import("../pages/SdrDashboardPage"), "SdrDashboardPage");
-const TerapeutaDaVezPage = lazyPage(
-  () => import("../pages/TerapeutaDaVezPage"),
-  "TerapeutaDaVezPage",
-);
-const TerapeutaDaVezGestaoPage = lazyPage(
-  () => import("../pages/TerapeutaDaVezGestaoPage"),
-  "TerapeutaDaVezGestaoPage",
-);
-
 function guarded(permission: Permission, page: ReactNode) {
   return (
     <RequirePermission permission={permission}>
@@ -81,29 +71,6 @@ export const router = createBrowserRouter([
   { path: ROUTES.forgotPassword, element: <ForgotPasswordPage /> },
   { path: ROUTES.resetPassword, element: <ResetPasswordPage /> },
   { path: ROUTES.forcedPasswordChange, element: <ForcedPasswordChangePage /> },
-  // Painel legado "Terapeuta da Vez" (cliente específico, fora do produto
-  // CRM) — sem login do CRM (pedido do cliente), mas o terminal precisa ser
-  // PAREADO com o código do dispositivo antes de qualquer chamada: o
-  // backend não responde mais nada dessas rotas sem credencial.
-  {
-    path: ROUTES.terapeutaDaVez,
-    element: (
-      <KioskGate>
-        <Suspense fallback={<Loading />}>
-          <TerapeutaDaVezPage />
-        </Suspense>
-      </KioskGate>
-    ),
-  },
-  // Gestão: continua com a senha própria (ver `TerapeutaDaVezGestaoPage`).
-  {
-    path: ROUTES.terapeutaDaVezGestao,
-    element: (
-      <Suspense fallback={<Loading />}>
-        <TerapeutaDaVezGestaoPage />
-      </Suspense>
-    ),
-  },
   {
     element: <ProtectedRoute />,
     children: [

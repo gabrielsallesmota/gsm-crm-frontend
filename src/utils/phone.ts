@@ -1,6 +1,5 @@
-/** Formatação de telefone BR pra digitação em formulário — extraído de
- * `TerapeutaDaVezPage.tsx` (única tela que já mascarava telefone) pra
- * reaproveitar nos formulários de Leads/Prospecção/Clientes, que até então
+/** Formatação de telefone BR pra digitação em formulário — usada nos
+ * formulários de Leads/Prospecção/Clientes, que até então
  * aceitavam qualquer texto no campo "Telefone" sem limite nenhum de
  * caracteres (dava pra digitar uma string de 19 dígitos, por exemplo).
  * Trava em 11 dígitos (DDD + 9 dígitos, o celular BR mais longo) e formata

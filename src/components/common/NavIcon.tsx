@@ -11,9 +11,6 @@ const PATHS = {
   // "Clientes" — maleta (contrato fechado), diferencia de "leads" (pessoas)
   // e "prospects" (alvo) já usados no menu.
   clients: "M9 7V5a3 3 0 0 1 3-3h0a3 3 0 0 1 3 3v2M3 10h18M4 7h16l-1 13H5z",
-  // "Terapeuta da Vez" — sino de recepção (fila/chamada), diferencia do
-  // "tasks" (check) e do "agenda" (calendário) já usados no menu.
-  queue: "M12 3a5 5 0 0 1 5 5v3l2 4H5l2-4V8a5 5 0 0 1 5-5zM9 19a3 3 0 0 0 6 0",
   // Usados só pelos toggles da sidebar (ver `AppLayout.tsx`) — não são
   // itens de navegação, por isso ficam fora de `NAV_ITEMS`.
   menu: "M4 7h16M4 12h16M4 17h16",

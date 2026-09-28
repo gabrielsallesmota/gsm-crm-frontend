@@ -3,9 +3,8 @@ import type { ReactNode } from "react";
 import styles from "./Modal.module.css";
 
 /** Modal genérico centralizado (overlay escuro + card no meio da tela) —
- * clique fora ou Esc fecha. Usado pra edição de registros nas telas de
- * gestão (terapeutas, procedimentos, espaços etc.), em vez do formulário
- * inline "some no topo da lista longa" de antes. */
+ * clique fora ou Esc fecha. Usado pra edição de registros em telas de
+ * gestão, em vez de formulário inline no topo de uma lista longa. */
 export function Modal({
   title,
   subtitle,

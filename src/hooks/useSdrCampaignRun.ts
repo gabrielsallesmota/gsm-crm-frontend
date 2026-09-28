@@ -15,10 +15,9 @@ export interface SdrCampaignRunPanel {
 }
 
 /** Polling simples e robusto (setInterval, ~3s) — pedido explícito do
- * usuário: "não introduza WebSocket sem necessidade demonstrada". Mais
- * simples que `useTerapeutaDaVezPanel`: sem o timer de "próxima transição
- * conhecida" (não dá pra prever quando um job de garimpo termina, ao
- * contrário de um atendimento com horário previsto). Para sozinho quando o
+ * usuário: "não introduza WebSocket sem necessidade demonstrada". Sem
+ * timer de "próxima transição conhecida" (não dá pra prever quando um job
+ * de garimpo termina). Para sozinho quando o
  * run chega num status terminal — sem gastar polling num run que já
  * acabou. */
 export function useSdrCampaignRun(runId: string | null): SdrCampaignRunPanel {
