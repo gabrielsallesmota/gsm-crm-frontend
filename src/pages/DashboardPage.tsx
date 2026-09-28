@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useDashboard } from "../hooks/useDashboard";
 import { KpiCard } from "../components/kpi/KpiCard";
 import { WeekBarChart } from "../components/charts/WeekBarChart";
@@ -7,10 +7,16 @@ import { SalesFunnel } from "../components/charts/SalesFunnel";
 import { Badge } from "../components/common/Badge";
 import { EmptyState } from "../components/common/EmptyState";
 import { PeriodFilter } from "../components/common/PeriodFilter";
-import { ProspectDashboardSection } from "../components/prospects/ProspectDashboardSection";
+// Dashboard de prospecção é INTERNO da GSM — chunk próprio (ver PipelinePage).
+const ProspectDashboardSection = lazy(() =>
+  import("../components/prospects/ProspectDashboardSection").then((m) => ({
+    default: m.ProspectDashboardSection,
+  })),
+);
 import { shortCurrency } from "../utils/currency";
 import { EMPTY_PERIOD, type Period } from "../utils/periods";
 import { useAuth } from "../hooks/useAuth";
+import { can } from "../auth/permissions";
 import styles from "./DashboardPage.module.css";
 
 type SourceFilter = "todos" | "ativo" | "passivo";
@@ -27,7 +33,7 @@ export function DashboardPage() {
   // Prospecção (funil comercial próprio da GSM) é restrita a platform staff
   // no backend — `isPlatformStaff` vem de `GET /auth/me` (ver `types/auth.ts`).
   const { user } = useAuth();
-  const isSuperAdmin = user?.isPlatformStaff ?? false;
+  const isSuperAdmin = can(user, "platform.internal");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("todos");
   const [period, setPeriod] = useState<Period>(EMPTY_PERIOD);
   const showPassivo = !isSuperAdmin || sourceFilter !== "ativo";
@@ -60,7 +66,11 @@ export function DashboardPage() {
 
       {showPassivo && showAtivo && <div className={styles.sourceDivider} />}
 
-      {showAtivo && <ProspectDashboardSection period={period} />}
+      {showAtivo && (
+        <Suspense fallback={null}>
+          <ProspectDashboardSection period={period} />
+        </Suspense>
+      )}
     </div>
   );
 }

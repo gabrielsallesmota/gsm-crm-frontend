@@ -3,6 +3,7 @@ import { AuthApiRepository } from "../repositories/api/AuthApiRepository";
 import { AuthMockRepository } from "../repositories/mock/AuthMockRepository";
 import { selectRepository } from "./factory";
 import type {
+  AuthUser,
   ChangePasswordInput,
   LoginInput,
   LoginOutcome,
@@ -37,6 +38,11 @@ export class AuthService {
 
   logout(refreshToken: string): Promise<void> {
     return repo.logout(refreshToken);
+  }
+
+  /** Fonte de verdade de papel/staff/troca de senha da sessão atual. */
+  me(accessToken: string): Promise<AuthUser> {
+    return repo.me(accessToken);
   }
 
   requestPasswordReset(input: RequestPasswordResetInput): Promise<void> {

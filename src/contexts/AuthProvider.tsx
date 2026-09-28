@@ -9,7 +9,14 @@ import type {
   TenantOption,
 } from "../types/auth";
 import { authService } from "../services/AuthService";
-import { setApiTokens, setOnSessionExpired } from "../repositories/api/ApiClient";
+import {
+  currentAccessToken,
+  currentRefreshToken,
+  setApiTokens,
+  setOnSessionExpired,
+  setOnTokensRefreshed,
+} from "../repositories/api/ApiClient";
+import { ApiError } from "../types/common";
 import { mockState } from "../repositories/mock/state";
 import { mockTenants } from "../mock/tenants";
 import { isDemoMode } from "../services/factory";
@@ -83,14 +90,44 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }, []);
 
   useEffect(() => {
+    // Tokens renovados em segundo plano pelo ApiClient precisam ir para o
+    // storage — senão um F5 usaria o refresh antigo (já revogado pela
+    // rotação) e deslogaria o usuário.
+    setOnTokensRefreshed((fresh) => {
+      setTokens(fresh);
+      const current = loadStoredSession();
+      if (current) saveStoredSession({ user: current.user, tokens: fresh });
+    });
     const stored = loadStoredSession();
     if (stored) {
-      setUser(stored.user);
       setTokens(stored.tokens);
       setApiTokens(stored.tokens);
       mockState.currentTenantId = stored.user.tenantId;
-      refreshAvailableTenants(stored.tokens.accessToken);
-      setLoading(false);
+      if (isDemoMode) {
+        setUser(stored.user);
+        setLoading(false);
+      } else {
+        // Papel, platform staff e troca de senha obrigatória NUNCA vêm do
+        // storage (editável pelo usuário) — sempre revalidados no backend
+        // antes de liberar a UI. Sem rede, usa o que estava salvo (a API
+        // continua recusando o que não for permitido).
+        authService
+          .me(stored.tokens.accessToken)
+          .then((fresh) => {
+            setUser(fresh);
+            const tokensNow = {
+              accessToken: currentAccessToken() ?? stored.tokens.accessToken,
+              refreshToken: currentRefreshToken() ?? stored.tokens.refreshToken,
+            };
+            saveStoredSession({ user: fresh, tokens: tokensNow });
+            refreshAvailableTenants(tokensNow.accessToken);
+          })
+          .catch((err: unknown) => {
+            if (err instanceof ApiError && err.status === 0) setUser(stored.user);
+            else saveStoredSession(null);
+          })
+          .finally(() => setLoading(false));
+      }
     } else if (isDemoMode) {
       // Modo demo: entra automaticamente como a empresa de demonstração,
       // sem passar pela tela de login fictícia.
@@ -110,7 +147,10 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       setAvailableTenants([]);
       saveStoredSession(null);
     });
-    return () => setOnSessionExpired(null);
+    return () => {
+      setOnSessionExpired(null);
+      setOnTokensRefreshed(null);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

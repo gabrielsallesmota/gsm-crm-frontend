@@ -31,7 +31,12 @@ export function AgendaPage() {
 
   async function handleCreate() {
     if (!leadId || !title.trim() || !at) return;
-    await create({ leadId, title: title.trim(), type, at: new Date(at).toISOString() });
+    try {
+      await create({ leadId, title: title.trim(), type, at: new Date(at).toISOString() });
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível criar o compromisso.");
+      return;
+    }
     setTitle("");
     setAt("");
     toast("Compromisso criado");
@@ -39,7 +44,12 @@ export function AgendaPage() {
   }
 
   async function handleDelete(eventId: string) {
-    await deleteEvent(eventId);
+    try {
+      await deleteEvent(eventId);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível remover o compromisso.");
+      return;
+    }
     toast("Compromisso removido");
     reload();
   }

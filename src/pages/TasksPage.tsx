@@ -26,13 +26,22 @@ export function TasksPage() {
   const [dueAt, setDueAt] = useState("");
 
   async function handleToggle(taskId: string) {
-    await toggle(taskId);
+    try {
+      await toggle(taskId);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível atualizar a tarefa.");
+    }
     reload();
   }
 
   async function handleCreate() {
     if (!leadId || !title.trim() || !dueAt) return;
-    await create({ leadId, title: title.trim(), priority, dueAt: new Date(dueAt).toISOString() });
+    try {
+      await create({ leadId, title: title.trim(), priority, dueAt: new Date(dueAt).toISOString() });
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível criar a tarefa.");
+      return;
+    }
     setTitle("");
     setDueAt("");
     toast("Tarefa criada");
@@ -40,7 +49,12 @@ export function TasksPage() {
   }
 
   async function handleDelete(taskId: string) {
-    await deleteTask(taskId);
+    try {
+      await deleteTask(taskId);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível remover a tarefa.");
+      return;
+    }
     toast("Tarefa removida");
     reload();
   }

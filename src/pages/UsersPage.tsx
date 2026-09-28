@@ -6,6 +6,8 @@ import { Avatar } from "../components/common/Avatar";
 import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
 import { useToast } from "../hooks/useToast";
+import { useAuth } from "../hooks/useAuth";
+import { can } from "../auth/permissions";
 import type { UserRole } from "../types/user";
 import styles from "./UsersPage.module.css";
 
@@ -21,6 +23,9 @@ export function UsersPage() {
   const { data, loading, error, reload } = useUsers();
   const { create: createUser } = useUserActions();
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
+  // Criar usuário é só ADMIN no backend (gestor só lista) — ver auth/permissions.ts.
+  const canCreate = can(currentUser, "users.create");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [team, setTeam] = useState("");
@@ -35,12 +40,17 @@ export function UsersPage() {
     setSubmitting(true);
     try {
       await createUser({ name, email, role, team: team || "—", password });
-      toast(`Usuário adicionado — compartilhe a senha temporária "${password}" com ${name} por um canal seguro.`);
+      // A senha NÃO é repetida no aviso (ficava exposta na tela/print).
+      toast(
+        `Usuário adicionado. Envie a senha temporária para ${name} por um canal seguro — ela será trocada no primeiro acesso.`,
+      );
       setName("");
       setEmail("");
       setTeam("");
       setPassword("");
       reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível adicionar o usuário.");
     } finally {
       setSubmitting(false);
     }
@@ -51,36 +61,61 @@ export function UsersPage() {
       <h1 className={styles.pageTitle}>Usuários</h1>
       <p className={styles.pageSubtitle}>Equipe com acesso ao CRM</p>
 
-      <div className={styles.form}>
-        <input className={styles.input} placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className={styles.input} placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input className={styles.input} placeholder="Time" value={team} onChange={(e) => setTeam(e.target.value)} />
-        <input
-          className={styles.input}
-          type="text"
-          placeholder="Senha temporária (mín. 8 caracteres)"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <select className={styles.select} value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
-          <option value="vendedor">Vendedor</option>
-          <option value="gestor">Gestor</option>
-          <option value="admin">Admin</option>
-        </select>
-        <Button
-          variant="primary"
-          onClick={() => void handleCreate()}
-          disabled={submitting || !name.trim() || !email.trim() || !passwordValid}
-        >
-          Adicionar
-        </Button>
-      </div>
-      <p className={styles.hint}>
-        O backend não tem convite por e-mail nem reset de senha ainda — defina uma senha temporária aqui e
-        compartilhe com a pessoa por um canal seguro (ela poderá trocá-la depois que essa funcionalidade existir).
-      </p>
+      {canCreate && (
+        <>
+          <div className={styles.form}>
+            <input
+              className={styles.input}
+              placeholder="Nome"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              className={styles.input}
+              placeholder="E-mail"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <input
+              className={styles.input}
+              placeholder="Time"
+              value={team}
+              onChange={(e) => setTeam(e.target.value)}
+            />
+            <input
+              className={styles.input}
+              type="text"
+              placeholder="Senha temporária (mín. 8 caracteres)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <select
+              className={styles.select}
+              value={role}
+              onChange={(e) => setRole(e.target.value as UserRole)}
+            >
+              <option value="vendedor">Vendedor</option>
+              <option value="gestor">Gestor</option>
+              <option value="admin">Admin</option>
+            </select>
+            <Button
+              variant="primary"
+              onClick={() => void handleCreate()}
+              disabled={submitting || !name.trim() || !email.trim() || !passwordValid}
+            >
+              Adicionar
+            </Button>
+          </div>
+          <p className={styles.hint}>
+            Defina uma senha temporária e envie para a pessoa por um canal seguro. No primeiro
+            acesso, o sistema exige que ela crie uma senha própria.
+          </p>
+        </>
+      )}
 
-      {error && <EmptyState title="Não foi possível carregar os usuários" message={error.message} />}
+      {error && (
+        <EmptyState title="Não foi possível carregar os usuários" message={error.message} />
+      )}
       {loading && !data && <div className={styles.loading}>Carregando…</div>}
 
       {data && (

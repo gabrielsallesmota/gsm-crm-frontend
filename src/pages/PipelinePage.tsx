@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { usePipelines } from "../hooks/usePipelines";
 import { usePipelineActions } from "../hooks/usePipelineActions";
 import { useLeads } from "../hooks/useLeads";
@@ -6,6 +6,7 @@ import { useLeadActions } from "../hooks/useLeadActions";
 import { useLeadMessageTemplates } from "../hooks/useLeadMessageTemplates";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
+import { can } from "../auth/permissions";
 import { EmptyState } from "../components/common/EmptyState";
 import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
@@ -13,7 +14,12 @@ import { PeriodFilter } from "../components/common/PeriodFilter";
 import { LeadDrawer } from "../components/leads/LeadDrawer";
 import { LeadImportModal } from "../components/leads/LeadImportModal";
 import { WhatsappButton } from "../components/leads/WhatsappButton";
-import { ProspectionBoard } from "../components/prospects/ProspectionBoard";
+// Prospecção é funil INTERNO da GSM (só platform staff) — chunk próprio,
+// nunca baixado por usuário de tenant. Não é controle de acesso: o backend
+// recusa /prospects para quem não é staff.
+const ProspectionBoard = lazy(() =>
+  import("../components/prospects/ProspectionBoard").then((m) => ({ default: m.ProspectionBoard })),
+);
 import { originOf } from "../constants/origins";
 import { BOARD_SORT_OPTIONS, sortBoardItems, type BoardSortOption } from "../utils/boardSort";
 import { brl } from "../utils/currency";
@@ -35,7 +41,7 @@ const SOURCE_FILTER_LABEL: Record<SourceFilter, string> = {
 export function PipelinePage() {
   // Ver DashboardPage.tsx — `isPlatformStaff` vem de `GET /auth/me`.
   const { user } = useAuth();
-  const isSuperAdmin = user?.isPlatformStaff ?? false;
+  const isSuperAdmin = can(user, "platform.internal");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("todos");
   const [period, setPeriod] = useState<Period>(EMPTY_PERIOD);
   const showPassivo = !isSuperAdmin || sourceFilter !== "ativo";
@@ -68,7 +74,11 @@ export function PipelinePage() {
 
       {showPassivo && showAtivo && <div className={styles.sourceDivider} />}
 
-      {showAtivo && <ProspectionBoard period={period} />}
+      {showAtivo && (
+        <Suspense fallback={null}>
+          <ProspectionBoard period={period} />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -84,6 +94,10 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
   const { move, exportCsv } = useLeadActions();
   const { data: templates } = useLeadMessageTemplates();
   const { toast } = useToast();
+  const { user } = useAuth();
+  // Reordenar estágios é configuração (ADMIN/GESTOR no backend) — vendedor
+  // não vê a alça de arrastar coluna. Ver auth/permissions.ts.
+  const canReorderStages = can(user, "pipeline.reorder");
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const pipeline = pipelines?.find((p) => p.id === selectedPipelineId) ?? pipelines?.[0];
 
@@ -124,7 +138,11 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
     if (!dragId) return;
     const leadId = dragId;
     setDragId(null);
-    await move(leadId, targetStage);
+    try {
+      await move(leadId, targetStage);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Não foi possível mover o lead.");
+    }
     reload();
   }
 
@@ -220,9 +238,9 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
               >
                 <div
                   className={styles.columnHeader}
-                  draggable
-                  onDragStart={() => setDragColumnId(stage.id)}
-                  title="Arraste pra reordenar os estágios"
+                  draggable={canReorderStages}
+                  onDragStart={() => canReorderStages && setDragColumnId(stage.id)}
+                  title={canReorderStages ? "Arraste pra reordenar os estágios" : undefined}
                 >
                   <span className={styles.columnDot} style={{ background: stage.color }} />
                   <span className={styles.columnLabel}>{stage.label}</span>

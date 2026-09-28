@@ -12,6 +12,7 @@ import { MessageTemplatesSettings } from "../components/prospects/MessageTemplat
 import { LeadMessageTemplatesSettings } from "../components/leads/LeadMessageTemplatesSettings";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
+import { can } from "../auth/permissions";
 import { ORIGIN } from "../constants/origins";
 import { hexToRgba, readableTextColor } from "../utils/colors";
 import type { Pipeline, PipelineStage, StageKey } from "../types/pipeline";
@@ -47,7 +48,7 @@ export function SettingsPage() {
   } = useProspectStageActions();
   // Ver DashboardPage.tsx — `isPlatformStaff` vem de `GET /auth/me`.
   const { user } = useAuth();
-  const isSuperAdmin = user?.isPlatformStaff ?? false;
+  const isSuperAdmin = can(user, "platform.internal");
   const { toast } = useToast();
   const [newName, setNewName] = useState("");
   const [newTagLabel, setNewTagLabel] = useState("");

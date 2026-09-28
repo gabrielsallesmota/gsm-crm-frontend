@@ -1,6 +1,12 @@
 import { ApiError } from "../../types/common";
 import { BASE_URL } from "./ApiClient";
 import {
+  KIOSK_UNAUTHORIZED_EVENT,
+  getKioskToken,
+  getOperationsPassword,
+  setKioskToken,
+} from "./operationsAuth";
+import {
   toAppointment,
   toAppointmentsForDay,
   toAttendance,
@@ -72,22 +78,46 @@ async function readErrorDetail(resp: Response): Promise<string> {
 }
 
 /**
- * Cliente HTTP próprio (não usa `apiRequest`) — o painel do quiosque é
- * aberto de propósito (pedido do cliente), sem token de sessão do CRM.
+ * Credenciais do terminal: o código de pareamento do dispositivo
+ * (`X-Operations-Kiosk-Token`) e, se a pessoa estiver na gestão, a senha
+ * de gestão (também aceita pelo backend nessas rotas). Sem nenhuma das
+ * duas o backend responde 401 — o painel NÃO é mais aberto à internet.
+ */
+function withKioskCredentials(init?: HeadersInit): Headers {
+  const headers = new Headers(init);
+  const kioskToken = getKioskToken();
+  if (kioskToken) headers.set("X-Operations-Kiosk-Token", kioskToken);
+  const password = getOperationsPassword();
+  if (password) headers.set("X-Operations-Password", password);
+  return headers;
+}
+
+async function checked(resp: Response): Promise<Response> {
+  if (resp.status === 401) {
+    // Código revogado/trocado no servidor: o terminal volta para a tela de
+    // pareamento em vez de ficar num loop de erros.
+    setKioskToken(null);
+    window.dispatchEvent(new Event(KIOSK_UNAUTHORIZED_EVENT));
+  }
+  if (!resp.ok) throw new ApiError(resp.status, await readErrorDetail(resp));
+  return resp;
+}
+
+/**
+ * Cliente HTTP próprio (não usa `apiRequest`) — o terminal não tem sessão
+ * do CRM, só as credenciais do dispositivo (ver `withKioskCredentials`).
  */
 async function publicRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const headers = new Headers(options.headers);
+  const headers = withKioskCredentials(options.headers);
   if (!headers.has("Content-Type") && options.body) headers.set("Content-Type", "application/json");
-  const resp = await fetch(`${BASE_URL}${path}`, { ...options, headers });
-  if (!resp.ok) throw new ApiError(resp.status, await readErrorDetail(resp));
+  const resp = await checked(await fetch(`${BASE_URL}${path}`, { ...options, headers }));
   if (resp.status === 204) return undefined as T;
   return (await resp.json()) as T;
 }
 
 /** Variante que devolve texto cru (CSV de export), não JSON. */
 async function publicRequestText(path: string): Promise<string> {
-  const resp = await fetch(`${BASE_URL}${path}`);
-  if (!resp.ok) throw new ApiError(resp.status, await readErrorDetail(resp));
+  const resp = await checked(await fetch(`${BASE_URL}${path}`, { headers: withKioskCredentials() }));
   return resp.text();
 }
 

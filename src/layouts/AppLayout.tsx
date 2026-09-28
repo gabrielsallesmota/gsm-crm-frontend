@@ -9,23 +9,22 @@ import { ToastHost } from "../components/common/ToastHost";
 import { useToast } from "../hooks/useToast";
 import { isDemoMode } from "../services/factory";
 import type { AuthUser } from "../types/auth";
+import { can, roleLabel as labelForRole, type Permission } from "../auth/permissions";
 import styles from "./AppLayout.module.css";
 
 function roleLabel(user: AuthUser | null): string | undefined {
-  return user?.role;
+  return user ? labelForRole(user.role) : undefined;
 }
 
 const NAV_ITEMS: {
   to: string;
   icon: Parameters<typeof NavIcon>[0]["name"];
   label: string;
-  adminOnly?: boolean;
-  /** Acesso de PLATAFORMA (`user.isPlatformStaff`), diferente de
-   * `adminOnly` (que é role NO TENANT). "Clientes" é carteira comercial
-   * interna da GSM — mesmo gate de `ProspectionBoard`/`PipelinePage`, mas
-   * como item de menu PRÓPRIO (ao contrário de Prospecção, que fica
-   * embutida em Pipeline — ver comentário abaixo). */
-  platformStaffOnly?: boolean;
+  /** Mesma permissão exigida pela ROTA (`routes/index.tsx`) — menu e rota
+   * nunca divergem. `platform.internal` = área interna da GSM ("Clientes"
+   * e SDR); as demais espelham os papéis do backend. Ver
+   * `auth/permissions.ts`. */
+  permission?: Permission;
 }[] = [
   { to: ROUTES.dashboard, icon: "dashboard", label: "Dashboard" },
   // Prospecção GSM não tem item de menu próprio — para quem é super admin,
@@ -33,17 +32,17 @@ const NAV_ITEMS: {
   // Passivo/Todos), não como uma tela separada. Ver `PipelinePage.tsx`.
   { to: ROUTES.pipeline, icon: "pipeline", label: "Pipeline" },
   { to: ROUTES.leads, icon: "leads", label: "Leads" },
-  { to: ROUTES.clientes, icon: "clients", label: "Clientes", platformStaffOnly: true },
+  { to: ROUTES.clientes, icon: "clients", label: "Clientes", permission: "platform.internal" },
   // SDR (Etapa 1) — pré-prospecção interna da GSM, mesmo gate de "Clientes"
   // acima. Reaproveita o ícone "prospects" (alvo/crosshair) — hoje sem uso
   // real em NAV_ITEMS (Prospecção GSM fica embutida em Pipeline, ver
   // comentário acima), e "pré-prospecção" é exatamente a ideia de um alvo.
-  { to: ROUTES.sdrDashboard, icon: "prospects", label: "SDR", platformStaffOnly: true },
+  { to: ROUTES.sdrDashboard, icon: "prospects", label: "SDR", permission: "platform.internal" },
   { to: ROUTES.tarefas, icon: "tasks", label: "Tarefas" },
   { to: ROUTES.agenda, icon: "agenda", label: "Agenda" },
   { to: ROUTES.relatorios, icon: "reports", label: "Relatórios" },
-  { to: ROUTES.configuracoes, icon: "settings", label: "Configurações", adminOnly: true },
-  { to: ROUTES.usuarios, icon: "users", label: "Usuários", adminOnly: true },
+  { to: ROUTES.configuracoes, icon: "settings", label: "Configurações", permission: "settings.manage" },
+  { to: ROUTES.usuarios, icon: "users", label: "Usuários", permission: "users.view" },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -104,13 +103,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mobileNavOpen]);
 
-  // "gsm_admin" nunca existiu como role real do backend — era um papel só
-  // do mock de demonstração (auditoria Fase 1-3: confirmado que o backend
-  // sempre usou só admin/gestor/vendedor). Removido daqui; o modo demo
-  // continua funcionando (a comparação nunca era o que fazia o demo
-  // funcionar — `isDemoMode`/`canSwitchTenant` já cobrem isso).
-  const isAdmin = user?.role === "admin" || user?.role === "gestor";
-  const isPlatformStaff = user?.isPlatformStaff ?? false;
   // Troca de tenant real (produção) — independente do mecanismo de demo
   // (`canSwitchTenant`/`switchTenant`, que continua intocado).
   const canSwitchRealTenant = !isDemoMode && availableTenants.length > 1;
@@ -169,10 +161,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
 
           <nav className={styles.nav}>
-            {NAV_ITEMS.filter(
-              (item) =>
-                (!item.adminOnly || isAdmin) && (!item.platformStaffOnly || isPlatformStaff),
-            ).map((item) => (
+            {NAV_ITEMS.filter((item) => !item.permission || can(user, item.permission)).map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
