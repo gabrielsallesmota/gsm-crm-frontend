@@ -23,7 +23,7 @@ const STATUS_COLOR: Record<SdrCampaignStatus, { color: string; bg: string }> = {
 
 export function SdrCampaignsPage() {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { toastError } = useToast();
   const { data: campaigns, loading, error, notImplemented } = useSdrCampaigns();
   const { start } = useSdrCampaignRunActions();
   const [startingCampaignId, setStartingCampaignId] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export function SdrCampaignsPage() {
       setStartingCampaignId(null);
       navigate(ROUTES.sdrCampanhaExecucao(startingCampaignId, run.id));
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível iniciar o garimpo");
+      toastError(err, "Não foi possível iniciar o garimpo");
     } finally {
       setStarting(false);
     }

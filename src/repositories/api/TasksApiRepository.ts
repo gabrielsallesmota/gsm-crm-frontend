@@ -1,5 +1,11 @@
 import type { TasksRepository } from "../TasksRepository";
-import type { CreateTaskInput, Task } from "../../types/task";
+import type { Page } from "../../types/common";
+import type {
+  CreateTaskInput,
+  Task,
+  TaskListQuery,
+  UpdateTaskInput,
+} from "../../types/task";
 import { apiRequest } from "./ApiClient";
 
 interface TaskDto {
@@ -10,6 +16,9 @@ interface TaskDto {
   priority: Task["priority"];
   done: boolean;
   due_at: string;
+  assignee_user_id: string | null;
+  assignee_name: string | null;
+  completed_at: string | null;
 }
 
 function toTask(dto: TaskDto): Task {
@@ -21,18 +30,23 @@ function toTask(dto: TaskDto): Task {
     priority: dto.priority,
     done: dto.done,
     dueAt: dto.due_at,
+    assigneeUserId: dto.assignee_user_id,
+    assigneeName: dto.assignee_name,
+    completedAt: dto.completed_at,
   };
 }
 
 export class TasksApiRepository implements TasksRepository {
-  async list(): Promise<Task[]> {
-    const dtos = await apiRequest<TaskDto[]>("/api/v1/tasks");
-    return dtos.map(toTask);
-  }
-
-  async toggle(taskId: string): Promise<Task> {
-    const dto = await apiRequest<TaskDto>(`/api/v1/tasks/${taskId}/toggle`, { method: "PATCH" });
-    return toTask(dto);
+  async list(query: TaskListQuery): Promise<Page<Task>> {
+    const params = new URLSearchParams({ scope: query.scope });
+    if (query.leadId) params.set("lead_id", query.leadId);
+    if (query.assigneeUserId) params.set("assignee_user_id", query.assigneeUserId);
+    params.set("page", String(query.page ?? 1));
+    params.set("page_size", String(query.pageSize ?? 25));
+    const dto = await apiRequest<{ items: TaskDto[]; total: number; page: number; page_size: number }>(
+      `/api/v1/tasks?${params.toString()}`,
+    );
+    return { items: dto.items.map(toTask), total: dto.total, page: dto.page, pageSize: dto.page_size };
   }
 
   async create(input: CreateTaskInput): Promise<Task> {
@@ -43,6 +57,21 @@ export class TasksApiRepository implements TasksRepository {
         title: input.title,
         priority: input.priority,
         due_at: input.dueAt,
+        assignee_user_id: input.assigneeUserId,
+      }),
+    });
+    return toTask(dto);
+  }
+
+  async update(taskId: string, input: UpdateTaskInput): Promise<Task> {
+    const dto = await apiRequest<TaskDto>(`/api/v1/tasks/${taskId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        title: input.title,
+        priority: input.priority,
+        due_at: input.dueAt,
+        assignee_user_id: input.assigneeUserId,
+        done: input.done,
       }),
     });
     return toTask(dto);

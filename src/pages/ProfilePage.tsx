@@ -3,6 +3,7 @@ import { useAuth } from "../hooks/useAuth";
 import { Avatar } from "../components/common/Avatar";
 import { ChangePasswordForm } from "../components/auth/ChangePasswordForm";
 import styles from "./ProfilePage.module.css";
+import { describeError } from "../utils/apiErrors";
 
 export function ProfilePage() {
   const { user, currentTenantName, changePassword } = useAuth();
@@ -23,7 +24,7 @@ export function ProfilePage() {
       });
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível trocar a senha.");
+      setError(describeError(err, "Não foi possível trocar a senha."));
     } finally {
       setLoading(false);
     }

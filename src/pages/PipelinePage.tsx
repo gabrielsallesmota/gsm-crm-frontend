@@ -1,9 +1,11 @@
 import { lazy, Suspense, useState } from "react";
 import { usePipelines } from "../hooks/usePipelines";
 import { usePipelineActions } from "../hooks/usePipelineActions";
-import { useLeads } from "../hooks/useLeads";
+import { usePipelineBoard, type BoardFilter } from "../hooks/usePipelineBoard";
 import { useLeadActions } from "../hooks/useLeadActions";
 import { useLeadMessageTemplates } from "../hooks/useLeadMessageTemplates";
+import { useTeamDirectory } from "../hooks/useTeamDirectory";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { can } from "../auth/permissions";
@@ -23,8 +25,9 @@ const ProspectionBoard = lazy(() =>
 import { originOf } from "../constants/origins";
 import { BOARD_SORT_OPTIONS, sortBoardItems, type BoardSortOption } from "../utils/boardSort";
 import { brl } from "../utils/currency";
+import { findLead, hasMore, reorderIds } from "../utils/pipelineBoard";
 import { EMPTY_PERIOD, type Period } from "../utils/periods";
-import type { StageKey } from "../types/pipeline";
+import type { PipelineStage } from "../types/pipeline";
 import type { Lead, LeadMessageTemplate } from "../types/lead";
 import styles from "./PipelinePage.module.css";
 
@@ -83,6 +86,13 @@ export function PipelinePage() {
   );
 }
 
+/**
+ * Quadro sobre as etapas REAIS do pipeline (Etapa 1): quantas, com que
+ * nomes, cores e ordem o cliente configurou — sem funil fixo. Cada coluna é
+ * paginada no backend ("Carregar mais"), o contador é o total real, o
+ * movimento é otimista com rollback e existe alternativa ao arrastar
+ * (select no card e na ficha do lead).
+ */
 function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean; period: Period }) {
   const {
     data: pipelines,
@@ -91,59 +101,80 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
     reload: reloadPipelines,
   } = usePipelines();
   const { reorderStages } = usePipelineActions();
-  const { move, exportCsv } = useLeadActions();
+  const { exportCsv } = useLeadActions();
   const { data: templates } = useLeadMessageTemplates();
-  const { toast } = useToast();
+  const { data: team } = useTeamDirectory();
+  const { toast, toastError } = useToast();
   const { user } = useAuth();
   // Reordenar estágios é configuração (ADMIN/GESTOR no backend) — vendedor
   // não vê a alça de arrastar coluna. Ver auth/permissions.ts.
   const canReorderStages = can(user, "pipeline.reorder");
+  const canFilterByOwner = can(user, "leads.viewAll");
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
-  const pipeline = pipelines?.find((p) => p.id === selectedPipelineId) ?? pipelines?.[0];
+  const pipeline =
+    pipelines?.find((p) => p.id === selectedPipelineId) ??
+    pipelines?.find((p) => p.isDefault) ??
+    pipelines?.[0];
+  const stages = pipeline?.stages ?? [];
 
-  const { data, loading, error, reload } = useLeads({
-    ...(pipeline ? { pipelineId: pipeline.id } : {}),
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
+  // "" = todos; "__none__" = sem responsável; senão o id do dono.
+  const [ownerFilter, setOwnerFilter] = useState("");
+  const filter: BoardFilter = {
     ...period,
-    page: 1,
-    pageSize: 200,
-  });
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    ...(ownerFilter === "__none__" ? { unassigned: true } : ownerFilter ? { ownerId: ownerFilter } : {}),
+  };
+  const board = usePipelineBoard(pipeline?.id ?? null, stages, filter);
+
   const [dragId, setDragId] = useState<string | null>(null);
-  // Arrastar uma COLUNA (reordenar estágios) é diferente de arrastar um
-  // CARD (mover lead de estágio) — estado separado, mesmo padrão de
+  // Arrastar uma COLUNA (reordenar etapas) é diferente de arrastar um CARD
+  // (mover lead de etapa) — estado separado, mesmo padrão de
   // `ProspectionBoard.tsx`.
-  const [dragColumnId, setDragColumnId] = useState<StageKey | null>(null);
+  const [dragColumnId, setDragColumnId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [sortOption, setSortOption] = useState<BoardSortOption>("none");
 
-  async function handleDrop(targetStage: StageKey) {
+  const ownerNames = new Map((team ?? []).map((m) => [m.id, m.name]));
+
+  async function moveLead(leadId: string, stage: PipelineStage) {
+    const result = await board.move(leadId, stage.id);
+    if (result.ok) {
+      if (stage.isWon) toast("Negócio marcado como ganho 🏆");
+      else if (stage.isLost) toast("Negócio marcado como perdido", "info");
+    } else if (result.reason === "busy") {
+      toast("Aguarde: este lead ainda está sendo movido.", "warning");
+    } else if (result.reason === "error") {
+      toastError(result.error, "Não foi possível mover o lead — ele voltou para a etapa anterior.");
+    }
+  }
+
+  async function handleDrop(target: PipelineStage) {
     if (dragColumnId) {
       const draggedStageId = dragColumnId;
       setDragColumnId(null);
-      if (!pipeline || draggedStageId === targetStage) return;
-      const ids = pipeline.stages.map((s) => s.id);
-      const fromIndex = ids.indexOf(draggedStageId);
-      const toIndex = ids.indexOf(targetStage);
-      if (fromIndex === -1 || toIndex === -1) return;
-      ids.splice(fromIndex, 1);
-      ids.splice(toIndex, 0, draggedStageId);
+      if (!pipeline) return;
+      const ids = reorderIds(
+        stages.map((s) => s.id),
+        draggedStageId,
+        target.id,
+      );
+      if (!ids) return;
       try {
         await reorderStages(pipeline.id, ids);
+        toast("Ordem das etapas atualizada");
         reloadPipelines();
       } catch (err) {
-        toast(err instanceof Error ? err.message : "Não foi possível reordenar os estágios");
+        toastError(err, "Não foi possível reordenar as etapas");
       }
       return;
     }
     if (!dragId) return;
     const leadId = dragId;
     setDragId(null);
-    try {
-      await move(leadId, targetStage);
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível mover o lead.");
-    }
-    reload();
+    await moveLead(leadId, target);
   }
 
   function handleExport() {
@@ -158,7 +189,7 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
         a.click();
         URL.revokeObjectURL(url);
       } catch (err) {
-        toast(err instanceof Error ? err.message : "Não foi possível exportar.");
+        toastError(err, "Não foi possível exportar.");
       }
     })();
   }
@@ -166,7 +197,7 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
   if (pipelineError) {
     return <EmptyState title="Não foi possível carregar os pipelines" message={pipelineError.message} />;
   }
-  if (loadingPipelines) return <div className={styles.loading}>Carregando…</div>;
+  if (loadingPipelines && !pipelines) return <div className={styles.loading}>Carregando…</div>;
   if (!pipeline) {
     return (
       <EmptyState
@@ -175,9 +206,17 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
       />
     );
   }
+  if (stages.length === 0) {
+    return (
+      <EmptyState
+        title="Este pipeline ainda não tem etapas"
+        message="Cadastre as etapas do funil em Configurações → Pipelines."
+      />
+    );
+  }
 
-  const leads = data?.items ?? [];
-  const selectedLead = leads.find((l) => l.id === selectedLeadId) ?? null;
+  const selectedLead = selectedLeadId ? findLead(board.board, selectedLeadId) : null;
+  const firstOpenStage = stages.find((s) => !s.isWon && !s.isLost) ?? stages[0];
 
   return (
     <div>
@@ -186,7 +225,9 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
           <h1 className={styles.pageTitle}>
             {taggedPassivo && <Badge {...PASSIVO_BADGE} />} Pipeline
           </h1>
-          <p className={styles.pageSubtitle}>Arraste os cards entre as etapas</p>
+          <p className={styles.pageSubtitle}>
+            Arraste os cards entre as etapas — ou abra o lead e escolha a etapa
+          </p>
         </div>
         <div className={styles.toolbar}>
           {pipelines && pipelines.length > 1 && (
@@ -194,6 +235,7 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
               className={styles.pipelineSelect}
               value={pipeline.id}
               onChange={(e) => setSelectedPipelineId(e.target.value)}
+              aria-label="Pipeline"
             >
               {pipelines.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -202,10 +244,34 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
               ))}
             </select>
           )}
+          <input
+            className={styles.pipelineSelect}
+            placeholder="Buscar lead…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Buscar lead"
+          />
+          {canFilterByOwner && (
+            <select
+              className={styles.pipelineSelect}
+              value={ownerFilter}
+              onChange={(e) => setOwnerFilter(e.target.value)}
+              aria-label="Responsável"
+            >
+              <option value="">Todos os responsáveis</option>
+              <option value="__none__">Sem responsável</option>
+              {team?.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             className={styles.pipelineSelect}
             value={sortOption}
             onChange={(e) => setSortOption(e.target.value as BoardSortOption)}
+            aria-label="Ordenação"
           >
             {BOARD_SORT_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -218,68 +284,93 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
         </div>
       </div>
 
-      {error && <EmptyState title="Não foi possível carregar os leads" message={error.message} />}
-
-      {!error && (
-        <div className={styles.board}>
-          {pipeline.stages.map((stage) => {
-            const stageLeads = sortBoardItems(
-              leads.filter((l) => l.stage === stage.id),
-              sortOption,
-              (l) => l.name,
-              (l) => l.createdAt,
-            );
-            return (
+      <div className={styles.board}>
+        {stages.map((stage) => {
+          const column = board.board[stage.id];
+          const stageLeads = sortBoardItems(
+            column?.items ?? [],
+            sortOption,
+            (l) => l.name,
+            (l) => l.createdAt,
+          );
+          return (
+            <div
+              key={stage.id}
+              className={styles.column}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => void handleDrop(stage)}
+            >
               <div
-                key={stage.id}
-                className={styles.column}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => void handleDrop(stage.id)}
+                className={styles.columnHeader}
+                draggable={canReorderStages}
+                onDragStart={() => canReorderStages && setDragColumnId(stage.id)}
+                title={canReorderStages ? "Arraste pra reordenar as etapas" : undefined}
               >
-                <div
-                  className={styles.columnHeader}
-                  draggable={canReorderStages}
-                  onDragStart={() => canReorderStages && setDragColumnId(stage.id)}
-                  title={canReorderStages ? "Arraste pra reordenar os estágios" : undefined}
-                >
-                  <span className={styles.columnDot} style={{ background: stage.color }} />
-                  <span className={styles.columnLabel}>{stage.label}</span>
-                  <span className={styles.columnCount}>{stageLeads.length}</span>
-                </div>
-                <div className={styles.cards}>
-                  {stageLeads.map((lead) => (
-                    <KanbanCard
-                      key={lead.id}
-                      lead={lead}
-                      templates={templates ?? []}
-                      onDragStart={() => setDragId(lead.id)}
-                      onClick={() => setSelectedLeadId(lead.id)}
-                    />
-                  ))}
-                  {stageLeads.length === 0 && !loading && <div className={styles.empty}>Sem leads</div>}
-                </div>
+                <span className={styles.columnDot} style={{ background: stage.color }} />
+                <span className={styles.columnLabel}>
+                  {stage.label}
+                  {stage.isWon ? " 🏆" : stage.isLost ? " ✕" : ""}
+                </span>
+                <span className={styles.columnCount} title="Total real nesta etapa">
+                  {column && column.page > 0 ? column.total : "…"}
+                </span>
               </div>
-            );
-          })}
-        </div>
-      )}
+              <div className={styles.cards}>
+                {stageLeads.map((lead) => (
+                  <KanbanCard
+                    key={lead.id}
+                    lead={lead}
+                    stages={stages}
+                    ownerName={lead.ownerId ? (ownerNames.get(lead.ownerId) ?? null) : null}
+                    pending={board.isMoving(lead.id)}
+                    templates={templates ?? []}
+                    onDragStart={() => setDragId(lead.id)}
+                    onClick={() => setSelectedLeadId(lead.id)}
+                    onMove={(target) => void moveLead(lead.id, target)}
+                  />
+                ))}
+                {column?.error && (
+                  <div className={styles.columnError} role="alert">
+                    {column.error}{" "}
+                    <button type="button" className={styles.linkBtn} onClick={board.reload}>
+                      Tentar de novo
+                    </button>
+                  </div>
+                )}
+                {column?.loading && <div className={styles.empty}>Carregando…</div>}
+                {column && !column.loading && !column.error && stageLeads.length === 0 && (
+                  <div className={styles.empty}>Sem leads</div>
+                )}
+                {column && !column.loading && hasMore(column) && (
+                  <button type="button" className={styles.loadMore} onClick={() => board.loadMore(stage.id)}>
+                    Carregar mais ({column.total - column.items.length})
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {selectedLead && (
         <LeadDrawer
+          key={selectedLead.id}
           lead={selectedLead}
+          stages={stages}
           templates={templates ?? []}
           onClose={() => setSelectedLeadId(null)}
-          onSaved={() => reload()}
+          onSaved={(lead) => board.applyLead(lead)}
+          onDeleted={() => board.reload()}
         />
       )}
 
-      {importing && pipeline && (
+      {importing && firstOpenStage && (
         <LeadImportModal
           pipelineId={pipeline.id}
-          stages={pipeline.stages}
-          defaultStageId={pipeline.stages[0]?.id ?? "novo"}
+          stages={stages}
+          defaultStageId={firstOpenStage.id}
           onClose={() => setImporting(false)}
-          onImported={() => reload()}
+          onImported={() => board.reload()}
         />
       )}
     </div>
@@ -288,20 +379,34 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
 
 function KanbanCard({
   lead,
+  stages,
+  ownerName,
+  pending,
   templates,
   onDragStart,
   onClick,
+  onMove,
 }: {
   lead: Lead;
+  stages: PipelineStage[];
+  ownerName: string | null;
+  pending: boolean;
   templates: LeadMessageTemplate[];
   onDragStart: () => void;
   onClick: () => void;
+  onMove: (stage: PipelineStage) => void;
 }) {
   const origin = originOf(lead.origin);
   return (
-    <div className={styles.card} draggable onDragStart={onDragStart} onClick={onClick}>
+    <div
+      className={pending ? `${styles.card} ${styles.cardPending}` : styles.card}
+      draggable={!pending}
+      onDragStart={onDragStart}
+      onClick={onClick}
+      aria-busy={pending}
+    >
       <div className={styles.cardName}>{lead.name}</div>
-      <div className={styles.cardCompany}>{lead.company}</div>
+      {lead.company && <div className={styles.cardCompany}>{lead.company}</div>}
       {lead.lastComment && (
         // `title` = tooltip nativo com o texto inteiro no hover; o texto
         // visível já vem truncado por CSS (`.cardComment`, ellipsis).
@@ -311,9 +416,27 @@ function KanbanCard({
       )}
       <div className={styles.cardFooter}>
         <span className={styles.cardValue}>R$ {brl(lead.value)}</span>
-        <Badge {...PASSIVO_BADGE} />
         <Badge label={origin.label} color={origin.color} bg={origin.bg} />
       </div>
+      <div className={styles.cardOwner}>{ownerName ?? (lead.ownerId ? "—" : "Sem responsável")}</div>
+      {/* Alternativa ao arrastar (celular/teclado): mover pela lista. */}
+      <select
+        className={styles.cardMove}
+        value={lead.stageId}
+        disabled={pending}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => {
+          const target = stages.find((s) => s.id === e.target.value);
+          if (target) onMove(target);
+        }}
+        aria-label={`Mover ${lead.name} para outra etapa`}
+      >
+        {stages.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.label}
+          </option>
+        ))}
+      </select>
       <WhatsappButton lead={lead} templates={templates} size="small" />
     </div>
   );

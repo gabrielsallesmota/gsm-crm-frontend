@@ -1,26 +1,26 @@
 import type { Lead } from "../types/lead";
 import type { DashboardMetrics } from "../types/dashboard";
-import { STAGES, STAGE_ORDER } from "../constants/stages";
+import type { PipelineStage } from "../types/pipeline";
 import { ORIGIN, ORIGIN_KEYS } from "../constants/origins";
 import { daysSince, isToday, weekdayShortLabel } from "../utils/dates";
 
-export function computeDashboardMetrics(leads: Lead[]): DashboardMetrics {
+/** Métricas da DEMONSTRAÇÃO, calculadas sobre as etapas REAIS do pipeline
+ * (ganho/perdido pelas flags da etapa, nunca por nome). */
+export function computeDashboardMetrics(leads: Lead[], stages: PipelineStage[]): DashboardMetrics {
   const total = leads.length;
-  const closed = leads.filter((l) => l.stage === "ganho");
-  const lost = leads.filter((l) => l.stage === "perdido");
-  const open = leads.filter((l) => l.stage !== "ganho" && l.stage !== "perdido");
+  const byId = new Map(stages.map((s) => [s.id, s]));
+  const closed = leads.filter((l) => byId.get(l.stageId)?.isWon);
+  const lost = leads.filter((l) => byId.get(l.stageId)?.isLost);
+  const open = leads.filter((l) => !byId.get(l.stageId)?.isWon && !byId.get(l.stageId)?.isLost);
 
   const conversionRate = total ? Math.round((closed.length / total) * 100) : 0;
   const forecastRevenue = open.reduce((sum, l) => sum + l.value * (l.probability / 100), 0);
   const closedRevenue = closed.reduce((sum, l) => sum + l.value, 0);
-  const avgFirstContactHours = total
-    ? leads.reduce((sum, l) => sum + (l.firstContactHours || 0), 0) / total
-    : 0;
-
-  const closedWithTime = closed.filter((l) => l.closedAt);
-  const avgCloseDays = closedWithTime.length
-    ? closedWithTime.reduce((sum, l) => sum + daysSince(l.closedAt as string), 0) /
-      closedWithTime.length
+  const avgCloseDays = closed.length
+    ? closed.reduce(
+        (sum, l) => sum + Math.max(0, daysSince(l.createdAt) - daysSince(l.updatedAt)),
+        0,
+      ) / closed.length
     : null;
 
   const today = leads.filter((l) => isToday(l.createdAt)).length;
@@ -54,12 +54,12 @@ export function computeDashboardMetrics(leads: Lead[]): DashboardMetrics {
     };
   });
 
-  const funnel = STAGE_ORDER.map((key) => {
-    const count = leads.filter((l) => l.stage === key).length;
+  const funnel = stages.map((stage) => {
+    const count = leads.filter((l) => l.stageId === stage.id).length;
     return {
-      key,
-      label: STAGES[key].label,
-      color: STAGES[key].color,
+      key: stage.id,
+      label: stage.label,
+      color: stage.color,
       count,
       widthPct: total ? Math.max(6, Math.round((count / total) * 100)) + "%" : "0%",
       pct: total ? Math.round((count / total) * 100) + "%" : "0%",
@@ -75,7 +75,6 @@ export function computeDashboardMetrics(leads: Lead[]): DashboardMetrics {
     conversionRate,
     forecastRevenue,
     closedRevenue,
-    avgFirstContactHours,
     avgCloseDays,
     open: open.length,
     lost: lost.length,

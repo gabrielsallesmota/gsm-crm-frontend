@@ -53,7 +53,7 @@ export function SdrCampaignFormPage() {
   const { id } = useParams<{ id: string }>();
   const isEditing = Boolean(id);
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const { get, create, update } = useSdrCampaignActions();
   const { data: presets } = useSdrIcpPresets();
   const { data: runs, loading: runsLoading } = useSdrCampaignRuns(isEditing ? (id ?? null) : null);
@@ -126,7 +126,7 @@ export function SdrCampaignFormPage() {
     if (!name.trim() || !niche.trim()) return;
     const cleanLocations = locations.filter((l) => l.country || l.state || l.city || l.locality);
     if (cleanLocations.length === 0) {
-      toast("Preencha pelo menos uma localidade (país, estado, cidade ou bairro/região).");
+      toast("Preencha pelo menos uma localidade (país, estado, cidade ou bairro/região).", "warning");
       return;
     }
     if (allowedTerms) {
@@ -172,7 +172,7 @@ export function SdrCampaignFormPage() {
       }
       navigate(ROUTES.sdrCampanhas);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível salvar a campanha");
+      toastError(err, "Não foi possível salvar a campanha");
     } finally {
       setSaving(false);
     }

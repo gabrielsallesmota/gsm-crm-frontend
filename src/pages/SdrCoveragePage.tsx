@@ -19,7 +19,7 @@ const STATUS_COLOR: Record<SdrCoverageStatus, { color: string; bg: string }> = {
 export function SdrCoveragePage() {
   const { data: coverage, loading, error, notImplemented, reload } = useSdrCoverage();
   const { create, delete: deleteCoverage } = useSdrCoverageActions();
-  const { toast } = useToast();
+  const { toastError } = useToast();
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -29,7 +29,7 @@ export function SdrCoveragePage() {
       await deleteCoverage(id);
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível excluir");
+      toastError(err, "Não foi possível excluir");
     } finally {
       setDeletingId(null);
     }
@@ -136,7 +136,7 @@ function CreateCoverageModal({
   onCreated: () => void;
   onCreateFn: ReturnType<typeof useSdrCoverageActions>["create"];
 }) {
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const [niche, setNiche] = useState("");
   const [provider, setProvider] = useState("manual");
   const [state, setState] = useState("");
@@ -151,7 +151,7 @@ function CreateCoverageModal({
       toast("Cobertura registrada");
       onCreated();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível registrar a cobertura");
+      toastError(err, "Não foi possível registrar a cobertura");
     } finally {
       setSubmitting(false);
     }

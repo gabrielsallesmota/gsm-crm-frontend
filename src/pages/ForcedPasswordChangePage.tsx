@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { ROUTES } from "../constants/routes";
 import { ChangePasswordForm } from "../components/auth/ChangePasswordForm";
 import styles from "./LoginPage.module.css";
+import { describeError } from "../utils/apiErrors";
 
 export function ForcedPasswordChangePage() {
   const { user, loading: authLoading, markPasswordChanged, changePassword } = useAuth();
@@ -26,7 +27,7 @@ export function ForcedPasswordChangePage() {
       markPasswordChanged();
       navigate(ROUTES.dashboard);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível trocar a senha.");
+      setError(describeError(err, "Não foi possível trocar a senha."));
     } finally {
       setLoading(false);
     }

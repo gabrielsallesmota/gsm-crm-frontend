@@ -8,8 +8,7 @@ import { EmptyState } from "../common/EmptyState";
 import { useToast } from "../../hooks/useToast";
 import { ApiError } from "../../types/common";
 import { ORIGIN, ORIGIN_KEYS, originOf } from "../../constants/origins";
-import { findPipelineIdForStageId, stageIdToKey, stageKeyToId } from "../../repositories/api/stageMapping";
-import type { Pipeline, StageKey } from "../../types/pipeline";
+import type { Pipeline } from "../../types/pipeline";
 import type { LeadMessageTemplate } from "../../types/lead";
 import styles from "../prospects/MessageTemplatesSettings.module.css";
 
@@ -20,19 +19,13 @@ function submitButtonLabel(submitting: boolean, isEditing: boolean): string {
   return isEditing ? "Salvar alterações" : "Adicionar template";
 }
 
-/** "pipelineId::stageKey" — junta os dois num valor só pro `<select>` de
- * estágio funcionar com uma lista plana mesmo quando há mais de um pipeline. */
-function stageOptionValue(pipelineId: string, stageKey: string): string {
-  return `${pipelineId}::${stageKey}`;
-}
-
+/** Etapa pelo UUID REAL (Etapa 1) — o template aponta direto para a etapa. */
 function stageLabelFor(stageId: string, pipelines: Pipeline[]): string {
-  const pipelineId = findPipelineIdForStageId(stageId);
-  const pipeline = pipelines.find((p) => p.id === pipelineId);
-  if (!pipeline) return "—";
-  const key = stageIdToKey(pipeline.id, stageId);
-  const stage = pipeline.stages.find((s) => s.id === key);
-  return pipelines.length > 1 ? `${pipeline.name} — ${stage?.label ?? "—"}` : stage?.label ?? "—";
+  for (const pipeline of pipelines) {
+    const stage = pipeline.stages.find((s) => s.id === stageId);
+    if (stage) return pipelines.length > 1 ? `${pipeline.name} — ${stage.label}` : stage.label;
+  }
+  return "Etapa removida";
 }
 
 /**
@@ -46,7 +39,7 @@ export function LeadMessageTemplatesSettings() {
   const { data: pipelines, loading: loadingPipelines, error: pipelinesError } = usePipelines();
   const { data: templates, loading: loadingTemplates, error, reload } = useLeadMessageTemplates();
   const { delete: deleteTemplate } = useLeadMessageTemplateActions();
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -56,7 +49,7 @@ export function LeadMessageTemplatesSettings() {
       toast("Template excluído");
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível excluir o template");
+      toastError(err, "Não foi possível excluir o template");
     }
   }
 
@@ -152,29 +145,17 @@ function TemplateForm({
   onCancel?: () => void;
 }) {
   const { create, update } = useLeadMessageTemplateActions();
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
 
-  const existingPipelineId = existing ? findPipelineIdForStageId(existing.stageId) : undefined;
-  const existingPipeline = pipelines.find((p) => p.id === existingPipelineId) ?? pipelines[0];
-  const existingStageKey =
-    existing && existingPipeline
-      ? stageIdToKey(existingPipeline.id, existing.stageId)
-      : (pipelines[0]?.stages[0]?.id ?? "novo");
-
-  const [stageOption, setStageOption] = useState(
-    stageOptionValue(existingPipeline?.id ?? "", existingStageKey),
-  );
+  const [stageId, setStageId] = useState(existing?.stageId ?? pipelines[0]?.stages[0]?.id ?? "");
   const [origin, setOrigin] = useState(existing?.origin ?? "");
   const [message, setMessage] = useState(existing?.message ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [errorNote, setErrorNote] = useState("");
 
   async function handleSubmit() {
-    const [pipelineId, stageKey] = stageOption.split("::");
-    const stageId =
-      pipelineId && stageKey ? stageKeyToId(pipelineId, stageKey as StageKey) : undefined;
     if (!stageId || !message.trim()) {
-      toast("Abra a aba Pipeline pelo menos uma vez antes de configurar mensagens.");
+      toast("Escolha a etapa e escreva a mensagem.", "warning");
       return;
     }
     setSubmitting(true);
@@ -193,7 +174,7 @@ function TemplateForm({
       if (err instanceof ApiError && err.status === 409) {
         setErrorNote(err.message);
       } else {
-        toast(err instanceof Error ? err.message : "Não foi possível salvar o template");
+        toastError(err, "Não foi possível salvar o template");
       }
     } finally {
       setSubmitting(false);
@@ -205,13 +186,13 @@ function TemplateForm({
       <div className={styles.formRow}>
         <select
           className={styles.select}
-          value={stageOption}
-          onChange={(e) => setStageOption(e.target.value)}
+          value={stageId}
+          onChange={(e) => setStageId(e.target.value)}
           disabled={Boolean(existing)}
         >
           {pipelines.flatMap((p) =>
             p.stages.map((s) => (
-              <option key={stageOptionValue(p.id, s.id)} value={stageOptionValue(p.id, s.id)}>
+              <option key={s.id} value={s.id}>
                 {pipelines.length > 1 ? `${p.name} — ${s.label}` : s.label}
               </option>
             )),

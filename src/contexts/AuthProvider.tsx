@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   AuthUser,
   ChangePasswordInput,
@@ -15,6 +15,7 @@ import {
   setApiTokens,
   setOnSessionExpired,
   setOnTokensRefreshed,
+  setStoredTokensLoader,
 } from "../repositories/api/ApiClient";
 import { ApiError } from "../types/common";
 import { mockState } from "../repositories/mock/state";
@@ -22,6 +23,11 @@ import { mockTenants } from "../mock/tenants";
 import { isDemoMode } from "../services/factory";
 import { ROUTES } from "../constants/routes";
 import { AuthContext, type AuthContextValue } from "./AuthContext";
+import {
+  classifyExternalSessionChange,
+  parseStoredSession,
+  type StoredSession,
+} from "../auth/sessionSync";
 import type { Tenant } from "../types/tenant";
 
 const STORAGE_KEY = "gsm_crm_session";
@@ -29,10 +35,6 @@ const STORAGE_KEY = "gsm_crm_session";
 // invalidar o `useMemo` de `value` sem motivo fora do modo demo.
 const EMPTY_TENANTS: Tenant[] = [];
 
-interface StoredSession {
-  user: AuthUser;
-  tokens: Session["tokens"];
-}
 
 interface PendingSelection {
   selectionToken: string;
@@ -41,8 +43,7 @@ interface PendingSelection {
 
 function loadStoredSession(): StoredSession | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StoredSession) : null;
+    return parseStoredSession(localStorage.getItem(STORAGE_KEY));
   } catch {
     return null;
   }
@@ -68,6 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   // do modo demo atualizava um `currentTenantId` próprio sem nunca
   // atualizar `user.tenantId`).
   const currentTenantId = user?.tenantId ?? mockState.currentTenantId;
+  const userRef = useRef<AuthUser | null>(null);
+  userRef.current = user;
 
   const applySession = useCallback((session: Session) => {
     setUser(session.user);
@@ -147,9 +150,42 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       setAvailableTenants([]);
       saveStoredSession(null);
     });
+    // Multi-aba: o ApiClient relê o par salvo antes de renovar (outra aba
+    // pode ter rotacionado o refresh) — ver `sessionClient.ts`.
+    setStoredTokensLoader(() => loadStoredSession()?.tokens ?? null);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY && event.key !== null) return;
+      const next = parseStoredSession(event.key === null ? null : event.newValue);
+      switch (classifyExternalSessionChange(userRef.current, next)) {
+        case "logout":
+          // Saiu em outra aba → sai aqui também (sem chamar o backend de novo).
+          setApiTokens(null);
+          setUser(null);
+          setTokens(null);
+          setAvailableTenants([]);
+          setPendingSelection(null);
+          break;
+        case "reload":
+          // Outro usuário/tenant nesta sessão do navegador: nada do estado
+          // em memória desta aba pode sobreviver.
+          window.location.reload();
+          break;
+        case "adopt-tokens":
+          if (next) {
+            setApiTokens(next.tokens);
+            setTokens(next.tokens);
+          }
+          break;
+        case "ignore":
+          break;
+      }
+    };
+    window.addEventListener("storage", onStorage);
     return () => {
       setOnSessionExpired(null);
       setOnTokensRefreshed(null);
+      setStoredTokensLoader(null);
+      window.removeEventListener("storage", onStorage);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

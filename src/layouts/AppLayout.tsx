@@ -6,6 +6,7 @@ import { Avatar } from "../components/common/Avatar";
 import { NavIcon } from "../components/common/NavIcon";
 import { ThemeToggle } from "../components/common/ThemeToggle";
 import { ToastHost } from "../components/common/ToastHost";
+import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { useToast } from "../hooks/useToast";
 import { isDemoMode } from "../services/factory";
 import type { AuthUser } from "../types/auth";
@@ -41,7 +42,12 @@ const NAV_ITEMS: {
   { to: ROUTES.tarefas, icon: "tasks", label: "Tarefas" },
   { to: ROUTES.agenda, icon: "agenda", label: "Agenda" },
   { to: ROUTES.relatorios, icon: "reports", label: "Relatórios" },
-  { to: ROUTES.configuracoes, icon: "settings", label: "Configurações", permission: "settings.manage" },
+  {
+    to: ROUTES.configuracoes,
+    icon: "settings",
+    label: "Configurações",
+    permission: "settings.manage",
+  },
   { to: ROUTES.usuarios, icon: "users", label: "Usuários", permission: "users.view" },
 ];
 
@@ -59,7 +65,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
+  const { toastError } = useToast();
   // Sidebar em telas estreitas vira drawer off-canvas (ver media query em
   // `AppLayout.module.css`) — controlado só aqui porque em desktop o botão
   // que abre/fecha nem é renderizado (`.menuToggle` some via CSS).
@@ -133,7 +139,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
         <aside
           id="app-sidebar"
-          className={["theme-dark", styles.sidebar, mobileNavOpen && styles.sidebarOpen, collapsed && styles.sidebarCollapsed]
+          className={[
+            "theme-dark",
+            styles.sidebar,
+            mobileNavOpen && styles.sidebarOpen,
+            collapsed && styles.sidebarCollapsed,
+          ]
             .filter(Boolean)
             .join(" ")}
         >
@@ -161,17 +172,21 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
 
           <nav className={styles.nav}>
-            {NAV_ITEMS.filter((item) => !item.permission || can(user, item.permission)).map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                title={item.label}
-                className={({ isActive }) => (isActive ? `${styles.navItem} ${styles.navItemActive}` : styles.navItem)}
-              >
-                <NavIcon name={item.icon} />
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
+            {NAV_ITEMS.filter((item) => !item.permission || can(user, item.permission)).map(
+              (item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  title={item.label}
+                  className={({ isActive }) =>
+                    isActive ? `${styles.navItem} ${styles.navItemActive}` : styles.navItem
+                  }
+                >
+                  <NavIcon name={item.icon} />
+                  <span>{item.label}</span>
+                </NavLink>
+              ),
+            )}
           </nav>
 
           <button
@@ -186,12 +201,19 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </button>
 
           <div className={styles.userBox}>
-            {user && <Avatar name={user.name} bg="var(--tone-green-bg)" color="var(--tone-green)" />}
+            {user && (
+              <Avatar name={user.name} bg="var(--tone-green-bg)" color="var(--tone-green)" />
+            )}
             <div className={styles.userInfo}>
               <div className={styles.userName}>{user?.name}</div>
               <div className={styles.userRole}>{roleLabel(user)}</div>
             </div>
-            <button className={styles.logoutBtn} onClick={handleLogout} title="Sair" aria-label="Sair">
+            <button
+              className={styles.logoutBtn}
+              onClick={handleLogout}
+              title="Sair"
+              aria-label="Sair"
+            >
               ⏻
             </button>
           </div>
@@ -230,7 +252,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   onChange={(e) => {
                     const tenantId = e.target.value;
                     selectTenant(tenantId).catch((err: unknown) => {
-                      toast(err instanceof Error ? err.message : "Não foi possível trocar de tenant.");
+                      toastError(err, "Não foi possível trocar de tenant.");
                     });
                   }}
                 >
@@ -260,7 +282,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           </header>
 
-          <main className={styles.content}>{children}</main>
+          <main className={styles.content}>
+            <ErrorBoundary key={location.pathname} scope="page">
+              {children}
+            </ErrorBoundary>
+          </main>
         </div>
       </div>
 

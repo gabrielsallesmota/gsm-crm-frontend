@@ -88,7 +88,7 @@ export function ClientDrawer({
    * (`nextDueDate`/`hasOverdueInstallment`) — pede pra página recarregar. */
   onReload?: () => void;
 }) {
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const {
     update,
     delete: deleteClient,
@@ -152,7 +152,7 @@ export function ClientDrawer({
       setEditing(false);
       onSaved?.(updated);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível salvar as alterações");
+      toastError(err, "Não foi possível salvar as alterações");
     } finally {
       setSaving(false);
     }
@@ -165,7 +165,7 @@ export function ClientDrawer({
       toast("Cliente removido");
       onDeleted?.();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível remover o cliente");
+      toastError(err, "Não foi possível remover o cliente");
       setDeleting(false);
     }
   }
@@ -177,7 +177,7 @@ export function ClientDrawer({
       toast("Contrato enviado com sucesso");
       onSaved?.(updated);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível enviar o contrato");
+      toastError(err, "Não foi possível enviar o contrato");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -195,7 +195,7 @@ export function ClientDrawer({
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível baixar o contrato");
+      toastError(err, "Não foi possível baixar o contrato");
     } finally {
       setContractBusy(false);
     }
@@ -208,7 +208,7 @@ export function ClientDrawer({
       toast("Contrato removido");
       onSaved?.(updated);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível remover o contrato");
+      toastError(err, "Não foi possível remover o contrato");
     } finally {
       setContractBusy(false);
     }
@@ -229,11 +229,11 @@ export function ClientDrawer({
 
   async function handleGenerateEqualPlan() {
     if (planTotalReais <= 0) {
-      toast("Informe o valor total do contrato");
+      toast("Informe o valor total do contrato", "warning");
       return;
     }
     if (!planFirstDueDate) {
-      toast("Informe a data do primeiro vencimento");
+      toast("Informe a data do primeiro vencimento", "warning");
       return;
     }
     setGenerating(true);
@@ -250,7 +250,7 @@ export function ClientDrawer({
       reloadInstallments();
       onReload?.();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível gerar as parcelas");
+      toastError(err, "Não foi possível gerar as parcelas");
     } finally {
       setGenerating(false);
     }
@@ -271,11 +271,11 @@ export function ClientDrawer({
 
   async function handleCreateCustomPlan() {
     if (customRows.some((r) => !r.dueDate)) {
-      toast("Informe o vencimento de cada parcela");
+      toast("Informe o vencimento de cada parcela", "warning");
       return;
     }
     if (customRows.some((r) => r.amountReais <= 0)) {
-      toast("Informe um valor maior que zero pra cada parcela");
+      toast("Informe um valor maior que zero pra cada parcela", "warning");
       return;
     }
     setGenerating(true);
@@ -292,7 +292,7 @@ export function ClientDrawer({
       reloadInstallments();
       onReload?.();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível gerar as parcelas");
+      toastError(err, "Não foi possível gerar as parcelas");
     } finally {
       setGenerating(false);
     }
@@ -308,7 +308,7 @@ export function ClientDrawer({
       reloadInstallments();
       onReload?.();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível atualizar a parcela");
+      toastError(err, "Não foi possível atualizar a parcela");
     }
   }
 
@@ -320,7 +320,7 @@ export function ClientDrawer({
 
   async function handleSaveInstallmentEdit(installmentId: string) {
     if (!editDueDate || editAmountReais <= 0) {
-      toast("Informe vencimento e valor válidos");
+      toast("Informe vencimento e valor válidos", "warning");
       return;
     }
     setSavingInstallmentEdit(true);
@@ -334,7 +334,7 @@ export function ClientDrawer({
       reloadInstallments();
       onReload?.();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível editar a parcela");
+      toastError(err, "Não foi possível editar a parcela");
     } finally {
       setSavingInstallmentEdit(false);
     }

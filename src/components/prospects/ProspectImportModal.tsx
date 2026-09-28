@@ -19,6 +19,7 @@ import {
   WHATSAPP_STATUS,
 } from "../../constants/prospectEnums";
 import styles from "./ProspectImportModal.module.css";
+import { describeError } from "../../utils/apiErrors";
 
 const IGNORE = "__ignore__";
 
@@ -186,7 +187,7 @@ export function ProspectImportModal({
       const result = await bulkImport(mappedRows, stageId, dedupeStrategy);
       setSummary(result);
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : "Não foi possível importar.");
+      setParseError(describeError(err, "Não foi possível importar."));
     } finally {
       setImporting(false);
     }

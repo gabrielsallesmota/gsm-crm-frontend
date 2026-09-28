@@ -4,10 +4,13 @@ import type { Period } from "../utils/periods";
 import { useAsyncResource, type AsyncResourceState } from "./useAsyncResource";
 import { useAuth } from "./useAuth";
 
-export function useDashboard(period?: Period): AsyncResourceState<DashboardMetrics> {
+export function useDashboard(
+  period?: Period,
+  pipelineId?: string,
+): AsyncResourceState<DashboardMetrics> {
   const { currentTenantId } = useAuth();
   return useAsyncResource(
-    () => dashboardService.getMetrics(period),
-    [currentTenantId, period?.dateFrom, period?.dateTo],
+    () => dashboardService.getMetrics(period, pipelineId),
+    [currentTenantId, period?.dateFrom, period?.dateTo, pipelineId],
   );
 }

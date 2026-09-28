@@ -8,6 +8,7 @@ export function KpiCard({
   icon,
   highlight = false,
   valueColor,
+  definition,
 }: {
   label: string;
   value: string;
@@ -15,9 +16,15 @@ export function KpiCard({
   icon: Parameters<typeof KpiIcon>[0]["name"];
   highlight?: boolean;
   valueColor?: string;
+  /** Como o número é calculado (tooltip + leitor de tela). */
+  definition?: string;
 }) {
   return (
-    <div className={highlight ? `${styles.card} ${styles.highlight}` : styles.card}>
+    <div
+      className={highlight ? `${styles.card} ${styles.highlight}` : styles.card}
+      title={definition}
+      aria-description={definition}
+    >
       <div className={styles.top}>
         <span className={styles.label}>{label}</span>
         <span className={styles.icon}>

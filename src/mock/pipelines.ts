@@ -1,6 +1,11 @@
-import type { Pipeline } from "../types/pipeline";
+import type { Pipeline, PipelineStage } from "../types/pipeline";
 
-export const mockPipelines: Pipeline[] = [
+type RawPipeline = Omit<Pipeline, "stages"> & { stages: Omit<PipelineStage, "order">[] };
+
+/** Sementes da demonstração. Os ids de etapa ("novo", "contato"...) são só
+ * dados de exemplo — viram ids únicos por pipeline abaixo (`p1-novo`), e a
+ * UI trata etapa sempre pelo id real, nunca por um funil fixo. */
+const rawPipelines: RawPipeline[] = [
   {
     id: "p1",
     tenantId: "c1",
@@ -62,3 +67,20 @@ export const mockPipelines: Pipeline[] = [
     ],
   },
 ];
+
+export const mockPipelines: Pipeline[] = rawPipelines.map((pipeline) => ({
+  ...pipeline,
+  stages: pipeline.stages.map((stage, index) => ({
+    ...stage,
+    id: `${pipeline.id}-${stage.id}`,
+    order: index,
+  })),
+}));
+
+/** Pipeline padrão de cada tenant de demonstração. */
+export function defaultMockPipelineId(tenantId: string): string {
+  const pipeline =
+    mockPipelines.find((p) => p.tenantId === tenantId && p.isDefault) ??
+    mockPipelines.find((p) => p.tenantId === tenantId);
+  return pipeline?.id ?? "p1";
+}

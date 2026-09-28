@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { ROUTES } from "../constants/routes";
 import { Button } from "../components/common/Button";
 import styles from "./LoginPage.module.css";
+import { describeError } from "../utils/apiErrors";
 
 export function ForgotPasswordPage() {
   const { requestPasswordReset } = useAuth();
@@ -23,7 +24,7 @@ export function ForgotPasswordPage() {
       // e-mail existe) — o front só precisa mostrar essa mensagem.
       setSubmitted(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível enviar o link.");
+      setError(describeError(err, "Não foi possível enviar o link."));
     } finally {
       setLoading(false);
     }

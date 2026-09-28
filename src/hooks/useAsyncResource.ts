@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { NotImplementedError } from "../utils/errors";
+import { ApiError } from "../types/common";
+import { describeError } from "../utils/apiErrors";
 
 export interface AsyncResourceState<T> {
   data: T | null;
@@ -33,7 +35,15 @@ export function useAsyncResource<T>(fetcher: () => Promise<T>, deps: unknown[]):
         if (err instanceof NotImplementedError) {
           setNotImplemented(true);
         } else {
-          setError(err instanceof Error ? err : new Error(String(err)));
+          // Erro de API vira mensagem de USUÁRIO (500 → "erro inesperado",
+          // 429 → "aguarde"...) mantendo o status para quem precisar.
+          setError(
+            err instanceof ApiError
+              ? new ApiError(err.status, describeError(err, "Não foi possível carregar os dados."))
+              : err instanceof Error
+                ? err
+                : new Error(String(err)),
+          );
         }
         setLoading(false);
       });

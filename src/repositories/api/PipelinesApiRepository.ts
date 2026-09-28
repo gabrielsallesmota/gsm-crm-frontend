@@ -1,17 +1,7 @@
 import type { PipelinesRepository } from "../PipelinesRepository";
-import type { Pipeline, PipelineStage, StageKey } from "../../types/pipeline";
-import { STAGE_ORDER } from "../../constants/stages";
+import type { Pipeline, PipelineStage, StageInput } from "../../types/pipeline";
+import { sortStages } from "../../types/pipeline";
 import { apiRequest } from "./ApiClient";
-import { buildStageMap, stageKeyToId, type RemoteStage } from "./stageMapping";
-
-interface PipelineDto {
-  id: string;
-  tenant_id: string;
-  name: string;
-  color: string;
-  order: number;
-  is_default: boolean;
-}
 
 interface StageDto {
   id: string;
@@ -23,25 +13,31 @@ interface StageDto {
   is_lost: boolean;
 }
 
-function toRemoteStage(dto: StageDto): RemoteStage {
-  return { id: dto.id, name: dto.name, color: dto.color, order: dto.order, isWon: dto.is_won, isLost: dto.is_lost };
+interface PipelineDto {
+  id: string;
+  tenant_id: string;
+  name: string;
+  color: string;
+  order: number;
+  is_default: boolean;
+  /** `GET /pipelines` e `GET /pipelines/{id}` já trazem as etapas reais. */
+  stages?: StageDto[];
 }
 
-async function toPipeline(dto: PipelineDto): Promise<Pipeline> {
-  const stageDtos = await apiRequest<StageDto[]>(`/api/v1/pipelines/${dto.id}/stages`);
-  buildStageMap(dto.id, stageDtos.map(toRemoteStage));
-  const byId = new Map(stageDtos.map((s) => [s.id, s]));
-  const stages: PipelineStage[] = STAGE_ORDER.map((key) => {
-    const remoteId = stageKeyToId(dto.id, key);
-    const match = remoteId ? byId.get(remoteId) : undefined;
-    return {
-      id: key,
-      label: match?.name ?? key,
-      color: match?.color ?? "#9aa6b2",
-      isWon: match?.is_won ?? false,
-      isLost: match?.is_lost ?? false,
-    };
-  });
+/** Etapa exatamente como o backend define — sem nenhum mapeamento para um
+ * funil fixo (o antigo `stageMapping.ts` foi removido na Etapa 1). */
+export function toStage(dto: StageDto): PipelineStage {
+  return {
+    id: dto.id,
+    label: dto.name,
+    color: dto.color,
+    order: dto.order,
+    isWon: dto.is_won,
+    isLost: dto.is_lost,
+  };
+}
+
+function toPipeline(dto: PipelineDto): Pipeline {
   return {
     id: dto.id,
     tenantId: dto.tenant_id,
@@ -49,19 +45,27 @@ async function toPipeline(dto: PipelineDto): Promise<Pipeline> {
     color: dto.color,
     isDefault: dto.is_default,
     active: true,
-    stages,
+    stages: sortStages((dto.stages ?? []).map(toStage)),
+  };
+}
+
+function stageBody(input: Partial<StageInput>) {
+  return {
+    name: input.label,
+    color: input.color,
+    is_won: input.isWon,
+    is_lost: input.isLost,
   };
 }
 
 export class PipelinesApiRepository implements PipelinesRepository {
   async list(): Promise<Pipeline[]> {
     const dtos = await apiRequest<PipelineDto[]>("/api/v1/pipelines");
-    return Promise.all(dtos.map(toPipeline));
+    return dtos.map(toPipeline);
   }
 
   async get(id: string): Promise<Pipeline> {
-    const dto = await apiRequest<PipelineDto>(`/api/v1/pipelines/${id}`);
-    return toPipeline(dto);
+    return toPipeline(await apiRequest<PipelineDto>(`/api/v1/pipelines/${id}`));
   }
 
   async create(input: Pick<Pipeline, "name" | "color">): Promise<Pipeline> {
@@ -73,11 +77,11 @@ export class PipelinesApiRepository implements PipelinesRepository {
   }
 
   async update(id: string, input: Partial<Pick<Pipeline, "name" | "color">>): Promise<Pipeline> {
-    const dto = await apiRequest<PipelineDto>(`/api/v1/pipelines/${id}`, {
+    await apiRequest<PipelineDto>(`/api/v1/pipelines/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ name: input.name, color: input.color }),
     });
-    return toPipeline(dto);
+    return this.get(id);
   }
 
   async delete(id: string): Promise<void> {
@@ -92,49 +96,28 @@ export class PipelinesApiRepository implements PipelinesRepository {
   }
 
   async setDefault(id: string): Promise<Pipeline> {
-    const dto = await apiRequest<PipelineDto>(`/api/v1/pipelines/${id}/default`, { method: "POST" });
-    return toPipeline(dto);
+    await apiRequest<PipelineDto>(`/api/v1/pipelines/${id}/default`, { method: "POST" });
+    return this.get(id);
   }
 
-  async createStage(
-    pipelineId: string,
-    input: Pick<PipelineStage, "label" | "color"> & { isWon?: boolean; isLost?: boolean },
-  ): Promise<PipelineStage> {
+  async createStage(pipelineId: string, input: StageInput): Promise<PipelineStage> {
     const dto = await apiRequest<StageDto>(`/api/v1/pipelines/${pipelineId}/stages`, {
       method: "POST",
-      body: JSON.stringify({
-        name: input.label,
-        color: input.color,
-        is_won: input.isWon ?? false,
-        is_lost: input.isLost ?? false,
-      }),
+      body: JSON.stringify({ ...stageBody(input), is_won: !!input.isWon, is_lost: !!input.isLost }),
     });
-    return { id: "novo", label: dto.name, color: dto.color, isWon: dto.is_won, isLost: dto.is_lost };
+    return toStage(dto);
   }
 
-  async updateStage(
-    pipelineId: string,
-    stageKey: StageKey,
-    input: Partial<Pick<PipelineStage, "label" | "color" | "isWon" | "isLost">>,
-  ): Promise<PipelineStage> {
-    // O frontend só conhece as 5 chaves fixas (`StageKey`) — o UUID real do
-    // estágio fica escondido atrás de `stageKeyToId` (cache montado por
-    // `toPipeline`/`buildStageMap` no último `list()`/`get()`). Repositório
-    // é a camada certa pra resolver isso, não a página (ver `stageMapping.ts`).
-    const stageId = stageKeyToId(pipelineId, stageKey);
-    if (!stageId) {
-      throw new Error("Estágio ainda não carregado — recarregue a página de Configurações.");
-    }
+  async updateStage(stageId: string, input: Partial<StageInput>): Promise<PipelineStage> {
     const dto = await apiRequest<StageDto>(`/api/v1/stages/${stageId}`, {
       method: "PATCH",
-      body: JSON.stringify({
-        name: input.label,
-        color: input.color,
-        is_won: input.isWon,
-        is_lost: input.isLost,
-      }),
+      body: JSON.stringify(stageBody(input)),
     });
-    return { id: stageKey, label: dto.name, color: dto.color, isWon: dto.is_won, isLost: dto.is_lost };
+    return toStage(dto);
+  }
+
+  async deleteStage(stageId: string): Promise<void> {
+    await apiRequest<void>(`/api/v1/stages/${stageId}`, { method: "DELETE" });
   }
 
   async reorderStages(_pipelineId: string, orderedIds: string[]): Promise<void> {

@@ -1,77 +1,148 @@
 import { useState } from "react";
 import type { Lead, LeadMessageTemplate, UpdateLeadInput } from "../../types/lead";
+import type { PipelineStage } from "../../types/pipeline";
+import type { Task } from "../../types/task";
 import { Avatar } from "../common/Avatar";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
+import { ConfirmDialog } from "../common/ConfirmDialog";
 import { CurrencyInput } from "../common/CurrencyInput";
-import { STAGES } from "../../constants/stages";
-import { TEMP } from "../../constants/temperature";
+import { TaskFormModal } from "../tasks/TaskFormModal";
+import { ORIGIN, ORIGIN_KEYS } from "../../constants/origins";
 import { brl } from "../../utils/currency";
+import { formatDateTime, isOverdue } from "../../utils/datetime";
+import { describeTimelineItem, timelineActor } from "../../utils/leadTimeline";
 import { useLeadActions } from "../../hooks/useLeadActions";
-import { useTags } from "../../hooks/useTags";
-import { useLeadComments } from "../../hooks/useLeadComments";
+import { useLeadTimeline } from "../../hooks/useLeadTimeline";
 import { useLeadCommentActions } from "../../hooks/useLeadCommentActions";
+import { usePipelines } from "../../hooks/usePipelines";
+import { useTags } from "../../hooks/useTags";
+import { useTasks } from "../../hooks/useTasks";
+import { useTaskActions } from "../../hooks/useTaskActions";
+import { useTeamDirectory } from "../../hooks/useTeamDirectory";
+import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../hooks/useToast";
+import { can } from "../../auth/permissions";
 import { readableTextColor } from "../../utils/colors";
 import { formatPhone } from "../../utils/phone";
 import { WhatsappButton } from "./WhatsappButton";
 import styles from "./LeadDrawer.module.css";
 
+/**
+ * Ficha do lead (Etapa 1) — fluxo comercial completo sem sair daqui:
+ * etapa (select = alternativa ao arrastar, essencial no celular), dono
+ * (só admin/gestor reatribuem; vendedor vê), dados, tags, tarefas REAIS do
+ * lead (criar/concluir), comentário e a timeline comercial REAL
+ * (`GET /leads/{id}/timeline`). Nada de seção fictícia (IA, temperatura...).
+ */
 export function LeadDrawer({
   lead,
+  stages,
   templates = [],
   onClose,
   onSaved,
+  onDeleted,
 }: {
   lead: Lead;
-  /** Opcional: só quem já carregou os templates (Pipeline) passa isso — a
-   * tela de lista de leads simplesmente não mostra o botão de WhatsApp. */
+  /** Etapas do pipeline do lead; omitido = busca pelos pipelines. */
+  stages?: PipelineStage[];
   templates?: LeadMessageTemplate[];
   onClose: () => void;
   onSaved?: (lead: Lead) => void;
+  onDeleted?: (leadId: string) => void;
 }) {
-  const { toast } = useToast();
-  const { update } = useLeadActions();
-  const { data: availableTags } = useTags();
-  const { data: comments, reload: reloadComments } = useLeadComments(lead.id);
+  const { user } = useAuth();
+  const canAssign = can(user, "leads.assign");
+  const { toast, toastError } = useToast();
+  const { update, move, delete: deleteLead } = useLeadActions();
   const { create: createComment } = useLeadCommentActions();
-  const stage = STAGES[lead.stage];
-  const temp = TEMP[lead.temperature];
+  const { setDone } = useTaskActions();
+  const { data: availableTags } = useTags();
+  const { data: team } = useTeamDirectory();
+  const { data: pipelines } = usePipelines();
+  const timeline = useLeadTimeline(lead.id);
+  const tasks = useTasks({ scope: "all", leadId: lead.id, page: 1, pageSize: 50 });
+
+  const pipelineStages =
+    stages ?? pipelines?.find((p) => p.id === lead.pipelineId)?.stages ?? [];
+  const stage = pipelineStages.find((s) => s.id === lead.stageId);
+  const ownerName = lead.ownerId
+    ? (team?.find((m) => m.id === lead.ownerId)?.name ?? "—")
+    : "Sem responsável";
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [assigning, setAssigning] = useState(false);
   const [form, setForm] = useState(() => fromLead(lead));
   const [newComment, setNewComment] = useState("");
   const [postingComment, setPostingComment] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  function afterChange(updated: Lead) {
+    onSaved?.(updated);
+    timeline.reload();
+  }
+
+  async function handleMove(stageId: string) {
+    if (stageId === lead.stageId) return;
+    setMoving(true);
+    try {
+      const updated = await move(lead.id, stageId);
+      const target = pipelineStages.find((s) => s.id === stageId);
+      toast(
+        target?.isWon
+          ? "Negócio marcado como ganho"
+          : target?.isLost
+            ? "Negócio marcado como perdido"
+            : `Movido para ${target?.label ?? "a nova etapa"}`,
+      );
+      afterChange(updated);
+    } catch (err) {
+      toastError(err, "Não foi possível mover o lead.");
+    } finally {
+      setMoving(false);
+    }
+  }
+
+  async function handleAssign(ownerId: string) {
+    if (!ownerId || ownerId === lead.ownerId) return;
+    setAssigning(true);
+    try {
+      const updated = await update(lead.id, { ownerId });
+      toast("Responsável atualizado");
+      afterChange(updated);
+    } catch (err) {
+      toastError(err, "Não foi possível trocar o responsável.");
+    } finally {
+      setAssigning(false);
+    }
+  }
 
   async function handlePostComment() {
-    if (!newComment.trim()) return;
+    const text = newComment.trim();
+    if (!text) return;
     setPostingComment(true);
     try {
-      await createComment(lead.id, newComment.trim());
+      await createComment(lead.id, text);
       setNewComment("");
-      reloadComments();
+      timeline.reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível adicionar o comentário");
+      toastError(err, "Não foi possível adicionar o comentário");
     } finally {
       setPostingComment(false);
     }
   }
 
-  function toggleTag(tagId: string) {
-    setForm((f) => ({
-      ...f,
-      tags: f.tags.includes(tagId) ? f.tags.filter((id) => id !== tagId) : [...f.tags, tagId],
-    }));
-  }
-
-  function startEdit() {
-    setForm(fromLead(lead));
-    setEditing(true);
-  }
-
-  function cancelEdit() {
-    setEditing(false);
+  async function handleToggleTask(task: Task) {
+    try {
+      await setDone(task.id, !task.done);
+      tasks.reload();
+      timeline.reload();
+    } catch (err) {
+      toastError(err, "Não foi possível atualizar a tarefa.");
+    }
   }
 
   async function handleSave() {
@@ -84,30 +155,61 @@ export function LeadDrawer({
         email: form.email.trim(),
         value: form.value,
         probability: Math.min(100, Math.max(0, Number(form.probability) || 0)),
+        origin: form.origin,
         notes: form.notes,
         tags: form.tags,
       };
       const updated = await update(lead.id, input);
       toast("Lead atualizado com sucesso");
-      onSaved?.(updated);
+      afterChange(updated);
       setEditing(false);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível salvar as alterações");
+      toastError(err, "Não foi possível salvar as alterações");
     } finally {
       setSaving(false);
     }
   }
 
+  async function handleDelete(): Promise<boolean> {
+    try {
+      await deleteLead(lead.id);
+      toast("Lead excluído");
+      onDeleted?.(lead.id);
+      onClose();
+      return true;
+    } catch (err) {
+      toastError(err, "Não foi possível excluir o lead.");
+      return false;
+    }
+  }
+
+  function toggleTag(tagId: string) {
+    setForm((f) => ({
+      ...f,
+      tags: f.tags.includes(tagId) ? f.tags.filter((id) => id !== tagId) : [...f.tags, tagId],
+    }));
+  }
+
+  const taskItems = [...(tasks.data?.items ?? [])].sort(
+    (a, b) => Number(a.done) - Number(b.done) || a.dueAt.localeCompare(b.dueAt),
+  );
+
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.drawer} onClick={(e) => e.stopPropagation()}>
+      <div
+        className={styles.drawer}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Lead ${lead.name}`}
+      >
         <button className={styles.close} onClick={onClose} aria-label="Fechar">
           ✕
         </button>
 
         <div className={styles.header}>
           <Avatar name={lead.name} bg="var(--tone-blue-bg)" color="var(--tone-blue)" size={48} />
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             {editing ? (
               <>
                 <input
@@ -115,35 +217,82 @@ export function LeadDrawer({
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="Nome"
+                  aria-label="Nome"
                 />
                 <input
                   className={styles.editInput}
                   value={form.company}
                   onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
                   placeholder="Empresa"
+                  aria-label="Empresa"
                 />
               </>
             ) : (
               <>
                 <div className={styles.name}>{lead.name}</div>
-                <div className={styles.company}>{lead.company !== "—" ? lead.company : lead.role}</div>
+                <div className={styles.company}>{lead.company || lead.role}</div>
               </>
             )}
           </div>
         </div>
 
         <div className={styles.badges}>
-          <Badge label={stage.label} color={stage.color} bg={stage.bg} />
-          <Badge label={temp.label} color={temp.color} bg="var(--tone-gray-bg)" />
+          {stage && (
+            <Badge
+              label={stage.isWon ? `🏆 ${stage.label}` : stage.label}
+              color={stage.color}
+              bg="var(--tone-gray-bg)"
+            />
+          )}
           <WhatsappButton lead={lead} templates={templates} />
           {!editing && (
-            <button className={styles.editToggle} onClick={startEdit}>
+            <button className={styles.editToggle} onClick={() => (setForm(fromLead(lead)), setEditing(true))}>
               ✎ Editar
             </button>
           )}
         </div>
 
         <div className={styles.grid}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Etapa</span>
+            <select
+              className={styles.editInputSmall}
+              value={lead.stageId}
+              disabled={moving || pipelineStages.length === 0}
+              onChange={(e) => void handleMove(e.target.value)}
+            >
+              {!stage && <option value={lead.stageId}>—</option>}
+              {pipelineStages.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                  {s.isWon ? " (ganho)" : s.isLost ? " (perdido)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Responsável</span>
+            {canAssign ? (
+              <select
+                className={styles.editInputSmall}
+                value={lead.ownerId ?? ""}
+                disabled={assigning || !team}
+                onChange={(e) => void handleAssign(e.target.value)}
+              >
+                {!lead.ownerId && <option value="">Sem responsável</option>}
+                {lead.ownerId && !team?.some((m) => m.id === lead.ownerId) && (
+                  <option value={lead.ownerId}>Usuário inativo</option>
+                )}
+                {team?.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className={styles.fieldValue}>{ownerName}</div>
+            )}
+          </label>
           <div className={styles.field}>
             <div className={styles.fieldLabel}>Valor</div>
             {editing ? (
@@ -195,36 +344,68 @@ export function LeadDrawer({
               <div className={styles.fieldValue}>{lead.email || "—"}</div>
             )}
           </div>
+          <div className={styles.field}>
+            <div className={styles.fieldLabel}>Origem</div>
+            {editing ? (
+              <select
+                className={styles.editInputSmall}
+                value={form.origin}
+                onChange={(e) => setForm((f) => ({ ...f, origin: e.target.value }))}
+              >
+                {!ORIGIN_KEYS.some((k) => k === form.origin) && (
+                  <option value={form.origin}>{form.origin || "—"}</option>
+                )}
+                {ORIGIN_KEYS.map((k) => (
+                  <option key={k} value={k}>
+                    {ORIGIN[k].label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className={styles.fieldValue}>
+                {ORIGIN_KEYS.some((k) => k === lead.origin)
+                  ? ORIGIN[lead.origin as (typeof ORIGIN_KEYS)[number]].label
+                  : lead.origin || "—"}
+              </div>
+            )}
+          </div>
+          <div className={styles.field}>
+            <div className={styles.fieldLabel}>Criado em</div>
+            <div className={styles.fieldValue}>{formatDateTime(lead.createdAt)}</div>
+          </div>
         </div>
 
         {(editing ? availableTags && availableTags.length > 0 : lead.tags.length > 0) && (
           <div className={styles.section}>
             <div className={styles.sectionTitle}>Tags</div>
-            {editing ? (
-              <div className={styles.tagOptions}>
-                {availableTags?.map((tag) => {
-                  const active = form.tags.includes(tag.id);
-                  return (
-                    <button
-                      type="button"
-                      key={tag.id}
-                      className={active ? `${styles.tagOption} ${styles.tagOptionActive}` : styles.tagOption}
-                      style={active ? { color: readableTextColor(tag.color), background: tag.bg } : undefined}
-                      onClick={() => toggleTag(tag.id)}
-                    >
-                      {tag.label}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className={styles.tagOptions}>
-                {lead.tags.map((tagId) => {
-                  const tag = availableTags?.find((t) => t.id === tagId);
-                  return tag ? <Badge key={tag.id} label={tag.label} color={tag.color} bg={tag.bg} /> : null;
-                })}
-              </div>
-            )}
+            <div className={styles.tagOptions}>
+              {editing
+                ? availableTags?.map((tag) => {
+                    const active = form.tags.includes(tag.id);
+                    return (
+                      <button
+                        type="button"
+                        key={tag.id}
+                        className={
+                          active ? `${styles.tagOption} ${styles.tagOptionActive}` : styles.tagOption
+                        }
+                        style={
+                          active ? { color: readableTextColor(tag.color), background: tag.bg } : undefined
+                        }
+                        onClick={() => toggleTag(tag.id)}
+                        aria-pressed={active}
+                      >
+                        {tag.label}
+                      </button>
+                    );
+                  })
+                : lead.tags.map((tagId) => {
+                    const tag = availableTags?.find((t) => t.id === tagId);
+                    return tag ? (
+                      <Badge key={tag.id} label={tag.label} color={tag.color} bg={tag.bg} />
+                    ) : null;
+                  })}
+            </div>
           </div>
         )}
 
@@ -250,47 +431,72 @@ export function LeadDrawer({
 
         {editing && (
           <div className={styles.editActions}>
-            <Button onClick={cancelEdit} disabled={saving}>
+            <Button onClick={() => setEditing(false)} disabled={saving}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={() => void handleSave()} disabled={saving || !form.name.trim()}>
+            <Button
+              variant="primary"
+              onClick={() => void handleSave()}
+              disabled={saving || !form.name.trim()}
+            >
               {saving ? "Salvando…" : "Salvar alterações"}
             </Button>
           </div>
         )}
 
-        {(lead.aiSummary || lead.aiNext) && (
-          <div className={styles.aiBox}>
-            {lead.aiSummary && <p className={styles.aiSummary}>{lead.aiSummary}</p>}
-            {lead.aiNext && (
-              <p className={styles.aiNext}>
-                <strong>Próximo passo:</strong> {lead.aiNext}
-              </p>
-            )}
-          </div>
-        )}
-
-        {lead.tasks.length > 0 && (
-          <div className={styles.section}>
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
             <div className={styles.sectionTitle}>Tarefas</div>
-            {lead.tasks.map((t) => (
-              <div key={t.id} className={styles.taskRow}>
-                <span>{t.done ? "☑" : "☐"}</span>
-                <span className={t.done ? styles.taskDone : undefined}>{t.title}</span>
-              </div>
-            ))}
+            <button type="button" className={styles.editToggle} onClick={() => setCreatingTask(true)}>
+              + Nova tarefa
+            </button>
           </div>
-        )}
+          {tasks.loading && !tasks.data && <div className={styles.empty}>Carregando…</div>}
+          {tasks.error && <div className={styles.empty}>Não foi possível carregar as tarefas.</div>}
+          {tasks.data && taskItems.length === 0 && (
+            <div className={styles.empty}>Nenhuma tarefa para este lead.</div>
+          )}
+          {taskItems.map((t) => (
+            <div key={t.id} className={styles.taskRow}>
+              <button
+                type="button"
+                className={styles.taskCheck}
+                onClick={() => void handleToggleTask(t)}
+                aria-label={t.done ? "Reabrir tarefa" : "Concluir tarefa"}
+              >
+                {t.done ? "☑" : "☐"}
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className={t.done ? styles.taskDone : undefined}>{t.title}</div>
+                <div
+                  className={
+                    isOverdue(t.dueAt, t.done) ? `${styles.taskMeta} ${styles.overdue}` : styles.taskMeta
+                  }
+                >
+                  {isOverdue(t.dueAt, t.done) ? "Atrasada · " : ""}
+                  {formatDateTime(t.dueAt)}
+                  {t.assigneeName ? ` · ${t.assigneeName}` : ""}
+                </div>
+              </div>
+            </div>
+          ))}
+          {tasks.data && tasks.data.total > taskItems.length && (
+            <div className={styles.empty}>
+              Mostrando {taskItems.length} de {tasks.data.total} — veja todas em Tarefas.
+            </div>
+          )}
+        </div>
 
         <div className={styles.section}>
-          <div className={styles.sectionTitle}>Comentários</div>
+          <div className={styles.sectionTitle}>Atividades</div>
           <div className={styles.commentForm}>
             <textarea
               className={styles.editTextarea}
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               rows={2}
-              placeholder="Deixe um comentário sobre este lead…"
+              placeholder="Registrar um comentário/follow-up…"
+              aria-label="Novo comentário"
             />
             <Button
               variant="primary"
@@ -300,35 +506,66 @@ export function LeadDrawer({
               {postingComment ? "Enviando…" : "Comentar"}
             </Button>
           </div>
-          {comments?.length === 0 && <div className={styles.empty}>Nenhum comentário ainda.</div>}
-          {comments?.map((c) => (
-            <div key={c.id} className={styles.commentRow}>
-              <div className={styles.commentMeta}>
-                <span className={styles.commentAuthor}>{c.authorName}</span>
-                <span className={styles.commentDate}>{new Date(c.createdAt).toLocaleString("pt-BR")}</span>
-              </div>
-              <p className={styles.commentText}>{c.text}</p>
+          {timeline.loading && !timeline.data && <div className={styles.empty}>Carregando…</div>}
+          {timeline.error && (
+            <div className={styles.empty}>
+              Não foi possível carregar a linha do tempo.{" "}
+              <button type="button" className={styles.editToggle} onClick={timeline.reload}>
+                Tentar de novo
+              </button>
             </div>
-          ))}
+          )}
+          {timeline.data?.length === 0 && (
+            <div className={styles.empty}>Sem atividades registradas ainda.</div>
+          )}
+          {timeline.data?.map((item) => {
+            const view = describeTimelineItem(item);
+            return (
+              <div key={`${item.type}-${item.id}`} className={styles.timelineRow}>
+                <span className={styles.timelineIcon} aria-hidden="true">
+                  {view.icon}
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <div className={styles.timelineTitle}>{view.title}</div>
+                  {view.detail && <div className={styles.timelineDesc}>{view.detail}</div>}
+                  <div className={styles.timelineWho}>
+                    {timelineActor(item)} · {formatDateTime(item.createdAt)}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        <div className={styles.section}>
-          <div className={styles.sectionTitle}>Linha do tempo</div>
-          {lead.timeline.length === 0 && <div className={styles.empty}>Sem atividades registradas ainda.</div>}
-          {lead.timeline.map((t, i) => (
-            <div key={i} className={styles.timelineRow}>
-              <span className={styles.timelineIcon} style={{ color: readableTextColor(t.color) }}>
-                {t.icon}
-              </span>
-              <div>
-                <div className={styles.timelineTitle}>{t.title}</div>
-                <div className={styles.timelineDesc}>{t.desc}</div>
-                <div className={styles.timelineWho}>{t.who}</div>
-              </div>
-            </div>
-          ))}
+        <div className={styles.dangerZone}>
+          <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+            Excluir lead
+          </Button>
         </div>
       </div>
+
+      {creatingTask && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <TaskFormModal
+            fixedLead={{ id: lead.id, name: lead.name }}
+            onClose={() => setCreatingTask(false)}
+            onSaved={() => {
+              tasks.reload();
+              timeline.reload();
+            }}
+          />
+        </div>
+      )}
+      {confirmDelete && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ConfirmDialog
+            title="Excluir lead?"
+            message={`"${lead.name}" e o histórico dele (tarefas, comentários, linha do tempo) serão removidos. Esta ação não pode ser desfeita.`}
+            onConfirm={handleDelete}
+            onClose={() => setConfirmDelete(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -336,11 +573,12 @@ export function LeadDrawer({
 function fromLead(lead: Lead) {
   return {
     name: lead.name,
-    company: lead.company === "—" ? "" : lead.company,
+    company: lead.company,
     phone: lead.phone,
     email: lead.email,
     value: lead.value,
     probability: String(lead.probability),
+    origin: lead.origin,
     notes: lead.notes,
     tags: lead.tags,
   };

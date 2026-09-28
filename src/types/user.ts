@@ -1,20 +1,45 @@
 export type UserRole = "admin" | "gestor" | "vendedor";
 
+export type MemberStatus = "active" | "suspended" | "invited";
+
+/** Membro da equipe do tenant atual (`GET /api/v1/users`, admin/gestor). */
 export interface User {
   id: string;
-  /** Opcional: `GET /api/v1/users` (Fase 3) não devolve mais `tenant_id` por
-   * membro — todo membro listado já é implicitamente do tenant atual.
-   * Mantido opcional (não removido) só para não quebrar o mock de demo,
-   * que ainda filtra usuários por tenant. */
+  /** Só o mock de demonstração usa. */
   tenantId?: string;
   name: string;
   email: string;
-  team: string;
   role: UserRole;
+  status: MemberStatus;
+  /** Convite ainda não aceito / senha temporária ainda não trocada. */
+  pendingFirstAccess: boolean;
   bg: string;
   color: string;
 }
 
-export type CreateUserInput = Pick<User, "name" | "email" | "role" | "team"> & {
-  password: string;
-};
+/** Versão mínima (sem e-mail) para o seletor de responsável — disponível
+ * para qualquer papel (`GET /api/v1/users/directory`). */
+export interface DirectoryMember {
+  id: string;
+  name: string;
+  role: UserRole;
+}
+
+/** Sem `password` = convite por e-mail (recomendado). */
+export interface CreateUserInput {
+  name: string;
+  email: string;
+  role: UserRole;
+  password?: string;
+}
+
+export interface CreateUserResult {
+  user: User;
+  /** `true` convite enviado; `false` falhou (reenviar); `null` senha temporária. */
+  invitationSent: boolean | null;
+}
+
+export interface UpdateMemberInput {
+  role?: UserRole;
+  active?: boolean;
+}

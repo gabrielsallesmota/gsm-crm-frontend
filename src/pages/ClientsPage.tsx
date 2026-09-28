@@ -158,7 +158,7 @@ function CreateClientModal({
     closedAt: string;
   }) => Promise<void>;
 }) {
-  const { toast } = useToast();
+  const { toastError } = useToast();
   const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -175,7 +175,7 @@ function CreateClientModal({
     } catch (err) {
       // Mesmo racional do `QuickCreateModal` de Leads: sem isso, um erro
       // aqui só aparecia como "Uncaught (in promise)" no console.
-      toast(err instanceof Error ? err.message : "Não foi possível criar o cliente");
+      toastError(err, "Não foi possível criar o cliente");
     } finally {
       setSubmitting(false);
     }

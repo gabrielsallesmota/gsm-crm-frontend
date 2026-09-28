@@ -2,5 +2,6 @@ import type { DashboardMetrics } from "../types/dashboard";
 import type { Period } from "../utils/periods";
 
 export interface DashboardRepository {
-  getMetrics(period?: Period): Promise<DashboardMetrics>;
+  /** `pipelineId` omitido = pipeline padrão do tenant. */
+  getMetrics(period?: Period, pipelineId?: string): Promise<DashboardMetrics>;
 }

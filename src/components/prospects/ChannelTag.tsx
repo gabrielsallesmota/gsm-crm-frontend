@@ -50,7 +50,7 @@ export function ChannelTag({
    * botão "Enviar") — nunca depois de "Copiar". */
   onSent?: () => void;
 }) {
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const { sendEmail } = useProspectActions();
   const [sending, setSending] = useState(false);
   const channel = prospect.contactChannel || "whatsapp";
@@ -68,27 +68,27 @@ export function ChannelTag({
     e.preventDefault();
     if (channel === "instagram") {
       if (!message) {
-        toast("Sem mensagem configurada pra esse estágio");
+        toast("Sem mensagem configurada pra esse estágio", "warning");
         return;
       }
       try {
         await navigator.clipboard.writeText(message);
         toast("Mensagem copiada — as quebras de linha vêm junto");
       } catch {
-        toast("Não foi possível copiar a mensagem");
+        toast("Não foi possível copiar a mensagem", "error");
       }
       return;
     }
     // email
     if (!prospect.email) {
-      toast("Sem e-mail cadastrado");
+      toast("Sem e-mail cadastrado", "warning");
       return;
     }
     try {
       await navigator.clipboard.writeText(buildEmailText(prospect, message));
       toast("E-mail copiado — cole no seu cliente de e-mail");
     } catch {
-      toast("Não foi possível copiar o e-mail");
+      toast("Não foi possível copiar o e-mail", "error");
     }
   }
 
@@ -129,11 +129,11 @@ export function ChannelTag({
     e.stopPropagation();
     e.preventDefault();
     if (!prospect.email) {
-      toast("Sem e-mail cadastrado");
+      toast("Sem e-mail cadastrado", "warning");
       return;
     }
     if (!message) {
-      toast("Sem mensagem configurada pra esse estágio");
+      toast("Sem mensagem configurada pra esse estágio", "warning");
       return;
     }
     setSending(true);
@@ -147,10 +147,10 @@ export function ChannelTag({
         toast("E-mail enviado");
         onSent?.();
       } else {
-        toast("Não foi possível enviar o e-mail agora — tente de novo em instantes");
+        toast("Não foi possível enviar o e-mail agora — tente de novo em instantes", "error");
       }
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível enviar o e-mail");
+      toastError(err, "Não foi possível enviar o e-mail");
     } finally {
       setSending(false);
     }

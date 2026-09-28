@@ -9,7 +9,23 @@ export const BASE_URL = import.meta.env.VITE_CRM_API_URL || "http://localhost:80
  * `sessionClient.ts`, testável sem Vite. Esta fachada só mantém a API
  * pública de sempre para o resto do código.
  */
-const client = createSessionClient(BASE_URL, (input, init) => fetch(input, init));
+let storedTokensLoader: (() => TokenResponse | null) | null = null;
+
+const client = createSessionClient(BASE_URL, (input, init) => fetch(input, init), {
+  loadStoredTokens: () => storedTokensLoader?.() ?? null,
+  // Web Locks: uma renovação por vez entre TODAS as abas do app. Sem
+  // suporte (navegador antigo), cai no single-flight por aba + releitura do
+  // storage em caso de recusa.
+  withRefreshLock: (fn) =>
+    typeof navigator !== "undefined" && navigator.locks
+      ? navigator.locks.request("gsm_crm_refresh", fn)
+      : fn(),
+});
+
+/** O `AuthProvider` (dono do storage) informa como ler o par salvo. */
+export function setStoredTokensLoader(loader: (() => TokenResponse | null) | null): void {
+  storedTokensLoader = loader;
+}
 
 export function setApiTokens(tokens: TokenResponse | null): void {
   client.setTokens(tokens);

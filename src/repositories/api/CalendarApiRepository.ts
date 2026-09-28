@@ -1,5 +1,10 @@
 import type { CalendarRepository } from "../CalendarRepository";
-import type { CalEvent, CreateCalEventInput } from "../../types/event";
+import type {
+  CalEvent,
+  CalendarRange,
+  CreateCalEventInput,
+  UpdateCalEventInput,
+} from "../../types/event";
 import { apiRequest } from "./ApiClient";
 import { shortTimeLabel } from "../../utils/dates";
 
@@ -21,21 +26,40 @@ function toCalEvent(dto: CalendarEventDto): CalEvent {
     type: dto.type,
     at: dto.at,
     // O backend não guarda um `time` separado — só `at` (datetime completo).
-    // Deriva aqui o mesmo texto curto que o modo Demo pré-computa.
     time: shortTimeLabel(dto.at),
   };
 }
 
 export class CalendarApiRepository implements CalendarRepository {
-  async listEvents(): Promise<CalEvent[]> {
-    const dtos = await apiRequest<CalendarEventDto[]>("/api/v1/calendar/events");
+  async listEvents(range?: CalendarRange): Promise<CalEvent[]> {
+    const params = new URLSearchParams();
+    if (range?.from) params.set("date_from", range.from);
+    if (range?.to) params.set("date_to", range.to);
+    if (range?.leadId) params.set("lead_id", range.leadId);
+    const query = params.toString();
+    const dtos = await apiRequest<CalendarEventDto[]>(
+      query ? `/api/v1/calendar/events?${query}` : "/api/v1/calendar/events",
+    );
     return dtos.map(toCalEvent);
   }
 
   async create(input: CreateCalEventInput): Promise<CalEvent> {
     const dto = await apiRequest<CalendarEventDto>("/api/v1/calendar/events", {
       method: "POST",
-      body: JSON.stringify({ lead_id: input.leadId, title: input.title, type: input.type, at: input.at }),
+      body: JSON.stringify({
+        lead_id: input.leadId,
+        title: input.title,
+        type: input.type,
+        at: input.at,
+      }),
+    });
+    return toCalEvent(dto);
+  }
+
+  async update(eventId: string, input: UpdateCalEventInput): Promise<CalEvent> {
+    const dto = await apiRequest<CalendarEventDto>(`/api/v1/calendar/events/${eventId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title: input.title, type: input.type, at: input.at }),
     });
     return toCalEvent(dto);
   }

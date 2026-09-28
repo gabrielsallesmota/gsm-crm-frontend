@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { ROUTES } from "../constants/routes";
 import { ChangePasswordForm } from "../components/auth/ChangePasswordForm";
 import styles from "./LoginPage.module.css";
+import { describeError } from "../utils/apiErrors";
 
 export function ResetPasswordPage() {
   const { confirmPasswordReset } = useAuth();
@@ -22,7 +23,7 @@ export function ResetPasswordPage() {
       await confirmPasswordReset({ token, newPassword: values.newPassword });
       navigate(ROUTES.login);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível redefinir a senha.");
+      setError(describeError(err, "Não foi possível redefinir a senha."));
     } finally {
       setLoading(false);
     }

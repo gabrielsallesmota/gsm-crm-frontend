@@ -7,12 +7,13 @@ import type {
   Lead,
   UpdateLeadInput,
 } from "../types/lead";
-import type { StageKey } from "../types/pipeline";
 
 export interface LeadActions {
   create(input: CreateLeadInput): Promise<Lead>;
   update(id: string, input: UpdateLeadInput): Promise<Lead>;
-  move(id: string, stage: StageKey): Promise<Lead>;
+  /** `stageId` é o UUID REAL da etapa (nunca um nome/chave). */
+  move(id: string, stageId: string): Promise<Lead>;
+  delete(id: string): Promise<void>;
   bulkImport(
     rows: ImportRowInput[],
     pipelineId: string,
@@ -24,16 +25,15 @@ export interface LeadActions {
 }
 
 /**
- * Mutações de lead usadas fora de `useLeads` (ex.: `LeadDrawer`, que edita
- * um lead sem listar nenhum) — mesma regra de camadas dos hooks de
- * leitura: só o hook fala com `leadsService`, componentes/páginas só
- * chamam o hook.
+ * Mutações de lead usadas fora de `useLeads` (ex.: `LeadDrawer`) — só o hook
+ * fala com `leadsService`, componentes/páginas só chamam o hook.
  */
 export function useLeadActions(): LeadActions {
   return {
     create: (input) => leadsService.create(input),
     update: (id, input) => leadsService.update(id, input),
-    move: (id, stage) => leadsService.move(id, stage),
+    move: (id, stageId) => leadsService.move(id, stageId),
+    delete: (id) => leadsService.delete(id),
     bulkImport: (rows, pipelineId, defaultStageId, defaultOwnerId, dedupeStrategy) =>
       leadsService.bulkImport(rows, pipelineId, defaultStageId, defaultOwnerId, dedupeStrategy),
     exportCsv: () => leadsService.exportCsv(),

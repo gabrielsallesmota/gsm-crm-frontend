@@ -83,7 +83,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
   } = useProspectStages();
   const { move, update, backfillCadence, confirmFirstContact } = useProspectActions();
   const { reorder: reorderStages } = useProspectStageActions();
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const { data: templates } = useMessageTemplates();
   const { data: lossReasons, reload: reloadLossReasons } = useProspectLossReasons();
 
@@ -140,7 +140,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
         await reorderStages(ids);
         reloadStages();
       } catch (err) {
-        toast(err instanceof Error ? err.message : "Não foi possível reordenar os estágios");
+        toastError(err, "Não foi possível reordenar os estágios");
       }
       return;
     }
@@ -208,7 +208,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
       await move(prospectId, stageId, targetDate);
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível mover o prospect");
+      toastError(err, "Não foi possível mover o prospect");
     }
   }
 
@@ -220,7 +220,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
       await move(prospectId, stageId, undefined, lossReasonId);
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível mover o prospect");
+      toastError(err, "Não foi possível mover o prospect");
     }
   }
 
@@ -244,7 +244,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
       }
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível confirmar o primeiro contato");
+      toastError(err, "Não foi possível confirmar o primeiro contato");
     }
   }
   // ^ `reload()` acima também cobre o caminho `setPendingMove` (refresca o
@@ -260,7 +260,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
       await update(prospect.id, { noWhatsapp: !prospect.noWhatsapp });
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível atualizar");
+      toastError(err, "Não foi possível atualizar");
     }
   }
 
@@ -275,7 +275,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
       );
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível recalcular as datas");
+      toastError(err, "Não foi possível recalcular as datas");
     } finally {
       setBackfilling(false);
     }
@@ -293,7 +293,7 @@ export function ProspectionBoard({ period }: { period: Period }) {
         a.click();
         URL.revokeObjectURL(url);
       } catch (err) {
-        toast(err instanceof Error ? err.message : "Não foi possível exportar.");
+        toastError(err, "Não foi possível exportar.");
       }
     })();
   }
@@ -783,7 +783,7 @@ function QuickCreateModal({
   onCreated: () => void;
 }) {
   const { create } = useProspectActions();
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const [companyName, setCompanyName] = useState("");
   const [phoneRaw, setPhoneRaw] = useState("");
   const [stageId, setStageId] = useState(defaultStageId);
@@ -810,7 +810,7 @@ function QuickCreateModal({
       if (err instanceof ApiError && err.status === 409) {
         setDuplicateNote(true);
       } else {
-        toast(err instanceof Error ? err.message : "Não foi possível criar o prospect");
+        toastError(err, "Não foi possível criar o prospect");
       }
     } finally {
       setSubmitting(false);

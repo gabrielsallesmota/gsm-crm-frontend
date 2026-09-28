@@ -1,39 +1,9 @@
-import type { StageKey } from "./pipeline";
-
-export type Temperature = "frio" | "morno" | "quente";
-
-export interface LeadTimelineEntry {
-  icon: string;
-  color: string;
-  title: string;
-  desc: string;
-  at: string;
-  who: string;
-}
-
-export interface LeadFile {
-  id: string;
-  name: string;
-  size: string;
-  kind: string;
-  at: string;
-}
-
-export interface LeadTaskRef {
-  id: string;
-  title: string;
-  priority: "alta" | "media" | "baixa";
-  done: boolean;
-  dueAt: string;
-}
-
-export interface LeadEventRef {
-  id: string;
-  title: string;
-  type: "retorno" | "reuniao" | "visita";
-  at: string;
-  time: string;
-}
+/**
+ * Lead como o backend devolve. Só dados REAIS: os campos fictícios que o
+ * protótipo exibia (temperatura, "IA", objeções, arquivos, timeline de
+ * exemplo, "1º atendimento") foram removidos na Etapa 1 — a timeline agora
+ * vem de `GET /leads/{id}/timeline` (ver `LeadTimelineItem`).
+ */
 
 /** Anotação datada de alguém sobre o lead — histórico append-only,
  * diferente de `Lead.notes` (campo livre único, sobrescrito a cada
@@ -48,8 +18,7 @@ export interface LeadComment {
 }
 
 /** Só o preview do comentário mais recente — o que aparece no card do
- * Kanban sem abrir o lead (hover/inline). A view completa é `LeadComment[]`,
- * carregada à parte (`GET /leads/{id}/comments`) só quando o lead é aberto. */
+ * Kanban sem abrir o lead. */
 export interface LastCommentPreview {
   text: string;
   createdAt: string;
@@ -60,56 +29,66 @@ export interface Lead {
   tenantId: string;
   name: string;
   company: string;
+  /** Cargo (`position` no backend). */
   role: string;
   phone: string;
   whatsapp: string;
   /** Telefone normalizado (`whatsapp` tem prioridade sobre `phone`) — usado
-   * pro link `wa.me/...` do botão de WhatsApp. Ver `utils/leadMessageTemplates.ts`. */
+   * pro link `wa.me/...` do botão de WhatsApp. */
   phoneNormalized: string;
-  /** UUID real do estágio no backend — diferente de `stage` (que colapsa
-   * pra um funil fixo de 5 chaves, ver `repositories/api/stageMapping.ts`).
-   * Templates de mensagem casam pelo estágio real, não pela chave colapsada. */
-  stageId: string;
   email: string;
   city: string;
   state: string;
   notes: string;
-  stage: StageKey;
-  /** `null` = lead de intake público (API Key, backend Fase 6) ainda não
-   * atribuído a ninguém — nenhuma tela hoje lê este campo para exibir nome
-   * de responsável, mas o tipo precisa refletir o contrato real da API
-   * (`GET /api/v1/leads`) desde que esse endpoint público existe. */
+  pipelineId: string;
+  /** UUID REAL da etapa no backend — identidade da etapa. */
+  stageId: string;
+  /** `null` = lead de intake público (API Key) ainda sem responsável. */
   ownerId: string | null;
   value: number;
   probability: number;
   origin: string;
   tags: string[];
-  /** `undefined` no modo Demo pra leads sem comentário (fixtures não
-   * precisam declarar); `null` explícito na API real. */
   lastComment?: LastCommentPreview | null;
   createdAt: string;
-  firstContactHours: number;
-  lastActivityAt: string;
-  closedAt?: string;
-  lossReason?: string;
-  temperature: Temperature;
-  sentiment: string;
-  aiProbability: string;
-  aiSummary: string;
-  aiNext: string;
-  objections: string[];
-  custom: Record<string, string>;
-  timeline: LeadTimelineEntry[];
-  tasks: LeadTaskRef[];
-  events: LeadEventRef[];
-  files: LeadFile[];
+  updatedAt: string;
+  /** Última movimentação de etapa (`last_interaction_at`); `null` se nunca moveu. */
+  lastInteractionAt: string | null;
+}
+
+/** Item da timeline COMERCIAL do lead (`GET /leads/{id}/timeline`) —
+ * eventos reais + comentários, mais recentes primeiro. Diferente do audit
+ * log técnico. */
+export type LeadTimelineType =
+  | "created"
+  | "stage_changed"
+  | "won"
+  | "lost"
+  | "owner_changed"
+  | "updated"
+  | "task_created"
+  | "task_completed"
+  | "task_reopened"
+  | "comment";
+
+export interface LeadTimelineItem {
+  id: string;
+  type: LeadTimelineType | string;
+  createdAt: string;
+  actorType: "user" | "api_key" | "system" | string;
+  actorName: string | null;
+  payload: Record<string, unknown>;
+  text: string | null;
 }
 
 export interface LeadListFilter {
   pipelineId?: string;
   stageId?: string;
   ownerId?: string;
+  /** Só leads sem responsável (fila do intake público). */
+  unassigned?: boolean;
   origin?: string;
+  tagId?: string;
   search?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -119,18 +98,27 @@ export interface LeadListFilter {
   sortDir?: "asc" | "desc";
 }
 
-export type CreateLeadInput = Pick<
-  Lead,
-  "name" | "company" | "phone" | "email" | "origin" | "value"
-> &
-  // Criação manual sempre exige um dono real — `ownerId: string | null` do
-  // `Lead` é só para leads já existentes (intake público, ver comentário
-  // acima); aqui sobrescreve de volta para obrigatório.
-  { ownerId: string } & Partial<Pick<Lead, "stage" | "notes">> & { pipelineId?: string };
+export interface CreateLeadInput {
+  name: string;
+  company: string;
+  phone: string;
+  email: string;
+  origin: string;
+  value: number;
+  /** Criação manual sempre exige um dono real. */
+  ownerId: string;
+  pipelineId: string;
+  /** Etapa inicial; omitida = primeira etapa em andamento do pipeline. */
+  stageId?: string;
+  notes?: string;
+}
 
 export type UpdateLeadInput = Partial<
-  Pick<Lead, "name" | "company" | "phone" | "email" | "notes" | "value" | "probability" | "tags">
->;
+  Pick<
+    Lead,
+    "name" | "company" | "phone" | "email" | "notes" | "value" | "probability" | "tags" | "origin"
+  >
+> & { ownerId?: string };
 
 export type DedupeStrategy = "skip" | "update" | "duplicate";
 

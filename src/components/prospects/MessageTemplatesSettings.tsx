@@ -27,7 +27,7 @@ export function MessageTemplatesSettings() {
   const { data: stages, loading: loadingStages, error: stagesError } = useProspectStages();
   const { data: templates, loading: loadingTemplates, error, reload } = useMessageTemplates();
   const { delete: deleteTemplate } = useMessageTemplateActions();
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -37,7 +37,7 @@ export function MessageTemplatesSettings() {
       toast("Template excluído");
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível excluir o template");
+      toastError(err, "Não foi possível excluir o template");
     }
   }
 
@@ -131,7 +131,7 @@ function TemplateForm({
   onCancel?: () => void;
 }) {
   const { create, update } = useMessageTemplateActions();
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const [stageId, setStageId] = useState(existing?.stageId ?? stages[0]?.id ?? "");
   const [niche, setNiche] = useState(existing?.niche ?? "");
   const [message, setMessage] = useState(existing?.message ?? "");
@@ -160,7 +160,7 @@ function TemplateForm({
       if (err instanceof ApiError && err.status === 409) {
         setErrorNote(err.message);
       } else {
-        toast(err instanceof Error ? err.message : "Não foi possível salvar o template");
+        toastError(err, "Não foi possível salvar o template");
       }
     } finally {
       setSubmitting(false);

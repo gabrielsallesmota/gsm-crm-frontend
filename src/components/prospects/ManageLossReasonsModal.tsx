@@ -37,7 +37,7 @@ export function ManageLossReasonsModal({
         err instanceof ApiError && err.status === 409
           ? err.message
           : "Não foi possível criar o motivo";
-      toast(message);
+      toast(message, "error");
     } finally {
       setCreating(false);
     }

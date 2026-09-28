@@ -8,11 +8,11 @@ import type {
   Lead,
   LeadListFilter,
   LeadMessageTemplate,
+  LeadTimelineItem,
   UpdateLeadInput,
   UpdateLeadMessageTemplateInput,
 } from "../../types/lead";
 import type { Page } from "../../types/common";
-import type { StageKey } from "../../types/pipeline";
 import { delay, NotImplementedError } from "../../utils/errors";
 import { mockState, nextLeadId } from "./state";
 
@@ -24,8 +24,11 @@ export class LeadsMockRepository implements LeadsRepository {
     await delay(250);
     let items = mockState.leads.filter((l) => l.tenantId === mockState.currentTenantId);
 
-    if (filter.stageId) items = items.filter((l) => l.stage === filter.stageId);
+    if (filter.pipelineId) items = items.filter((l) => l.pipelineId === filter.pipelineId);
+    if (filter.stageId) items = items.filter((l) => l.stageId === filter.stageId);
     if (filter.ownerId) items = items.filter((l) => l.ownerId === filter.ownerId);
+    else if (filter.unassigned) items = items.filter((l) => l.ownerId === null);
+    if (filter.tagId) items = items.filter((l) => l.tags.includes(filter.tagId!));
     if (filter.origin) items = items.filter((l) => l.origin === filter.origin);
     if (filter.search) {
       const q = filter.search.trim().toLowerCase();
@@ -55,42 +58,36 @@ export class LeadsMockRepository implements LeadsRepository {
 
   async create(input: CreateLeadInput): Promise<Lead> {
     await delay(250);
+    const pipeline = mockState.pipelines.find((p) => p.id === input.pipelineId);
+    const stageId =
+      input.stageId ??
+      pipeline?.stages.find((st) => !st.isWon && !st.isLost)?.id ??
+      pipeline?.stages[0]?.id ??
+      "";
+    const now = new Date().toISOString();
     const lead: Lead = {
       id: nextLeadId(),
       tenantId: mockState.currentTenantId,
       name: input.name,
-      company: input.company || "—",
+      company: input.company,
       role: "",
       phone: input.phone,
       whatsapp: "",
       phoneNormalized: "",
-      stageId: input.stage ?? "novo",
       email: input.email,
       city: "",
       state: "",
       notes: input.notes ?? "",
-      stage: input.stage ?? "novo",
+      pipelineId: input.pipelineId,
+      stageId,
       ownerId: input.ownerId,
       value: input.value,
       probability: 20,
       origin: input.origin,
       tags: [],
-      createdAt: new Date().toISOString(),
-      firstContactHours: 0,
-      lastActivityAt: new Date().toISOString(),
-      temperature: "morno",
-      sentiment: "Neutro",
-      aiProbability: "20%",
-      aiSummary: "",
-      aiNext: "",
-      objections: [],
-      custom: {},
-      timeline: [
-        { icon: "✨", color: "#2ee66e", title: "Lead criado", desc: "Cadastro manual.", at: new Date().toISOString(), who: "Você" },
-      ],
-      tasks: [],
-      events: [],
-      files: [],
+      createdAt: now,
+      updatedAt: now,
+      lastInteractionAt: null,
     };
     mockState.leads.unshift(lead);
     return lead;
@@ -101,19 +98,36 @@ export class LeadsMockRepository implements LeadsRepository {
     const lead = mockState.leads.find((l) => l.id === id);
     if (!lead) throw new Error(`Lead ${id} não encontrado.`);
     Object.assign(lead, input);
-    lead.lastActivityAt = new Date().toISOString();
+    lead.updatedAt = new Date().toISOString();
     return lead;
   }
 
-  async move(id: string, stage: StageKey): Promise<Lead> {
+  async move(id: string, stageId: string): Promise<Lead> {
     await delay(200);
     const lead = mockState.leads.find((l) => l.id === id);
     if (!lead) throw new Error(`Lead ${id} não encontrado.`);
-    lead.stage = stage;
-    lead.stageId = stage;
-    lead.lastActivityAt = new Date().toISOString();
-    if (stage === "ganho" || stage === "perdido") lead.closedAt = new Date().toISOString();
+    const pipeline = mockState.pipelines.find((p) => p.id === lead.pipelineId);
+    if (!pipeline?.stages.some((st) => st.id === stageId)) {
+      throw new Error("A etapa informada não pertence ao pipeline deste lead.");
+    }
+    lead.stageId = stageId;
+    lead.lastInteractionAt = new Date().toISOString();
     return lead;
+  }
+
+  /** A demonstração não grava eventos — mostra só os comentários (dado
+   * de exemplo real da sessão), nunca uma timeline inventada. */
+  async timeline(id: string): Promise<LeadTimelineItem[]> {
+    await delay(150);
+    return (mockState.leadComments[id] ?? []).map((c) => ({
+      id: c.id,
+      type: "comment",
+      createdAt: c.createdAt,
+      actorType: "user",
+      actorName: c.authorName,
+      payload: {},
+      text: c.text,
+    }));
   }
 
   async delete(id: string): Promise<void> {

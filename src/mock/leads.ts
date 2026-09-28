@@ -1,4 +1,7 @@
 import type { Lead } from "../types/lead";
+import type { CalEvent } from "../types/event";
+import type { Task } from "../types/task";
+import { defaultMockPipelineId } from "./pipelines";
 import { daysAgo, daysFromNow } from "../utils/dates";
 
 function timeline(entries: { icon: string; color: string; title: string; desc: string; days: number; who: string }[]) {
@@ -17,7 +20,35 @@ function timeline(entries: { icon: string; color: string; title: string; desc: s
  * estágio real nem número de WhatsApp separado, então esses três campos são
  * preenchidos em bloco logo abaixo em vez de repetidos em cada registro.
  */
-const rawMockLeads: Omit<Lead, "whatsapp" | "phoneNormalized" | "stageId">[] = [
+/** Semente crua da demonstração — ainda carrega campos ilustrativos antigos
+ * (IA, temperatura...) que NÃO fazem parte do `Lead` real e são descartados
+ * no mapeamento abaixo. Tarefas/compromissos viram coleções próprias
+ * (mesma divisão do backend). */
+interface MockLeadSeed {
+  id: string;
+  tenantId: string;
+  name: string;
+  company: string;
+  role: string;
+  phone: string;
+  email: string;
+  city: string;
+  state: string;
+  notes: string;
+  stage: string;
+  ownerId: string | null;
+  value: number;
+  probability: number;
+  origin: string;
+  tags: string[];
+  createdAt: string;
+  lastActivityAt: string;
+  tasks: { id: string; title: string; priority: Task["priority"]; done: boolean; dueAt: string }[];
+  events: { id: string; title: string; type: CalEvent["type"]; at: string; time: string }[];
+  [legacy: string]: unknown;
+}
+
+const rawMockLeads: MockLeadSeed[] = [
   {
     id: "l1", tenantId: "c1", name: "Marina Alves", company: "—", role: "Cliente final",
     phone: "(11) 98812-3344", email: "marina@email.com", city: "São Paulo", state: "SP",
@@ -248,9 +279,57 @@ const rawMockLeads: Omit<Lead, "whatsapp" | "phoneNormalized" | "stageId">[] = [
   },
 ];
 
-export const mockLeads: Lead[] = rawMockLeads.map((lead) => ({
-  ...lead,
-  whatsapp: "",
-  phoneNormalized: "",
-  stageId: lead.stage,
-}));
+export const mockLeads: Lead[] = rawMockLeads.map((seed) => {
+  const pipelineId = defaultMockPipelineId(seed.tenantId);
+  return {
+    id: seed.id,
+    tenantId: seed.tenantId,
+    name: seed.name,
+    company: seed.company === "—" ? "" : seed.company,
+    role: seed.role,
+    phone: seed.phone,
+    whatsapp: "",
+    phoneNormalized: "",
+    email: seed.email,
+    city: seed.city,
+    state: seed.state,
+    notes: seed.notes,
+    pipelineId,
+    stageId: `${pipelineId}-${seed.stage}`,
+    ownerId: seed.ownerId,
+    value: seed.value,
+    probability: seed.probability,
+    origin: seed.origin,
+    tags: seed.tags,
+    createdAt: seed.createdAt,
+    updatedAt: seed.lastActivityAt,
+    lastInteractionAt: seed.lastActivityAt,
+  };
+});
+
+export const mockTaskSeeds: Task[] = rawMockLeads.flatMap((seed) =>
+  seed.tasks.map((t) => ({
+    id: t.id,
+    leadId: seed.id,
+    leadName: seed.name,
+    title: t.title,
+    priority: t.priority,
+    done: t.done,
+    dueAt: t.dueAt,
+    assigneeUserId: seed.ownerId,
+    assigneeName: null,
+    completedAt: null,
+  })),
+);
+
+export const mockEventSeeds: CalEvent[] = rawMockLeads.flatMap((seed) =>
+  seed.events.map((e) => ({
+    id: e.id,
+    leadId: seed.id,
+    leadName: seed.name,
+    title: e.title,
+    type: e.type,
+    at: e.at,
+    time: e.time,
+  })),
+);

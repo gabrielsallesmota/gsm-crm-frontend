@@ -1,7 +1,7 @@
 import type { Lead } from "../types/lead";
 import type { User } from "../types/user";
 import type { ReportCard } from "../types/report";
-import { STAGES, STAGE_ORDER } from "../constants/stages";
+import type { PipelineStage } from "../types/pipeline";
 import { shortCurrency } from "../utils/currency";
 import { computeDashboardMetrics } from "./dashboard";
 
@@ -9,25 +9,27 @@ function maxOf(values: number[]): number {
   return Math.max(1, ...values);
 }
 
-export function computeReportCards(leads: Lead[], users: User[]): ReportCard[] {
-  const { funnel, originLegend } = computeDashboardMetrics(leads);
-  const lost = leads.filter((l) => l.stage === "perdido");
+export function computeReportCards(
+  leads: Lead[],
+  users: User[],
+  stages: PipelineStage[],
+): ReportCard[] {
+  const { funnel, originLegend } = computeDashboardMetrics(leads, stages);
+  const byId = new Map(stages.map((s) => [s.id, s]));
+  const lost = leads.filter((l) => byId.get(l.stageId)?.isLost);
 
   const bySeller = users.map((u) => ({
     label: u.name.split(" ")[0] ?? u.name,
     total: leads.filter((l) => l.ownerId === u.id).length,
-    won: leads.filter((l) => l.ownerId === u.id && l.stage === "ganho").length,
+    won: leads.filter((l) => l.ownerId === u.id && byId.get(l.stageId)?.isWon).length,
   }));
 
-  const lossReasons: Record<string, number> = {};
-  for (const l of lost) {
-    const reason = l.lossReason || "Outro";
-    lossReasons[reason] = (lossReasons[reason] ?? 0) + 1;
-  }
+  // A demonstração não registra motivo de perda — agrupa como "Não informado".
+  const lossReasons: Record<string, number> = lost.length ? { "Não informado": lost.length } : {};
 
-  const revenueByStage = STAGE_ORDER.map((key) => ({
-    key,
-    value: leads.filter((l) => l.stage === key).reduce((sum, l) => sum + l.value, 0),
+  const revenueByStage = stages.map((stage) => ({
+    stage,
+    value: leads.filter((l) => l.stageId === stage.id).reduce((sum, l) => sum + l.value, 0),
   }));
   const maxRevenue = maxOf(revenueByStage.map((x) => x.value));
 
@@ -88,10 +90,10 @@ export function computeReportCards(leads: Lead[], users: User[]): ReportCard[] {
       title: "Receita por etapa",
       subtitle: "Valor em cada fase",
       bars: revenueByStage.map((x) => ({
-        label: STAGES[x.key].label,
+        label: x.stage.label,
         widthPct: Math.round((x.value / maxRevenue) * 100) + "%",
         value: "R$ " + shortCurrency(x.value),
-        color: STAGES[x.key].color,
+        color: x.stage.color,
       })),
     },
   ];

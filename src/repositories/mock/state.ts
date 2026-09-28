@@ -1,4 +1,4 @@
-import { mockLeads } from "../../mock/leads";
+import { mockEventSeeds, mockLeads, mockTaskSeeds } from "../../mock/leads";
 import { mockPipelines } from "../../mock/pipelines";
 import { mockUsers } from "../../mock/users";
 import { mockTenants } from "../../mock/tenants";
@@ -9,6 +9,8 @@ import type { User } from "../../types/user";
 import type { Tenant } from "../../types/tenant";
 import type { Tag } from "../../types/tag";
 import type { LeadComment } from "../../types/lead";
+import type { Task } from "../../types/task";
+import type { CalEvent } from "../../types/event";
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -24,6 +26,8 @@ export const mockState: {
   // divisão do backend: `LeadComment` não é embutido em `Lead`) — indexado
   // por `leadId`, mais recente primeiro.
   leadComments: Record<string, LeadComment[]>;
+  tasks: Task[];
+  events: CalEvent[];
   currentTenantId: string;
 } = {
   leads: clone(mockLeads),
@@ -32,6 +36,8 @@ export const mockState: {
   tenants: clone(mockTenants),
   tags: clone(mockTags),
   leadComments: {},
+  tasks: clone(mockTaskSeeds),
+  events: clone(mockEventSeeds),
   currentTenantId: mockTenants[0]?.id ?? "c1",
 };
 

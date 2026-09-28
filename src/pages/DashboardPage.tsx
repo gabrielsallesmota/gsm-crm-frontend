@@ -16,6 +16,7 @@ const ProspectDashboardSection = lazy(() =>
 import { shortCurrency } from "../utils/currency";
 import { EMPTY_PERIOD, type Period } from "../utils/periods";
 import { useAuth } from "../hooks/useAuth";
+import { usePipelines } from "../hooks/usePipelines";
 import { can } from "../auth/permissions";
 import styles from "./DashboardPage.module.css";
 
@@ -75,6 +76,31 @@ export function DashboardPage() {
   );
 }
 
+/**
+ * Definição de cada KPI (Etapa 1) — fonte: `GET /api/v1/dashboard`
+ * (`GetDashboardMetricsUseCase`). Tudo é calculado sobre os leads do
+ * PIPELINE escolhido (padrão: o pipeline padrão), criados dentro do PERÍODO
+ * filtrado (sem período = todos), com dias no fuso America/Sao_Paulo.
+ * Vendedor vê só os próprios leads. Ganho/perdido = flag da etapa (nunca o
+ * nome). Sem base suficiente → "—" (nunca um 0 inventado). O antigo
+ * "1º atendimento" foi REMOVIDO: o backend não registra primeiro contato e
+ * a tela mostrava sempre "0min".
+ */
+const KPI_DEFINITIONS = {
+  total: "Leads do pipeline criados no período filtrado.",
+  today: "Leads criados hoje (dia de São Paulo), dentro do filtro.",
+  week: "Leads criados nos últimos 7 dias, incluindo hoje.",
+  month: "Leads criados nos últimos 31 dias, incluindo hoje.",
+  closed: "Leads que estão numa etapa marcada como GANHO.",
+  conversion: "Ganhos ÷ total de leads do recorte. Sem leads = indisponível.",
+  forecast: "Soma de valor × probabilidade dos leads em etapas em andamento.",
+  closedRevenue: "Soma do valor dos leads em etapa de ganho.",
+  closeTime:
+    "Média de dias entre a criação e a última mudança de etapa dos leads ganhos. Sem ganhos = indisponível.",
+  open: "Leads em etapas que não são de ganho nem de perda.",
+  lost: "Leads que estão numa etapa marcada como PERDA.",
+} as const;
+
 function LeadsDashboardSection({
   taggedPassivo,
   period,
@@ -82,44 +108,138 @@ function LeadsDashboardSection({
   taggedPassivo: boolean;
   period: Period;
 }) {
-  // Sem branch de `notImplemented` aqui de propósito: `DashboardApiRepository`
-  // já chama `GET /api/v1/dashboard` de verdade (existe desde a Fase 3) e
-  // nunca lança `NotImplementedError` — o branch antigo nunca disparava em
-  // produção, só documentava uma lacuna que já foi fechada.
-  const { data, loading, error } = useDashboard(period);
+  const { user } = useAuth();
+  const ownOnly = !can(user, "leads.viewAll");
+  const { data: pipelines } = usePipelines();
+  const [pipelineId, setPipelineId] = useState("");
+  const { data, loading, error, reload } = useDashboard(period, pipelineId || undefined);
+  const scopeHint = ownOnly ? "seus leads" : "toda a equipe";
 
   return (
     <div>
-      <h1 className={styles.pageTitle}>
-        {taggedPassivo && <Badge {...PASSIVO_BADGE} />} Dashboard
-      </h1>
-      <p className={styles.pageSubtitle}>Visão geral do funil</p>
+      <div className={styles.header}>
+        <div>
+          <h1 className={styles.pageTitle}>
+            {taggedPassivo && <Badge {...PASSIVO_BADGE} />} Dashboard
+          </h1>
+          <p className={styles.pageSubtitle}>
+            Visão geral do funil · {scopeHint} · passe o mouse nos indicadores para ver a definição
+          </p>
+        </div>
+        {pipelines && pipelines.length > 1 && (
+          <select
+            className={styles.pipelineSelect}
+            value={pipelineId}
+            onChange={(e) => setPipelineId(e.target.value)}
+            aria-label="Pipeline"
+          >
+            <option value="">Pipeline padrão</option>
+            {pipelines.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
-      {error && <EmptyState title="Não foi possível carregar o dashboard" message={error.message} />}
+      {error && (
+        <EmptyState
+          title="Não foi possível carregar o dashboard"
+          message={error.message}
+          action={{ label: "Tentar de novo", onClick: reload }}
+        />
+      )}
 
       {loading && !data && <div className={styles.loading}>Carregando…</div>}
 
       {data && (
         <>
           <div className={styles.kpiGrid}>
-            <KpiCard label="Total de leads" value={String(data.totalLeads)} hint="na empresa" icon="leads" highlight />
-            <KpiCard label="Leads hoje" value={String(data.today)} hint="entraram hoje" icon="today" valueColor="var(--tone-blue)" />
-            <KpiCard label="Na semana" value={String(data.week)} hint="últimos 7 dias" icon="week" />
-            <KpiCard label="No mês" value={String(data.month)} hint="últimos 30 dias" icon="month" />
-            <KpiCard label="Clientes fechados" value={String(data.closed)} hint="negócios ganhos" icon="closed" valueColor="var(--tone-green)" />
-            <KpiCard label="Taxa de conversão" value={`${data.conversionRate}%`} hint="ganhos / total" icon="conversion" valueColor="var(--tone-amber)" />
-            <KpiCard label="Receita prevista" value={`R$ ${shortCurrency(Math.round(data.forecastRevenue))}`} hint="ponderada pela prob." icon="forecast" valueColor="var(--tone-purple)" />
-            <KpiCard label="Receita fechada" value={`R$ ${shortCurrency(data.closedRevenue)}`} hint="já ganho" icon="revenue" highlight />
             <KpiCard
-              label="1º atendimento"
-              value={data.avgFirstContactHours < 1 ? `${Math.round(data.avgFirstContactHours * 60)}min` : `${data.avgFirstContactHours.toFixed(1)}h`}
-              hint="tempo médio"
-              icon="firstContact"
+              label="Total de leads"
+              value={String(data.totalLeads)}
+              hint="no recorte"
+              definition={KPI_DEFINITIONS.total}
+              icon="leads"
+              highlight
+            />
+            <KpiCard
+              label="Leads hoje"
+              value={String(data.today)}
+              hint="entraram hoje"
+              definition={KPI_DEFINITIONS.today}
+              icon="today"
               valueColor="var(--tone-blue)"
             />
-            <KpiCard label="Até fechamento" value={data.avgCloseDays != null ? `${data.avgCloseDays.toFixed(0)}d` : "—"} hint="tempo médio" icon="closeTime" />
-            <KpiCard label="Em aberto" value={String(data.open)} hint="em negociação" icon="open" valueColor="var(--tone-amber)" />
-            <KpiCard label="Perdidos" value={String(data.lost)} hint="no período" icon="lost" />
+            <KpiCard
+              label="Na semana"
+              value={String(data.week)}
+              hint="últimos 7 dias"
+              definition={KPI_DEFINITIONS.week}
+              icon="week"
+            />
+            <KpiCard
+              label="No mês"
+              value={String(data.month)}
+              hint="últimos 31 dias"
+              definition={KPI_DEFINITIONS.month}
+              icon="month"
+            />
+            <KpiCard
+              label="Negócios ganhos"
+              value={String(data.closed)}
+              hint="em etapa de ganho"
+              definition={KPI_DEFINITIONS.closed}
+              icon="closed"
+              valueColor="var(--tone-green)"
+            />
+            <KpiCard
+              label="Taxa de conversão"
+              value={data.totalLeads > 0 ? `${data.conversionRate}%` : "—"}
+              hint={data.totalLeads > 0 ? "ganhos / total" : "sem leads no recorte"}
+              definition={KPI_DEFINITIONS.conversion}
+              icon="conversion"
+              valueColor="var(--tone-amber)"
+            />
+            <KpiCard
+              label="Receita prevista"
+              value={`R$ ${shortCurrency(Math.round(data.forecastRevenue))}`}
+              hint="valor × probabilidade"
+              definition={KPI_DEFINITIONS.forecast}
+              icon="forecast"
+              valueColor="var(--tone-purple)"
+            />
+            <KpiCard
+              label="Receita ganha"
+              value={`R$ ${shortCurrency(data.closedRevenue)}`}
+              hint="valor dos ganhos"
+              definition={KPI_DEFINITIONS.closedRevenue}
+              icon="revenue"
+              highlight
+            />
+            <KpiCard
+              label="Até o ganho"
+              value={data.avgCloseDays != null ? `${data.avgCloseDays.toFixed(0)}d` : "—"}
+              hint={data.avgCloseDays != null ? "tempo médio" : "sem ganhos no recorte"}
+              definition={KPI_DEFINITIONS.closeTime}
+              icon="closeTime"
+            />
+            <KpiCard
+              label="Em aberto"
+              value={String(data.open)}
+              hint="em negociação"
+              definition={KPI_DEFINITIONS.open}
+              icon="open"
+              valueColor="var(--tone-amber)"
+            />
+            <KpiCard
+              label="Perdidos"
+              value={String(data.lost)}
+              hint="em etapa de perda"
+              definition={KPI_DEFINITIONS.lost}
+              icon="lost"
+            />
           </div>
 
           <div className={styles.chartsGrid}>

@@ -31,7 +31,6 @@ export interface DashboardMetrics {
   conversionRate: number;
   forecastRevenue: number;
   closedRevenue: number;
-  avgFirstContactHours: number;
   avgCloseDays: number | null;
   open: number;
   lost: number;

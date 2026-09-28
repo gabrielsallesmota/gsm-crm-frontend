@@ -83,3 +83,20 @@
     grid-template-columns: 1fr;
   }
 }
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pipelineSelect {
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 13px;
+}

@@ -50,7 +50,7 @@ export function WhatsappButton({
       await navigator.clipboard.writeText(message);
       toast("Mensagem copiada — as quebras de linha vêm junto");
     } catch {
-      toast("Não foi possível copiar a mensagem");
+      toast("Não foi possível copiar a mensagem", "error");
     }
   }
 

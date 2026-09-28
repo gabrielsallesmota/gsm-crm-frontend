@@ -6,19 +6,21 @@ import type {
   ImportSummary,
   Lead,
   LeadListFilter,
+  LeadTimelineItem,
   LeadMessageTemplate,
   UpdateLeadInput,
   UpdateLeadMessageTemplateInput,
 } from "../types/lead";
 import type { Page } from "../types/common";
-import type { StageKey } from "../types/pipeline";
 
 export interface LeadsRepository {
   list(filter: LeadListFilter): Promise<Page<Lead>>;
   get(id: string): Promise<Lead>;
   create(input: CreateLeadInput): Promise<Lead>;
   update(id: string, input: UpdateLeadInput): Promise<Lead>;
-  move(id: string, stage: StageKey): Promise<Lead>;
+  /** Move para uma etapa REAL (UUID) do pipeline do lead. */
+  move(id: string, stageId: string): Promise<Lead>;
+  timeline(id: string): Promise<LeadTimelineItem[]>;
   delete(id: string): Promise<void>;
 
   bulkImport(

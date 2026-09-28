@@ -27,7 +27,7 @@ export function ManageStagesModal({
   onChanged: () => void;
 }) {
   const { create, update, delete: deleteStage } = useProspectStageActions();
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const [name, setName] = useState("");
   const [color, setColor] = useState<string>(COLOR_PRESETS[0] ?? "#4aa3ff");
   const [creating, setCreating] = useState(false);
@@ -48,7 +48,7 @@ export function ManageStagesModal({
       setName("");
       onChanged();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível criar o estágio");
+      toastError(err, "Não foi possível criar o estágio");
     } finally {
       setCreating(false);
     }
@@ -68,7 +68,7 @@ export function ManageStagesModal({
       await update(stage.id, { [flag]: value });
       onChanged();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível salvar o estágio");
+      toastError(err, "Não foi possível salvar o estágio");
     }
   }
 
@@ -81,7 +81,7 @@ export function ManageStagesModal({
       }
       onChanged();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível salvar a mensagem do estágio");
+      toastError(err, "Não foi possível salvar a mensagem do estágio");
     }
   }
 
@@ -105,7 +105,7 @@ export function ManageStagesModal({
       } else {
         const parsed = Number(raw);
         if (!Number.isFinite(parsed) || parsed < 0) {
-          toast("Informe um número de dias úteis válido (0 ou mais)");
+          toast("Informe um número de dias úteis válido (0 ou mais)", "warning");
           return;
         }
         await update(stage.id, { followupBusinessDays: Math.round(parsed) });
@@ -117,7 +117,7 @@ export function ManageStagesModal({
       });
       onChanged();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível salvar a cadência do estágio");
+      toastError(err, "Não foi possível salvar a cadência do estágio");
     } finally {
       setSavingCadenceId(null);
     }

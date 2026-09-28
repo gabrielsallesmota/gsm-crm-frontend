@@ -2,18 +2,19 @@ import { useMemo, useState } from "react";
 import { Button } from "../common/Button";
 import { useAuth } from "../../hooks/useAuth";
 import { useLeadActions } from "../../hooks/useLeadActions";
-import { useToast } from "../../hooks/useToast";
 import { parseCsv, readFileAsText } from "../../utils/csv";
 import { ORIGIN_KEYS } from "../../constants/origins";
-import { stageKeyToId } from "../../repositories/api/stageMapping";
 import {
   IMPORTABLE_LEAD_FIELDS,
   type DedupeStrategy,
   type ImportRowInput,
   type ImportSummary,
 } from "../../types/lead";
-import type { PipelineStage, StageKey } from "../../types/pipeline";
+import type { PipelineStage } from "../../types/pipeline";
+import { useTeamDirectory } from "../../hooks/useTeamDirectory";
+import { can } from "../../auth/permissions";
 import styles from "../prospects/ProspectImportModal.module.css";
+import { describeError } from "../../utils/apiErrors";
 
 const IGNORE = "__ignore__";
 
@@ -59,21 +60,23 @@ export function LeadImportModal({
 }: {
   pipelineId: string;
   stages: PipelineStage[];
-  defaultStageId: StageKey;
+  defaultStageId: string;
   onClose: () => void;
   onImported: () => void;
 }) {
   const { user } = useAuth();
   const { bulkImport } = useLeadActions();
-  const { toast } = useToast();
   const [fileName, setFileName] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<string[]>([]);
-  // `defaultStageId` aqui é uma `StageKey` colapsada (ver `PipelineStage`),
-  // não o UUID real do estágio — resolvido pra UUID no submit via
-  // `stageKeyToId` (só o backend entende UUID).
-  const [stageKey, setStageKey] = useState(defaultStageId);
+  // UUID REAL da etapa de entrada (Etapa 1: nada de chave "novo/contato").
+  const [stageId, setStageId] = useState(defaultStageId);
+  // Admin/gestor escolhem o dono dos leads importados; vendedor importa
+  // sempre para si (o backend força isso).
+  const canAssign = can(user, "leads.assign");
+  const { data: team } = useTeamDirectory();
+  const [ownerId, setOwnerId] = useState(user?.id ?? "");
   const [dedupeStrategy, setDedupeStrategy] = useState<DedupeStrategy>("skip");
   const [importing, setImporting] = useState(false);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
@@ -108,17 +111,22 @@ export function LeadImportModal({
 
   async function handleSubmit() {
     if (mappedRows.length === 0 || !user) return;
-    const stageId = stageKeyToId(pipelineId, stageKey);
-    if (!stageId) {
-      toast("Estágio do pipeline ainda não carregado — abra a aba Pipeline antes de importar.");
+    if (!stages.some((s) => s.id === stageId)) {
+      setParseError("Escolha a etapa de entrada dos leads.");
       return;
     }
     setImporting(true);
     try {
-      const result = await bulkImport(mappedRows, pipelineId, stageId, user.id, dedupeStrategy);
+      const result = await bulkImport(
+        mappedRows,
+        pipelineId,
+        stageId,
+        canAssign && ownerId ? ownerId : user.id,
+        dedupeStrategy,
+      );
       setSummary(result);
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : "Não foi possível importar.");
+      setParseError(describeError(err, "Não foi possível importar."));
     } finally {
       setImporting(false);
     }
@@ -193,8 +201,8 @@ export function LeadImportModal({
                     <div className={styles.label}>Estágio de entrada (leads novos)</div>
                     <select
                       className={styles.select}
-                      value={stageKey}
-                      onChange={(e) => setStageKey(e.target.value as StageKey)}
+                      value={stageId}
+                      onChange={(e) => setStageId(e.target.value)}
                     >
                       {stages.map((s) => (
                         <option key={s.id} value={s.id}>
@@ -203,6 +211,23 @@ export function LeadImportModal({
                       ))}
                     </select>
                   </div>
+                  {canAssign && (
+                    <div>
+                      <div className={styles.label}>Responsável pelos leads novos</div>
+                      <select
+                        className={styles.select}
+                        value={ownerId}
+                        onChange={(e) => setOwnerId(e.target.value)}
+                      >
+                        {team?.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                        {!team && user && <option value={user.id}>Eu</option>}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <div className={styles.label}>Se o telefone já existir</div>
                     <select

@@ -192,26 +192,8 @@
   margin: 0;
 }
 
-.aiBox {
-  background: rgba(167, 139, 250, 0.08);
-  border: 1px solid rgba(167, 139, 250, 0.2);
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
-}
 
-.aiSummary {
-  font-size: 13px;
-  color: var(--text-dim);
-  margin: 0 0 8px;
-  line-height: 1.6;
-}
 
-.aiNext {
-  font-size: 13px;
-  color: var(--purple);
-  margin: 0;
-}
 
 .taskRow {
   display: flex;
@@ -309,4 +291,39 @@
   font-size: 11px;
   color: var(--faint);
   margin-top: 2px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.taskCheck {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 16px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.taskMeta {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  margin-top: 2px;
+}
+
+.overdue {
+  color: var(--tone-red);
+  font-weight: 600;
+}
+
+.dangerZone {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
 }

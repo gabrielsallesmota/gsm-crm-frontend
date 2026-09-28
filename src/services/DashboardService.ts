@@ -11,8 +11,8 @@ const repo: DashboardRepository = selectRepository(
 );
 
 export class DashboardService {
-  getMetrics(period?: Period): Promise<DashboardMetrics> {
-    return repo.getMetrics(period);
+  getMetrics(period?: Period, pipelineId?: string): Promise<DashboardMetrics> {
+    return repo.getMetrics(period, pipelineId);
   }
 }
 

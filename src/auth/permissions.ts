@@ -16,6 +16,8 @@ import type { AuthUser } from "../types/auth";
  * - users.create      → POST /users           require_tenant_role(ADMIN)
  * - settings.manage   → escrita de pipelines/estágios/tags/templates (ADMIN, GESTOR)
  * - pipeline.reorder  → PATCH /stages/reorder (ADMIN, GESTOR)
+ * - leads.assign      → PATCH /leads/{id} owner_id (ADMIN, GESTOR; vendedor → 403)
+ * - leads.viewAll     → vendedor só enxerga os próprios leads (escopo no backend)
  * - platform.internal → SDR, Prospecção GSM, Clientes GSM, /platform (platform_staff)
  */
 export type Permission =
@@ -23,6 +25,8 @@ export type Permission =
   | "users.create"
   | "settings.manage"
   | "pipeline.reorder"
+  | "leads.assign"
+  | "leads.viewAll"
   | "platform.internal";
 
 export type TenantRole = "admin" | "gestor" | "vendedor";
@@ -30,8 +34,15 @@ export type TenantRole = "admin" | "gestor" | "vendedor";
 const TENANT_ROLES: readonly TenantRole[] = ["admin", "gestor", "vendedor"];
 
 const ROLE_PERMISSIONS: Record<TenantRole, readonly Permission[]> = {
-  admin: ["users.view", "users.create", "settings.manage", "pipeline.reorder"],
-  gestor: ["users.view", "settings.manage", "pipeline.reorder"],
+  admin: [
+    "users.view",
+    "users.create",
+    "settings.manage",
+    "pipeline.reorder",
+    "leads.assign",
+    "leads.viewAll",
+  ],
+  gestor: ["users.view", "settings.manage", "pipeline.reorder", "leads.assign", "leads.viewAll"],
   vendedor: [],
 };
 

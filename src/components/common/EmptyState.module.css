@@ -27,3 +27,14 @@
   margin: 0 auto;
   line-height: 1.6;
 }
+
+.action {
+  margin-top: 14px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}

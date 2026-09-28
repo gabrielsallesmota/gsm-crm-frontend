@@ -21,7 +21,7 @@ const STATUS_COLOR: Record<SdrCandidateStatus, { color: string; bg: string }> = 
 
 export function SdrCandidatesPage() {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const [status, setStatus] = useState<SdrCandidateStatus | "">("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -51,7 +51,7 @@ export function SdrCandidatesPage() {
   async function runBulk(action: "review" | "approve" | "discard") {
     if (selected.size === 0) return;
     if (action === "discard" && !bulkReason) {
-      toast("Escolha um motivo de descarte pra ação em lote");
+      toast("Escolha um motivo de descarte pra ação em lote", "warning");
       return;
     }
     setBulkRunning(true);
@@ -65,7 +65,7 @@ export function SdrCandidatesPage() {
       setSelected(new Set());
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível executar a ação em lote");
+      toastError(err, "Não foi possível executar a ação em lote");
     } finally {
       setBulkRunning(false);
     }

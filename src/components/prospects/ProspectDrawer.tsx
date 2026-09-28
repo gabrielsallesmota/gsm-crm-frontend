@@ -57,7 +57,7 @@ export function ProspectDrawer({
   onSaved?: (prospect: Prospect) => void;
   onDeleted?: () => void;
 }) {
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const { update, move, confirmFirstContact, delete: deleteProspect } = useProspectActions();
   const { data: comments, notImplemented: commentsNotImplemented, reload: reloadComments } =
     useProspectComments(prospect.id);
@@ -80,7 +80,7 @@ export function ProspectDrawer({
       setNewComment("");
       reloadComments();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível adicionar o comentário");
+      toastError(err, "Não foi possível adicionar o comentário");
     } finally {
       setPostingComment(false);
     }
@@ -111,7 +111,7 @@ export function ProspectDrawer({
       const updated = await update(prospect.id, { noWhatsapp: !prospect.noWhatsapp });
       onSaved?.(updated);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível atualizar");
+      toastError(err, "Não foi possível atualizar");
     } finally {
       setTogglingNoWhatsapp(false);
     }
@@ -176,7 +176,7 @@ export function ProspectDrawer({
       if (err instanceof ApiError && err.status === 409) {
         setDuplicateBlock({ companyName: form.companyName });
       } else {
-        toast(err instanceof Error ? err.message : "Não foi possível salvar as alterações");
+        toastError(err, "Não foi possível salvar as alterações");
       }
     } finally {
       setSaving(false);
@@ -190,7 +190,7 @@ export function ProspectDrawer({
       toast("Primeiro contato confirmado");
       onSaved?.(updated);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível confirmar o primeiro contato");
+      toastError(err, "Não foi possível confirmar o primeiro contato");
     } finally {
       setConfirmingFirstContact(false);
     }
@@ -201,7 +201,7 @@ export function ProspectDrawer({
       const updated = await move(prospect.id, stageId);
       onSaved?.(updated);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível mover o estágio");
+      toastError(err, "Não foi possível mover o estágio");
     }
   }
 
@@ -222,7 +222,7 @@ export function ProspectDrawer({
       toast("Prospect excluído");
       onDeleted?.();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível excluir");
+      toastError(err, "Não foi possível excluir");
       setDeleting(false);
     }
   }

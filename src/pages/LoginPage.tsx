@@ -6,6 +6,7 @@ import { isDemoMode } from "../services/factory";
 import { ROUTES } from "../constants/routes";
 import { Button } from "../components/common/Button";
 import styles from "./LoginPage.module.css";
+import { describeError } from "../utils/apiErrors";
 
 export function LoginPage() {
   const { login, pendingTenantSelection, selectTenant } = useAuth();
@@ -24,7 +25,7 @@ export function LoginPage() {
       // `pendingTenantSelection` preenchido e o formulário abaixo assume.
       navigate(ROUTES.dashboard);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível entrar.");
+      setError(describeError(err, "Não foi possível entrar."));
     } finally {
       setLoading(false);
     }
@@ -43,7 +44,7 @@ export function LoginPage() {
       // para garantir que nenhum dado do passo anterior fique em memória).
       await selectTenant(tenantId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível selecionar o tenant.");
+      setError(describeError(err, "Não foi possível selecionar o tenant."));
     } finally {
       setLoading(false);
     }

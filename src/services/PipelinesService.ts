@@ -2,60 +2,10 @@ import type { PipelinesRepository } from "../repositories/PipelinesRepository";
 import { PipelinesApiRepository } from "../repositories/api/PipelinesApiRepository";
 import { PipelinesMockRepository } from "../repositories/mock/PipelinesMockRepository";
 import { selectRepository } from "./factory";
-import type { Pipeline, PipelineStage, StageKey } from "../types/pipeline";
 
-const repo: PipelinesRepository = selectRepository(
+/** Repasse direto ao repositório do modo atual (API real ou demonstração)
+ * — a interface `PipelinesRepository` é o contrato. */
+export const pipelinesService: PipelinesRepository = selectRepository(
   () => new PipelinesMockRepository(),
   () => new PipelinesApiRepository(),
 );
-
-export class PipelinesService {
-  list(): Promise<Pipeline[]> {
-    return repo.list();
-  }
-
-  get(id: string): Promise<Pipeline> {
-    return repo.get(id);
-  }
-
-  create(input: Pick<Pipeline, "name" | "color">): Promise<Pipeline> {
-    return repo.create(input);
-  }
-
-  update(id: string, input: Partial<Pick<Pipeline, "name" | "color" | "active">>): Promise<Pipeline> {
-    return repo.update(id, input);
-  }
-
-  delete(id: string): Promise<void> {
-    return repo.delete(id);
-  }
-
-  reorder(orderedIds: string[]): Promise<void> {
-    return repo.reorder(orderedIds);
-  }
-
-  setDefault(id: string): Promise<Pipeline> {
-    return repo.setDefault(id);
-  }
-
-  createStage(
-    pipelineId: string,
-    input: Pick<PipelineStage, "label" | "color"> & { isWon?: boolean; isLost?: boolean },
-  ): Promise<PipelineStage> {
-    return repo.createStage(pipelineId, input);
-  }
-
-  updateStage(
-    pipelineId: string,
-    stageKey: StageKey,
-    input: Partial<Pick<PipelineStage, "label" | "color" | "isWon" | "isLost">>,
-  ): Promise<PipelineStage> {
-    return repo.updateStage(pipelineId, stageKey, input);
-  }
-
-  reorderStages(pipelineId: string, orderedIds: string[]): Promise<void> {
-    return repo.reorderStages(pipelineId, orderedIds);
-  }
-}
-
-export const pipelinesService = new PipelinesService();

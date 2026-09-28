@@ -15,7 +15,9 @@ import { useAuth } from "../hooks/useAuth";
 import { can } from "../auth/permissions";
 import { ORIGIN } from "../constants/origins";
 import { hexToRgba, readableTextColor } from "../utils/colors";
-import type { Pipeline, PipelineStage, StageKey } from "../types/pipeline";
+import type { Pipeline, PipelineStage } from "../types/pipeline";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
+import { reorderIds } from "../utils/pipelineBoard";
 import type { ProspectStage } from "../types/prospect";
 import styles from "./SettingsPage.module.css";
 
@@ -33,7 +35,16 @@ const DEFAULT_STAGES: { label: string; color: string; isWon?: boolean; isLost?: 
 
 export function SettingsPage() {
   const { data: pipelines, loading, error, reload } = usePipelines();
-  const { create, update, setDefault, createStage, updateStage } = usePipelineActions();
+  const {
+    create,
+    update,
+    delete: deletePipeline,
+    setDefault,
+    createStage,
+    updateStage,
+    deleteStage,
+    reorderStages,
+  } = usePipelineActions();
   const { data: tags, error: tagsError, reload: reloadTags } = useTags();
   const { create: createTag, delete: deleteTag } = useTagActions();
   const {
@@ -49,13 +60,16 @@ export function SettingsPage() {
   // Ver DashboardPage.tsx — `isPlatformStaff` vem de `GET /auth/me`.
   const { user } = useAuth();
   const isSuperAdmin = can(user, "platform.internal");
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const [newName, setNewName] = useState("");
   const [newTagLabel, setNewTagLabel] = useState("");
   const [newTagColor, setNewTagColor] = useState("#4aa3ff");
-  const [editingStage, setEditingStage] = useState<{ pipelineId: string; stageKey: StageKey } | null>(
-    null,
-  );
+  // Etapa em edição — identidade é SEMPRE o UUID real (Etapa 1).
+  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [newStageFor, setNewStageFor] = useState<string | null>(null);
+  const [newStageForm, setNewStageForm] = useState({ label: "", color: "#4aa3ff" });
+  const [confirmDeleteStage, setConfirmDeleteStage] = useState<PipelineStage | null>(null);
+  const [confirmDeletePipeline, setConfirmDeletePipeline] = useState<Pipeline | null>(null);
   const [stageForm, setStageForm] = useState({ label: "", color: "#4aa3ff", isWon: false, isLost: false });
   const [editingPipeline, setEditingPipeline] = useState<string | null>(null);
   const [pipelineForm, setPipelineForm] = useState({ name: "", color: "#4aa3ff" });
@@ -83,7 +97,7 @@ export function SettingsPage() {
       toast("Pipeline criado");
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível criar o pipeline");
+      toastError(err, "Não foi possível criar o pipeline");
     }
   }
 
@@ -93,7 +107,7 @@ export function SettingsPage() {
       toast("Pipeline padrão atualizado");
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível definir o pipeline padrão");
+      toastError(err, "Não foi possível definir o pipeline padrão");
     }
   }
 
@@ -110,7 +124,7 @@ export function SettingsPage() {
       toast("Pipeline atualizado");
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível atualizar o pipeline");
+      toastError(err, "Não foi possível atualizar o pipeline");
     }
   }
 
@@ -128,7 +142,7 @@ export function SettingsPage() {
       toast("Estágio de prospecção criado");
       reloadProspectStages();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível criar o estágio de prospecção");
+      toastError(err, "Não foi possível criar o estágio de prospecção");
     }
   }
 
@@ -151,7 +165,7 @@ export function SettingsPage() {
       toast("Estágio de prospecção atualizado");
       reloadProspectStages();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível atualizar o estágio de prospecção");
+      toastError(err, "Não foi possível atualizar o estágio de prospecção");
     }
   }
 
@@ -161,7 +175,7 @@ export function SettingsPage() {
       toast("Estágio de prospecção removido");
       reloadProspectStages();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível remover o estágio de prospecção");
+      toastError(err, "Não foi possível remover o estágio de prospecção");
     }
   }
 
@@ -176,24 +190,77 @@ export function SettingsPage() {
       toast("Estágios padrão criados");
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível criar os estágios padrão");
+      toastError(err, "Não foi possível criar os estágios padrão");
     }
   }
 
-  function startEditStage(pipelineId: string, stage: PipelineStage) {
-    setEditingStage({ pipelineId, stageKey: stage.id });
+  function startEditStage(stage: PipelineStage) {
+    setEditingStageId(stage.id);
     setStageForm({ label: stage.label, color: stage.color, isWon: stage.isWon, isLost: stage.isLost });
   }
 
   async function handleSaveStage() {
-    if (!editingStage) return;
+    if (!editingStageId) return;
     try {
-      await updateStage(editingStage.pipelineId, editingStage.stageKey, stageForm);
-      setEditingStage(null);
-      toast("Estágio atualizado");
+      await updateStage(editingStageId, { ...stageForm, label: stageForm.label.trim() });
+      setEditingStageId(null);
+      toast("Etapa atualizada");
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível atualizar o estágio");
+      toastError(err, "Não foi possível atualizar a etapa");
+    }
+  }
+
+  async function handleCreateStage(pipelineId: string) {
+    if (!newStageForm.label.trim()) return;
+    try {
+      await createStage(pipelineId, { label: newStageForm.label.trim(), color: newStageForm.color });
+      setNewStageForm({ label: "", color: "#4aa3ff" });
+      setNewStageFor(null);
+      toast("Etapa criada");
+      reload();
+    } catch (err) {
+      toastError(err, "Não foi possível criar a etapa");
+    }
+  }
+
+  async function handleDeleteStage(stage: PipelineStage): Promise<boolean> {
+    try {
+      await deleteStage(stage.id);
+      setEditingStageId(null);
+      toast("Etapa excluída");
+      reload();
+      return true;
+    } catch (err) {
+      // 409 = ainda há leads nesta etapa (mensagem do backend).
+      toastError(err, "Não foi possível excluir a etapa");
+      return false;
+    }
+  }
+
+  async function handleMoveStage(pipeline: Pipeline, stage: PipelineStage, direction: -1 | 1) {
+    const ids = pipeline.stages.map((st) => st.id);
+    const neighbor = ids[ids.indexOf(stage.id) + direction];
+    if (!neighbor) return;
+    const next = reorderIds(ids, stage.id, neighbor);
+    if (!next) return;
+    try {
+      await reorderStages(pipeline.id, next);
+      reload();
+    } catch (err) {
+      toastError(err, "Não foi possível reordenar as etapas");
+    }
+  }
+
+  async function handleDeletePipeline(pipeline: Pipeline): Promise<boolean> {
+    try {
+      await deletePipeline(pipeline.id);
+      toast("Pipeline excluído");
+      reload();
+      return true;
+    } catch (err) {
+      toastError(err, "Não foi possível excluir o pipeline");
+      return false;
     }
   }
 
@@ -205,7 +272,7 @@ export function SettingsPage() {
       toast("Tag criada");
       reloadTags();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível criar a tag");
+      toastError(err, "Não foi possível criar a tag");
     }
   }
 
@@ -215,14 +282,14 @@ export function SettingsPage() {
       toast("Tag removida");
       reloadTags();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível remover a tag");
+      toastError(err, "Não foi possível remover a tag");
     }
   }
 
   return (
     <div>
       <h1 className={styles.pageTitle}>Configurações</h1>
-      <p className={styles.pageSubtitle}>Pipelines, estágios, tags e origens</p>
+      <p className={styles.pageSubtitle}>Pipelines, etapas, tags e origens</p>
 
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
@@ -285,19 +352,30 @@ export function SettingsPage() {
                   {pipeline.isDefault ? (
                     <Badge label="Padrão" color="#2ee66e" bg="rgba(46,230,110,.14)" />
                   ) : (
-                    <button
-                      type="button"
-                      className={styles.setDefaultBtn}
-                      onClick={() => void handleSetDefault(pipeline.id)}
-                    >
-                      Tornar padrão
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className={styles.setDefaultBtn}
+                        onClick={() => void handleSetDefault(pipeline.id)}
+                      >
+                        Tornar padrão
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.editIconBtn}
+                        onClick={() => setConfirmDeletePipeline(pipeline)}
+                        aria-label={`Excluir pipeline ${pipeline.name}`}
+                        title="Excluir pipeline"
+                      >
+                        ✕
+                      </button>
+                    </>
                   )}
                 </div>
               )}
               <div className={styles.stages}>
-                {pipeline.stages.map((stage) =>
-                  editingStage?.pipelineId === pipeline.id && editingStage.stageKey === stage.id ? (
+                {pipeline.stages.map((stage, index) =>
+                  editingStageId === stage.id ? (
                     <div key={stage.id} className={styles.stageEditForm}>
                       <input
                         className={styles.input}
@@ -315,7 +393,14 @@ export function SettingsPage() {
                         <input
                           type="checkbox"
                           checked={stageForm.isWon}
-                          onChange={(e) => setStageForm((f) => ({ ...f, isWon: e.target.checked }))}
+                          // Ganho e perda são exclusivos (o backend recusa os dois).
+                          onChange={(e) =>
+                            setStageForm((f) => ({
+                              ...f,
+                              isWon: e.target.checked,
+                              isLost: e.target.checked ? false : f.isLost,
+                            }))
+                          }
                         />
                         Ganho
                       </label>
@@ -323,7 +408,13 @@ export function SettingsPage() {
                         <input
                           type="checkbox"
                           checked={stageForm.isLost}
-                          onChange={(e) => setStageForm((f) => ({ ...f, isLost: e.target.checked }))}
+                          onChange={(e) =>
+                            setStageForm((f) => ({
+                              ...f,
+                              isLost: e.target.checked,
+                              isWon: e.target.checked ? false : f.isWon,
+                            }))
+                          }
                         />
                         Perdido
                       </label>
@@ -334,7 +425,26 @@ export function SettingsPage() {
                       >
                         Salvar
                       </Button>
-                      <Button onClick={() => setEditingStage(null)}>Cancelar</Button>
+                      <Button onClick={() => setEditingStageId(null)}>Cancelar</Button>
+                      <Button
+                        onClick={() => void handleMoveStage(pipeline, stage, -1)}
+                        disabled={index === 0}
+                        aria-label="Mover etapa para a esquerda"
+                        title="Mover para antes"
+                      >
+                        ←
+                      </Button>
+                      <Button
+                        onClick={() => void handleMoveStage(pipeline, stage, 1)}
+                        disabled={index === pipeline.stages.length - 1}
+                        aria-label="Mover etapa para a direita"
+                        title="Mover para depois"
+                      >
+                        →
+                      </Button>
+                      <Button variant="danger" onClick={() => setConfirmDeleteStage(stage)}>
+                        Excluir
+                      </Button>
                     </div>
                   ) : (
                     <button
@@ -342,12 +452,47 @@ export function SettingsPage() {
                       key={stage.id}
                       className={styles.stageChip}
                       style={{ color: readableTextColor(stage.color) }}
-                      onClick={() => startEditStage(pipeline.id, stage)}
-                      title="Clique para editar"
+                      onClick={() => startEditStage(stage)}
+                      title="Clique para editar, reordenar ou excluir"
                     >
                       {stage.label}
+                      {stage.isWon ? " 🏆" : stage.isLost ? " ✕" : ""}
                     </button>
                   ),
+                )}
+                {newStageFor === pipeline.id ? (
+                  <div className={styles.stageEditForm}>
+                    <input
+                      className={styles.input}
+                      placeholder="Nome da etapa…"
+                      value={newStageForm.label}
+                      onChange={(e) => setNewStageForm((f) => ({ ...f, label: e.target.value }))}
+                      autoFocus
+                    />
+                    <input
+                      className={styles.colorInput}
+                      type="color"
+                      value={newStageForm.color}
+                      onChange={(e) => setNewStageForm((f) => ({ ...f, color: e.target.value }))}
+                      aria-label="Cor da etapa"
+                    />
+                    <Button
+                      variant="primary"
+                      onClick={() => void handleCreateStage(pipeline.id)}
+                      disabled={!newStageForm.label.trim()}
+                    >
+                      Adicionar
+                    </Button>
+                    <Button onClick={() => setNewStageFor(null)}>Cancelar</Button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.stageChip}
+                    onClick={() => setNewStageFor(pipeline.id)}
+                  >
+                    + Etapa
+                  </button>
                 )}
               </div>
               {pipeline.stages.length === 0 && (
@@ -364,6 +509,23 @@ export function SettingsPage() {
           ))}
         </div>
       </section>
+
+      {confirmDeleteStage && (
+        <ConfirmDialog
+          title="Excluir etapa?"
+          message={`A etapa "${confirmDeleteStage.label}" será excluída. Só é possível excluir uma etapa sem leads — mova os leads antes.`}
+          onConfirm={() => handleDeleteStage(confirmDeleteStage)}
+          onClose={() => setConfirmDeleteStage(null)}
+        />
+      )}
+      {confirmDeletePipeline && (
+        <ConfirmDialog
+          title="Excluir pipeline?"
+          message={`"${confirmDeletePipeline.name}" e as etapas dele serão excluídos. Só é possível excluir um pipeline sem leads.`}
+          onConfirm={() => handleDeletePipeline(confirmDeletePipeline)}
+          onClose={() => setConfirmDeletePipeline(null)}
+        />
+      )}
 
       <section className={styles.section}>
         <div className={styles.sectionHeader}>

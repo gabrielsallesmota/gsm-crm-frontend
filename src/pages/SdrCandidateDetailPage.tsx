@@ -99,7 +99,7 @@ function fmtDateTime(iso: string): string {
 export function SdrCandidateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const { data: candidate, loading, error, reload } = useSdrCandidate(id ?? "");
   const { data: decisions, reload: reloadDecisions } = useSdrCandidateDecisions(id ?? "");
   const { data: appearances } = useSdrCandidateAppearances(id ?? "");
@@ -157,7 +157,7 @@ export function SdrCandidateDetailPage() {
       reload();
       reloadAudits();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível salvar o site");
+      toastError(err, "Não foi possível salvar o site");
     } finally {
       setWebsiteBusy(false);
     }
@@ -172,7 +172,7 @@ export function SdrCandidateDetailPage() {
       reload();
       reloadAudits();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível atualizar a auditoria");
+      toastError(err, "Não foi possível atualizar a auditoria");
     } finally {
       setAuditRefreshBusy(false);
     }
@@ -191,7 +191,7 @@ export function SdrCandidateDetailPage() {
       );
       refreshEnrichment();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível salvar o CNPJ");
+      toastError(err, "Não foi possível salvar o CNPJ");
     } finally {
       setCnpjBusy(false);
     }
@@ -205,7 +205,7 @@ export function SdrCandidateDetailPage() {
       toast("Atualização enfileirada");
       refreshEnrichment();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível atualizar");
+      toastError(err, "Não foi possível atualizar");
     } finally {
       setRefreshBusy(false);
     }
@@ -219,7 +219,7 @@ export function SdrCandidateDetailPage() {
       toast("Score GSM calculado");
       reloadScores();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível calcular o score");
+      toastError(err, "Não foi possível calcular o score");
     } finally {
       setScoreBusy(false);
     }
@@ -234,7 +234,7 @@ export function SdrCandidateDetailPage() {
       setEditedMessage(null);
       reloadOutreach();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível gerar a análise comercial");
+      toastError(err, "Não foi possível gerar a análise comercial");
     } finally {
       setOutreachBusy(false);
     }
@@ -253,7 +253,7 @@ export function SdrCandidateDetailPage() {
       toast("Duplicidade confirmada");
       reloadDuplicateSuggestions();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível confirmar");
+      toastError(err, "Não foi possível confirmar");
     } finally {
       setSuggestionBusyId(null);
     }
@@ -267,7 +267,7 @@ export function SdrCandidateDetailPage() {
       toast("Sugestão descartada");
       reloadDuplicateSuggestions();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível descartar");
+      toastError(err, "Não foi possível descartar");
     } finally {
       setSuggestionBusyId(null);
     }
@@ -282,7 +282,7 @@ export function SdrCandidateDetailPage() {
       toast("Candidate marcado em revisão");
       refreshAll();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível revisar");
+      toastError(err, "Não foi possível revisar");
     } finally {
       setBusy(false);
     }
@@ -298,7 +298,7 @@ export function SdrCandidateDetailPage() {
       toast('Candidate aprovado — Prospect criado em "A prospectar"');
       refreshAll();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível aprovar");
+      toastError(err, "Não foi possível aprovar");
     } finally {
       setBusy(false);
     }
@@ -314,7 +314,7 @@ export function SdrCandidateDetailPage() {
       toast("Candidate descartado");
       refreshAll();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível descartar");
+      toastError(err, "Não foi possível descartar");
     } finally {
       setBusy(false);
     }
@@ -329,7 +329,7 @@ export function SdrCandidateDetailPage() {
       toast("Candidate liberado pra reavaliação");
       refreshAll();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível reavaliar");
+      toastError(err, "Não foi possível reavaliar");
     } finally {
       setBusy(false);
     }

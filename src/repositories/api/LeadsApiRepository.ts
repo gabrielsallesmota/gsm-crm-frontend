@@ -8,13 +8,12 @@ import type {
   Lead,
   LeadListFilter,
   LeadMessageTemplate,
+  LeadTimelineItem,
   UpdateLeadInput,
   UpdateLeadMessageTemplateInput,
 } from "../../types/lead";
 import type { Page } from "../../types/common";
-import type { StageKey } from "../../types/pipeline";
 import { apiRequest, apiRequestText } from "./ApiClient";
-import { stageIdToKey, stageKeyToId } from "./stageMapping";
 
 interface StageDto {
   id: string;
@@ -47,6 +46,7 @@ interface LeadDto {
   probability: number | null;
   origin: string;
   created_at: string;
+  updated_at: string;
   last_interaction_at: string | null;
   tags: string[];
   last_comment: { text: string; created_at: string } | null;
@@ -87,60 +87,43 @@ function importRowBody(row: ImportRowInput) {
   };
 }
 
-function temperatureFromProbability(p: number): Lead["temperature"] {
-  if (p >= 70) return "quente";
-  if (p >= 40) return "morno";
-  return "frio";
+interface TimelineItemDto {
+  id: string;
+  type: string;
+  created_at: string;
+  actor_type: string;
+  actor_name: string | null;
+  payload: Record<string, unknown>;
+  text: string | null;
 }
 
-/**
- * O backend ainda não guarda os campos "ricos" do CRM (timeline de
- * atividades, insights de IA, sentimento, objeções, campos customizados) —
- * `tags` já é real (módulo `tags`); `tasks`/`events` também já existem no
- * backend, mas como telas GLOBAIS próprias (`/tasks`, `/calendar`), não
- * embutidas na resposta do lead — por isso continuam `[]` aqui. Essas
- * seções aparecem vazias em produção até o backend ganhar esse
- * histórico; a tela é a mesma, só o conteúdo disponível é menor.
- */
 function toLead(dto: LeadDto): Lead {
-  const probability = dto.probability ?? 0;
   return {
     id: dto.id,
     tenantId: dto.tenant_id,
     name: dto.name,
-    company: dto.company ?? "—",
+    company: dto.company ?? "",
     role: dto.position ?? "",
     phone: dto.phone ?? "",
     whatsapp: dto.whatsapp ?? "",
     phoneNormalized: dto.phone_normalized ?? "",
-    stageId: dto.stage_id,
     email: dto.email ?? "",
     city: dto.city ?? "",
     state: dto.state ?? "",
     notes: dto.notes ?? "",
-    stage: stageIdToKey(dto.pipeline_id, dto.stage_id),
+    pipelineId: dto.pipeline_id,
+    stageId: dto.stage_id,
     ownerId: dto.owner_id,
     value: dto.expected_value ?? 0,
-    probability,
+    probability: dto.probability ?? 0,
     origin: dto.origin,
     tags: dto.tags,
     lastComment: dto.last_comment
       ? { text: dto.last_comment.text, createdAt: dto.last_comment.created_at }
       : null,
     createdAt: dto.created_at,
-    firstContactHours: 0,
-    lastActivityAt: dto.last_interaction_at ?? dto.created_at,
-    temperature: temperatureFromProbability(probability),
-    sentiment: "—",
-    aiProbability: `${probability}%`,
-    aiSummary: "",
-    aiNext: "",
-    objections: [],
-    custom: {},
-    timeline: [],
-    tasks: [],
-    events: [],
-    files: [],
+    updatedAt: dto.updated_at,
+    lastInteractionAt: dto.last_interaction_at,
   };
 }
 
@@ -148,11 +131,10 @@ export class LeadsApiRepository implements LeadsRepository {
   async list(filter: LeadListFilter): Promise<Page<Lead>> {
     const params = new URLSearchParams();
     if (filter.pipelineId) params.set("pipeline_id", filter.pipelineId);
-    if (filter.pipelineId && filter.stageId) {
-      const stageId = stageKeyToId(filter.pipelineId, filter.stageId as StageKey);
-      if (stageId) params.set("stage_id", stageId);
-    }
+    if (filter.stageId) params.set("stage_id", filter.stageId);
     if (filter.ownerId) params.set("owner_id", filter.ownerId);
+    else if (filter.unassigned) params.set("unassigned", "true");
+    if (filter.tagId) params.set("tag_id", filter.tagId);
     if (filter.origin) params.set("origin", filter.origin);
     if (filter.search) params.set("search", filter.search);
     if (filter.dateFrom) params.set("date_from", filter.dateFrom);
@@ -177,23 +159,17 @@ export class LeadsApiRepository implements LeadsRepository {
     if (!pipelineId) {
       throw new Error("Selecione um pipeline para criar o lead.");
     }
-    let stageId = input.stage ? stageKeyToId(pipelineId, input.stage) : undefined;
+    let stageId = input.stageId;
     if (!stageId) {
-      // Sem chave explícita (form rápido de "novo lead", que não escolhe
-      // estágio) — antes dependia só do cache local em `stageMapping`
-      // (populado por um `usePipelines()` anterior), e falhava com "abra a
-      // tela de Pipeline" sempre que o pipeline não tinha estágio mapeado
-      // pra chave fixa "novo" (ex.: pipeline customizado sem um estágio
-      // "Novo"/intake, só com Ganho/Perdido). Resolve direto da API, mesmo
-      // critério do intake público do backend (`PublicCreateLeadUseCase`):
-      // primeiro estágio por `order` que não é ganho nem perdido.
-      const stages = await apiRequest<StageDto[]>(`/api/v1/pipelines/${pipelineId}/stages`);
-      const intake = [...stages]
-        .filter((s) => !s.is_won && !s.is_lost)
-        .sort((a, b) => a.order - b.order)[0];
+      // Form rápido não escolhe etapa: usa a primeira etapa EM ANDAMENTO do
+      // pipeline (mesmo critério do intake público do backend).
+      const pipeline = await apiRequest<{ stages: StageDto[] }>(`/api/v1/pipelines/${pipelineId}`);
+      const intake = [...pipeline.stages]
+        .filter((st) => !st.is_won && !st.is_lost)
+        .sort((x, y) => x.order - y.order)[0];
       if (!intake) {
         throw new Error(
-          "Esse pipeline não tem nenhum estágio inicial configurado (todos são Ganho/Perdido) — crie um estágio em Configurações antes de cadastrar um lead.",
+          "Esse pipeline não tem nenhuma etapa em andamento — crie uma etapa em Configurações antes de cadastrar um lead.",
         );
       }
       stageId = intake.id;
@@ -227,6 +203,8 @@ export class LeadsApiRepository implements LeadsRepository {
         notes: input.notes,
         expected_value: input.value,
         probability: input.probability,
+        origin: input.origin,
+        owner_id: input.ownerId,
         // `undefined` (campo omitido) faz o backend não mexer nas tags —
         // só envia `tag_ids` quando `input.tags` de fato veio preenchido.
         tag_ids: input.tags,
@@ -235,17 +213,25 @@ export class LeadsApiRepository implements LeadsRepository {
     return toLead(dto);
   }
 
-  async move(id: string, stage: StageKey): Promise<Lead> {
-    const current = await apiRequest<LeadDto>(`/api/v1/leads/${id}`);
-    const stageId = stageKeyToId(current.pipeline_id, stage);
-    if (!stageId) {
-      throw new Error("Estágio do pipeline ainda não carregado — abra a tela de Pipeline antes de mover o lead.");
-    }
+  async move(id: string, stageId: string): Promise<Lead> {
     const moved = await apiRequest<LeadDto>(`/api/v1/leads/${id}/move`, {
       method: "PATCH",
       body: JSON.stringify({ stage_id: stageId }),
     });
     return toLead(moved);
+  }
+
+  async timeline(id: string): Promise<LeadTimelineItem[]> {
+    const items = await apiRequest<TimelineItemDto[]>(`/api/v1/leads/${id}/timeline`);
+    return items.map((i) => ({
+      id: i.id,
+      type: i.type,
+      createdAt: i.created_at,
+      actorType: i.actor_type,
+      actorName: i.actor_name,
+      payload: i.payload,
+      text: i.text,
+    }));
   }
 
   async delete(id: string): Promise<void> {

@@ -13,7 +13,7 @@ import styles from "./SdrPages.module.css";
 export function SdrIcpPresetsPage() {
   const { data: presets, loading, error, notImplemented, reload } = useSdrIcpPresets();
   const { create, delete: deletePreset } = useSdrIcpPresetActions();
-  const { toast } = useToast();
+  const { toastError } = useToast();
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -23,7 +23,7 @@ export function SdrIcpPresetsPage() {
       await deletePreset(preset.id);
       reload();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível excluir esse preset");
+      toastError(err, "Não foi possível excluir esse preset");
     } finally {
       setDeletingId(null);
     }
@@ -151,7 +151,7 @@ function CreatePresetModal({
         err instanceof ApiError && err.status === 409
           ? err.message
           : "Não foi possível criar o preset";
-      toast(message);
+      toast(message, "error");
     } finally {
       setSubmitting(false);
     }

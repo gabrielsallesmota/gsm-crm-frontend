@@ -28,7 +28,7 @@ function fmtDateTime(iso: string | null): string {
 export function SdrCampaignRunPage() {
   const { id: campaignId, runId } = useParams<{ id: string; runId: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { toast, toastError } = useToast();
   const { run, loading, error, pause, resume, cancel, reprocessFailed } =
     useSdrCampaignRun(runId ?? null);
   const { data: deadJobs } = useSdrRunJobs(runId ?? null, "dead", run?.failureCount ?? 0);
@@ -40,7 +40,7 @@ export function SdrCampaignRunPage() {
       await action();
       toast(successMessage);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível completar a ação");
+      toastError(err, "Não foi possível completar a ação");
     } finally {
       setBusy(false);
     }
@@ -52,7 +52,7 @@ export function SdrCampaignRunPage() {
       const count = await reprocessFailed();
       toast(`${count} falha(s) reenfileirada(s)`);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível reprocessar as falhas");
+      toastError(err, "Não foi possível reprocessar as falhas");
     } finally {
       setBusy(false);
     }

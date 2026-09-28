@@ -57,10 +57,8 @@ function toOriginLegend(items: OriginBreakdownDto[]): DashboardMetrics["originLe
 }
 
 function toFunnel(stages: FunnelStageDto[], totalLeads: number): DashboardMetrics["funnel"] {
-  // Diferente de `stageMapping.ts` (usado por Leads/Pipeline, que colapsa
-  // os estágios reais em 5 chaves fixas do protótipo), o dashboard mostra
-  // CADA estágio real do pipeline — o backend já entrega `label`/`color`
-  // por estágio, então não há necessidade do colapso aqui.
+  // CADA etapa real do pipeline, na ordem real — o backend já entrega
+  // `label`/`color` por etapa (mesma regra do quadro desde a Etapa 1).
   return stages.map((stage) => ({
     key: stage.stage_id,
     label: stage.label,
@@ -90,15 +88,6 @@ function toWeekSeries(bars: WeekBarDto[]): DashboardMetrics["weekSeries"] {
   });
 }
 
-/**
- * O backend ainda não registra o momento do primeiro contato/resposta de um
- * lead — só `created_at`/`updated_at`/`last_interaction_at` (ver
- * `app/modules/leads/domain/entities.py`). Mesma lacuna já documentada em
- * `LeadsApiRepository.toLead` (`firstContactHours: 0`); usamos o mesmo
- * placeholder neutro aqui até o backend passar a registrar esse timestamp.
- */
-const AVG_FIRST_CONTACT_HOURS_PLACEHOLDER = 0;
-
 function toDashboardMetrics(dto: DashboardMetricsDto): DashboardMetrics {
   return {
     totalLeads: dto.total_leads,
@@ -109,7 +98,6 @@ function toDashboardMetrics(dto: DashboardMetricsDto): DashboardMetrics {
     conversionRate: Math.round(dto.conversion_rate),
     forecastRevenue: dto.forecast_revenue,
     closedRevenue: dto.closed_revenue,
-    avgFirstContactHours: AVG_FIRST_CONTACT_HOURS_PLACEHOLDER,
     avgCloseDays: dto.avg_close_days,
     open: dto.open,
     lost: dto.lost,
@@ -120,8 +108,9 @@ function toDashboardMetrics(dto: DashboardMetricsDto): DashboardMetrics {
 }
 
 export class DashboardApiRepository implements DashboardRepository {
-  async getMetrics(period?: Period): Promise<DashboardMetrics> {
+  async getMetrics(period?: Period, pipelineId?: string): Promise<DashboardMetrics> {
     const params = new URLSearchParams();
+    if (pipelineId) params.set("pipeline_id", pipelineId);
     if (period?.dateFrom) params.set("date_from", period.dateFrom);
     if (period?.dateTo) params.set("date_to", period.dateTo);
     const query = params.toString();
