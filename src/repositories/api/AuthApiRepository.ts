@@ -41,6 +41,14 @@ interface UserResponseDto {
   tenant_id: string;
   role: string;
   is_platform_staff: boolean;
+  features?: Record<string, boolean>;
+  tenant_name?: string | null;
+  impersonation?: {
+    session_id: string;
+    mode: string;
+    expires_at: string;
+    reason: string;
+  } | null;
 }
 
 function toTenantOption(dto: TenantOptionDto): TenantOption {
@@ -64,6 +72,16 @@ function toAuthUser(dto: UserResponseDto): AuthUser {
     accountId: dto.account_id,
     tenantId: dto.tenant_id,
     isPlatformStaff: dto.is_platform_staff,
+    ...(dto.features ? { features: dto.features } : {}),
+    tenantName: dto.tenant_name ?? null,
+    impersonation: dto.impersonation
+      ? {
+          sessionId: dto.impersonation.session_id,
+          mode: dto.impersonation.mode,
+          expiresAt: dto.impersonation.expires_at,
+          reason: dto.impersonation.reason,
+        }
+      : null,
   };
 }
 

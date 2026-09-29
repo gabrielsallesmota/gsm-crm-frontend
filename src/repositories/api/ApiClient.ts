@@ -75,3 +75,42 @@ export function currentAccessToken(): string | null {
 export function currentRefreshToken(): string | null {
   return client.currentRefreshToken();
 }
+
+/**
+ * Sessão de SUPORTE (Etapa 2). Enquanto o staff da GSM está impersonando um
+ * tenant, o cliente principal carrega o token de suporte (curto, sem
+ * refresh) e ESTE cliente guarda a sessão real do staff — é por ele que
+ * saem as chamadas do control plane (`/platform/*`: encerrar, elevar), que
+ * recusam token de suporte. Fora do modo suporte, tudo usa o cliente
+ * principal (nunca dois clientes renovando o mesmo refresh token).
+ */
+const staffClient = createSessionClient(BASE_URL, (input, init) => fetch(input, init));
+let supportMode = false;
+
+export function setSupportStaffTokens(tokens: TokenResponse | null): void {
+  staffClient.setTokens(tokens);
+  supportMode = tokens !== null;
+}
+
+export function setOnStaffTokensRefreshed(cb: ((tokens: TokenResponse) => void) | null): void {
+  staffClient.setOnTokensRefreshed(cb);
+}
+
+export function setOnStaffSessionExpired(cb: (() => void) | null): void {
+  staffClient.setOnSessionExpired(cb);
+}
+
+export function isSupportMode(): boolean {
+  return supportMode;
+}
+
+/** Chamadas do control plane — sempre com a sessão REAL do staff. */
+export function platformRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return supportMode ? staffClient.json<T>(path, options) : client.json<T>(path, options);
+}
+
+export function currentStaffTokens(): TokenResponse | null {
+  const accessToken = staffClient.currentAccessToken();
+  const refreshToken = staffClient.currentRefreshToken();
+  return accessToken && refreshToken ? { accessToken, refreshToken } : null;
+}

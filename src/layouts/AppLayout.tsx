@@ -11,6 +11,8 @@ import { useToast } from "../hooks/useToast";
 import { isDemoMode } from "../services/factory";
 import type { AuthUser } from "../types/auth";
 import { can, roleLabel as labelForRole, type Permission } from "../auth/permissions";
+import { hasFeature, type TenantFeature } from "../auth/features";
+import { SupportBanner } from "../components/common/SupportBanner";
 import styles from "./AppLayout.module.css";
 
 function roleLabel(user: AuthUser | null): string | undefined {
@@ -26,22 +28,25 @@ const NAV_ITEMS: {
    * e SDR); as demais espelham os papéis do backend. Ver
    * `auth/permissions.ts`. */
   permission?: Permission;
+  /** Funcionalidade contratada exigida (Etapa 2) — some do menu quando o
+   * tenant não contratou (o backend recusa de qualquer jeito). */
+  feature?: TenantFeature;
 }[] = [
-  { to: ROUTES.dashboard, icon: "dashboard", label: "Dashboard" },
+  { to: ROUTES.dashboard, icon: "dashboard", label: "Dashboard", feature: "dashboard" },
   // Prospecção GSM não tem item de menu próprio — para quem é super admin,
   // ela aparece embutida dentro de Pipeline/Dashboard (filtro Ativo/
   // Passivo/Todos), não como uma tela separada. Ver `PipelinePage.tsx`.
-  { to: ROUTES.pipeline, icon: "pipeline", label: "Pipeline" },
-  { to: ROUTES.leads, icon: "leads", label: "Leads" },
+  { to: ROUTES.pipeline, icon: "pipeline", label: "Pipeline", feature: "crm" },
+  { to: ROUTES.leads, icon: "leads", label: "Leads", feature: "crm" },
   { to: ROUTES.clientes, icon: "clients", label: "Clientes", permission: "platform.internal" },
   // SDR (Etapa 1) — pré-prospecção interna da GSM, mesmo gate de "Clientes"
   // acima. Reaproveita o ícone "prospects" (alvo/crosshair) — hoje sem uso
   // real em NAV_ITEMS (Prospecção GSM fica embutida em Pipeline, ver
   // comentário acima), e "pré-prospecção" é exatamente a ideia de um alvo.
   { to: ROUTES.sdrDashboard, icon: "prospects", label: "SDR", permission: "platform.internal" },
-  { to: ROUTES.tarefas, icon: "tasks", label: "Tarefas" },
-  { to: ROUTES.agenda, icon: "agenda", label: "Agenda" },
-  { to: ROUTES.relatorios, icon: "reports", label: "Relatórios" },
+  { to: ROUTES.tarefas, icon: "tasks", label: "Tarefas", feature: "crm" },
+  { to: ROUTES.agenda, icon: "agenda", label: "Agenda", feature: "crm" },
+  { to: ROUTES.relatorios, icon: "reports", label: "Relatórios", feature: "reports" },
   {
     to: ROUTES.configuracoes,
     icon: "settings",
@@ -49,6 +54,14 @@ const NAV_ITEMS: {
     permission: "settings.manage",
   },
   { to: ROUTES.usuarios, icon: "users", label: "Usuários", permission: "users.view" },
+  // Control plane — área própria (layout separado); só platform staff e
+  // nunca durante uma sessão de suporte.
+  {
+    to: ROUTES.platform,
+    icon: "platform",
+    label: "Plataforma GSM",
+    permission: "platform.console",
+  },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -128,6 +141,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
+      <SupportBanner />
+
       <div className={styles.body}>
         {mobileNavOpen && (
           <div
@@ -172,7 +187,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
 
           <nav className={styles.nav}>
-            {NAV_ITEMS.filter((item) => !item.permission || can(user, item.permission)).map(
+            {NAV_ITEMS.filter(
+              (item) =>
+                (!item.permission || can(user, item.permission)) &&
+                (!item.feature || hasFeature(user, item.feature)),
+            ).map(
               (item) => (
                 <NavLink
                   key={item.to}

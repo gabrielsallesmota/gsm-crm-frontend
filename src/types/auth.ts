@@ -20,6 +20,24 @@ export interface AuthUser {
    * `role` (que é por-tenant). `GET /auth/me` agora expõe isto de verdade
    * (antes a UI sempre tratava a pessoa como não-staff, mesmo já sendo). */
   isPlatformStaff: boolean;
+  /** Funcionalidades CONTRATADAS do tenant atual (Etapa 2, `GET /auth/me`).
+   * Ausente = versão antiga do backend/demo → vale o default do catálogo.
+   * Esconder menu é só UX: o backend recusa (403) o que não foi contratado. */
+  features?: Record<string, boolean>;
+  tenantName?: string | null;
+  /** Preenchido só quando esta sessão é uma sessão de SUPORTE da GSM
+   * (impersonation). */
+  impersonation?: ImpersonationInfo | null;
+}
+
+export type ImpersonationMode = "read_only" | "write";
+
+export interface ImpersonationInfo {
+  sessionId: string;
+  mode: ImpersonationMode | string;
+  /** ISO 8601 */
+  expiresAt: string;
+  reason: string;
 }
 
 /** Um tenant que a pessoa pode acessar — devolvido no login (quando há mais

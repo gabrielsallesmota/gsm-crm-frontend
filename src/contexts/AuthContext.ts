@@ -41,6 +41,14 @@ export interface AuthContextValue {
   requestPasswordReset: (input: RequestPasswordResetInput) => Promise<void>;
   confirmPasswordReset: (input: ResetPasswordInput) => Promise<void>;
   changePassword: (input: ChangePasswordInput) => Promise<void>;
+  // --- Sessão de suporte (Etapa 2) — só platform staff ---
+  /** Abre uma sessão de SUPORTE (somente leitura) no tenant do cliente. A
+   * sessão real do staff fica guardada à parte e volta ao encerrar. */
+  startImpersonation: (tenantId: string, reason: string, durationMinutes: number) => Promise<void>;
+  /** Libera escrita na sessão de suporte atual (novo motivo, auditado). */
+  elevateImpersonation: (reason: string) => Promise<void>;
+  /** Encerra a sessão de suporte e volta para a área da plataforma. */
+  endImpersonation: () => Promise<void>;
 }
 
 // Só o Context + o tipo aqui — nenhum componente neste arquivo, de

@@ -3,7 +3,14 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { ROUTES } from "../constants/routes";
 import type { Permission } from "../auth/permissions";
 import { ProtectedRoute } from "./ProtectedRoute";
-import { NotFoundPage, RequirePermission, RouteLoading as Loading } from "./RequirePermission";
+import {
+  NotFoundPage,
+  RequireFeature,
+  RequirePermission,
+  RouteLoading as Loading,
+} from "./RequirePermission";
+import type { TenantFeature } from "../auth/features";
+import { PlatformLayout } from "../platform/PlatformLayout";
 import { LoginPage } from "../pages/LoginPage";
 import { ForgotPasswordPage } from "../pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "../pages/ResetPasswordPage";
@@ -65,6 +72,30 @@ function guarded(permission: Permission, page: ReactNode) {
 }
 
 const internal = (page: ReactNode) => guarded("platform.internal", page);
+const contracted = (feature: TenantFeature, page: ReactNode) => (
+  <RequireFeature feature={feature}>{page}</RequireFeature>
+);
+
+// Control plane (Etapa 2) — chunk próprio, nunca baixado por quem não é staff.
+const PlatformOverviewPage = lazyPage(
+  () => import("../platform/PlatformOverviewPage"),
+  "PlatformOverviewPage",
+);
+const OrganizationsPage = lazyPage(() => import("../platform/OrganizationsPage"), "OrganizationsPage");
+const OrganizationNewPage = lazyPage(
+  () => import("../platform/OrganizationNewPage"),
+  "OrganizationNewPage",
+);
+const OrganizationDetailPage = lazyPage(
+  () => import("../platform/OrganizationDetailPage"),
+  "OrganizationDetailPage",
+);
+const PlatformAuditPage = lazyPage(() => import("../platform/PlatformAuditPage"), "PlatformAuditPage");
+const SupportSessionsPage = lazyPage(
+  () => import("../platform/SupportSessionsPage"),
+  "SupportSessionsPage",
+);
+const platformPage = (page: ReactNode) => <Suspense fallback={<Loading />}>{page}</Suspense>;
 
 export const router = createBrowserRouter([
   { path: ROUTES.login, element: <LoginPage /> },
@@ -72,13 +103,26 @@ export const router = createBrowserRouter([
   { path: ROUTES.resetPassword, element: <ResetPasswordPage /> },
   { path: ROUTES.forcedPasswordChange, element: <ForcedPasswordChangePage /> },
   {
+    // Área do Super Admin GSM — layout e guard próprios (fora do AppLayout).
+    element: <PlatformLayout />,
+    children: [
+      { path: ROUTES.platform, element: platformPage(<PlatformOverviewPage />) },
+      { path: ROUTES.platformOrganizations, element: platformPage(<OrganizationsPage />) },
+      { path: ROUTES.platformOrganizationNew, element: platformPage(<OrganizationNewPage />) },
+      { path: "/platform/organizations/:id", element: platformPage(<OrganizationDetailPage />) },
+      { path: ROUTES.platformAudit, element: platformPage(<PlatformAuditPage />) },
+      { path: ROUTES.platformSessions, element: platformPage(<SupportSessionsPage />) },
+      { path: "/platform/*", element: <NotFoundPage /> },
+    ],
+  },
+  {
     element: <ProtectedRoute />,
     children: [
       { path: "/", element: <Navigate to={ROUTES.dashboard} replace /> },
-      { path: ROUTES.dashboard, element: <DashboardPage /> },
-      { path: ROUTES.pipeline, element: <PipelinePage /> },
-      { path: ROUTES.leads, element: <LeadsPage /> },
-      { path: `${ROUTES.leads}/:id`, element: <LeadsPage /> },
+      { path: ROUTES.dashboard, element: contracted("dashboard", <DashboardPage />) },
+      { path: ROUTES.pipeline, element: contracted("crm", <PipelinePage />) },
+      { path: ROUTES.leads, element: contracted("crm", <LeadsPage />) },
+      { path: `${ROUTES.leads}/:id`, element: contracted("crm", <LeadsPage />) },
       { path: ROUTES.clientes, element: internal(<ClientsPage />) },
       { path: ROUTES.sdrCampanhas, element: internal(<SdrCampaignsPage />) },
       { path: ROUTES.sdrCampanhaNova, element: internal(<SdrCampaignFormPage />) },
@@ -95,9 +139,9 @@ export const router = createBrowserRouter([
       { path: ROUTES.sdrDashboard, element: internal(<SdrDashboardPage />) },
       // Qualquer outra URL sob /sdr também "não existe" para não-staff.
       { path: "/sdr/*", element: internal(<NotFoundPage />) },
-      { path: ROUTES.tarefas, element: <TasksPage /> },
-      { path: ROUTES.agenda, element: <AgendaPage /> },
-      { path: ROUTES.relatorios, element: <ReportsPage /> },
+      { path: ROUTES.tarefas, element: contracted("crm", <TasksPage />) },
+      { path: ROUTES.agenda, element: contracted("crm", <AgendaPage />) },
+      { path: ROUTES.relatorios, element: contracted("reports", <ReportsPage />) },
       { path: ROUTES.configuracoes, element: guarded("settings.manage", <SettingsPage />) },
       { path: ROUTES.usuarios, element: guarded("users.view", <UsersPage />) },
       { path: ROUTES.perfil, element: <ProfilePage /> },

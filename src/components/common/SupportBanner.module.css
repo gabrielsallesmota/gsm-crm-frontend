@@ -1,0 +1,47 @@
+.banner {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: #3a2a00;
+  border-bottom: 2px solid #f5a524;
+  color: #fff4dc;
+  font-size: 12.5px;
+}
+
+.write {
+  background: #4a0f12;
+  border-bottom-color: #e5484d;
+}
+
+.text b {
+  letter-spacing: 0.02em;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  background: transparent;
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btnStrong {
+  background: #f5a524;
+  border-color: #f5a524;
+  color: #111;
+  font-weight: 600;
+}

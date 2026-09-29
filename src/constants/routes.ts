@@ -26,4 +26,11 @@ export const ROUTES = {
   configuracoes: "/configuracoes",
   usuarios: "/usuarios",
   perfil: "/perfil",
+  // Control plane da GSM (Etapa 2) — só platform staff.
+  platform: "/platform",
+  platformOrganizations: "/platform/organizations",
+  platformOrganizationNew: "/platform/organizations/new",
+  platformOrganization: (id: string) => `/platform/organizations/${id}`,
+  platformAudit: "/platform/audit",
+  platformSessions: "/platform/support-sessions",
 } as const;

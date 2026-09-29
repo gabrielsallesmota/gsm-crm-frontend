@@ -1,0 +1,371 @@
+/* Control plane da GSM (Etapa 2) — identidade visual PRÓPRIA (barra superior
+   escura com acento âmbar), para ninguém confundir "estou administrando a
+   plataforma" com "estou dentro do CRM de um cliente". */
+.shell {
+  --pf-accent: #f5a524;
+  --pf-accent-soft: rgba(245, 165, 36, 0.14);
+  --pf-danger: #e5484d;
+  --pf-ok: #2ee66e;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  background: #0b0f14;
+  border-bottom: 2px solid var(--pf-accent);
+  color: #e8edf2;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.brandBadge {
+  background: var(--pf-accent);
+  color: #111;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.nav {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.navLink {
+  color: #aeb8c2;
+  text-decoration: none;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13.5px;
+}
+
+.navLink:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.navLinkActive {
+  color: #111;
+  background: var(--pf-accent);
+}
+
+.topRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12.5px;
+  color: #aeb8c2;
+}
+
+.backLink {
+  color: #e8edf2;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  color: var(--heading);
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 16px 18px;
+}
+
+.cardLabel {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cardValue {
+  font-size: 26px;
+  font-weight: 700;
+  margin-top: 6px;
+  color: var(--heading);
+}
+
+.panel {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.panelTitle {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: var(--heading);
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.input,
+.select {
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 13.5px;
+  max-width: 100%;
+}
+
+.input {
+  min-width: 220px;
+  flex: 1;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.rowLink {
+  cursor: pointer;
+}
+
+.rowLink:hover td {
+  background: var(--hover-bg-2, rgba(127, 127, 127, 0.06));
+}
+
+.muted {
+  color: var(--muted-2);
+  font-size: 12px;
+}
+
+.pill {
+  display: inline-block;
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pillActive {
+  color: #0f7a3b;
+  background: rgba(46, 230, 110, 0.16);
+}
+
+.pillSuspended {
+  color: var(--pf-danger);
+  background: rgba(229, 72, 77, 0.14);
+}
+
+.pillInternal {
+  color: #8a5a00;
+  background: var(--pf-accent-soft);
+}
+
+.pillNeutral {
+  color: var(--muted);
+  background: var(--hover-bg-2, rgba(127, 127, 127, 0.1));
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.featureItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.featureItem input {
+  margin-top: 3px;
+}
+
+.featureName {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.steps {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.step {
+  font-size: 12.5px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+}
+
+.stepActive {
+  border-color: var(--pf-accent);
+  background: var(--pf-accent-soft);
+  color: var(--heading);
+  font-weight: 600;
+}
+
+.stepDone {
+  color: var(--heading);
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 16px;
+  font-size: 13.5px;
+}
+
+.summary dt {
+  color: var(--muted);
+}
+
+.summary dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.notice {
+  border-left: 3px solid var(--pf-accent);
+  background: var(--pf-accent-soft);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.danger {
+  border-left-color: var(--pf-danger);
+  background: rgba(229, 72, 77, 0.1);
+}
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    padding: 10px 16px;
+  }
+
+  .content {
+    padding: 18px 16px 48px;
+  }
+
+  .input {
+    min-width: 0;
+  }
+}

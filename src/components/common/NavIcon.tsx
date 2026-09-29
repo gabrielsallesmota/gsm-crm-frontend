@@ -22,6 +22,8 @@ const PATHS = {
   // Toggle claro/escuro (ver `ThemeToggle.tsx`).
   sun: "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
   moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
+  // Control plane da GSM (Etapa 2) — escudo.
+  platform: "M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3zM9 12l2 2 4-4",
 };
 
 export function NavIcon({ name, size = 17 }: { name: keyof typeof PATHS; size?: number }) {

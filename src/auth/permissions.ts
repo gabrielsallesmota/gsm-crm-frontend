@@ -18,7 +18,13 @@ import type { AuthUser } from "../types/auth";
  * - pipeline.reorder  → PATCH /stages/reorder (ADMIN, GESTOR)
  * - leads.assign      → PATCH /leads/{id} owner_id (ADMIN, GESTOR; vendedor → 403)
  * - leads.viewAll     → vendedor só enxerga os próprios leads (escopo no backend)
- * - platform.internal → SDR, Prospecção GSM, Clientes GSM, /platform (platform_staff)
+ * - platform.internal → SDR, Prospecção GSM, Clientes GSM (platform_staff)
+ * - platform.console  → control plane `/platform/*` (platform_staff)
+ *
+ * Etapa 2: durante uma SESSÃO DE SUPORTE (impersonation) a pessoa vê o
+ * tenant do cliente como o admin dele vê — `platform.*` fica indisponível
+ * (o backend também recusa o token de suporte nessas rotas) e as
+ * permissões de gestão de usuários somem (o backend bloqueia).
  */
 export type Permission =
   | "users.view"
@@ -27,7 +33,8 @@ export type Permission =
   | "pipeline.reorder"
   | "leads.assign"
   | "leads.viewAll"
-  | "platform.internal";
+  | "platform.internal"
+  | "platform.console";
 
 export type TenantRole = "admin" | "gestor" | "vendedor";
 
@@ -50,11 +57,22 @@ export function toTenantRole(role: string | undefined | null): TenantRole | null
   return TENANT_ROLES.find((r) => r === role) ?? null;
 }
 
-type Principal = Pick<AuthUser, "role" | "isPlatformStaff"> | null | undefined;
+type Principal =
+  | (Pick<AuthUser, "role" | "isPlatformStaff"> & Partial<Pick<AuthUser, "impersonation">>)
+  | null
+  | undefined;
+
+// O suporte da GSM nunca gerencia usuários/papéis do cliente (bloqueado no
+// backend mesmo com escrita liberada).
+const BLOCKED_DURING_SUPPORT: readonly Permission[] = ["users.create"];
 
 export function can(user: Principal, permission: Permission): boolean {
   if (!user) return false;
-  if (permission === "platform.internal") return user.isPlatformStaff === true;
+  const supporting = Boolean(user.impersonation);
+  if (permission === "platform.internal" || permission === "platform.console") {
+    return user.isPlatformStaff === true && !supporting;
+  }
+  if (supporting && BLOCKED_DURING_SUPPORT.includes(permission)) return false;
   const role = toTenantRole(user.role);
   // Papel desconhecido (ex.: backend novo, dado corrompido no storage) =
   // nenhuma permissão — nunca "admin por padrão".
@@ -73,7 +91,9 @@ export type RouteAccess = "allow" | "not_found" | "forbidden";
 
 export function evaluateRouteAccess(user: Principal, permission: Permission): RouteAccess {
   if (can(user, permission)) return "allow";
-  return permission === "platform.internal" ? "not_found" : "forbidden";
+  return permission === "platform.internal" || permission === "platform.console"
+    ? "not_found"
+    : "forbidden";
 }
 
 export const ROLE_LABEL: Record<TenantRole, string> = {

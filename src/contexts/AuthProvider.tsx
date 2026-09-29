@@ -9,10 +9,15 @@ import type {
   TenantOption,
 } from "../types/auth";
 import { authService } from "../services/AuthService";
+import { platformService } from "../services/PlatformService";
 import {
   currentAccessToken,
   currentRefreshToken,
+  currentStaffTokens,
   setApiTokens,
+  setOnStaffSessionExpired,
+  setOnStaffTokensRefreshed,
+  setSupportStaffTokens,
   setOnSessionExpired,
   setOnTokensRefreshed,
   setStoredTokensLoader,
@@ -31,6 +36,8 @@ import {
 import type { Tenant } from "../types/tenant";
 
 const STORAGE_KEY = "gsm_crm_session";
+// Sessão REAL do staff guardada durante uma sessão de suporte (Etapa 2).
+const STAFF_STORAGE_KEY = "gsm_crm_staff_session";
 // Referência estável (não um array literal novo a cada render) — evita
 // invalidar o `useMemo` de `value` sem motivo fora do modo demo.
 const EMPTY_TENANTS: Tenant[] = [];
@@ -46,6 +53,23 @@ function loadStoredSession(): StoredSession | null {
     return parseStoredSession(localStorage.getItem(STORAGE_KEY));
   } catch {
     return null;
+  }
+}
+
+function loadStaffSession(): StoredSession | null {
+  try {
+    return parseStoredSession(localStorage.getItem(STAFF_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function saveStaffSession(session: StoredSession | null): void {
+  try {
+    if (session) localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(session));
+    else localStorage.removeItem(STAFF_STORAGE_KEY);
+  } catch {
+    // storage indisponível: a sessão de suporte simplesmente não sobrevive a F5
   }
 }
 
@@ -144,7 +168,34 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     } else {
       setLoading(false);
     }
+    // Sessão de suporte em andamento (F5 no meio do suporte): o cliente
+    // "staff" volta a carregar a sessão real da pessoa.
+    const staff = loadStaffSession();
+    if (staff) setSupportStaffTokens(staff.tokens);
+    setOnStaffTokensRefreshed((fresh) => {
+      const current = loadStaffSession();
+      if (current) saveStaffSession({ user: current.user, tokens: fresh });
+    });
+    setOnStaffSessionExpired(() => {
+      // A sessão REAL do staff expirou: sai de tudo.
+      saveStaffSession(null);
+      setSupportStaffTokens(null);
+      saveStoredSession(null);
+      setApiTokens(null);
+      setUser(null);
+      setTokens(null);
+    });
     setOnSessionExpired(() => {
+      const staffSession = loadStaffSession();
+      if (staffSession) {
+        // Token de suporte encerrado/expirado (não tem refresh): volta para a
+        // sessão real do staff em vez de deslogar.
+        saveStaffSession(null);
+        setSupportStaffTokens(null);
+        saveStoredSession(staffSession);
+        window.location.assign(ROUTES.platformSessions);
+        return;
+      }
       setUser(null);
       setTokens(null);
       setAvailableTenants([]);
@@ -184,6 +235,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     return () => {
       setOnSessionExpired(null);
       setOnTokensRefreshed(null);
+      setOnStaffTokensRefreshed(null);
+      setOnStaffSessionExpired(null);
       setStoredTokensLoader(null);
       window.removeEventListener("storage", onStorage);
     };
@@ -209,14 +262,73 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   );
 
   const logout = useCallback(async () => {
-    if (tokens) await authService.logout(tokens.refreshToken).catch(() => undefined);
+    const staffSession = loadStaffSession();
+    if (staffSession) {
+      // Sair durante o suporte: encerra a sessão de suporte e a do staff.
+      const sessionId = user?.impersonation?.sessionId;
+      if (sessionId) await platformService.endImpersonation(sessionId).catch(() => undefined);
+      const staffTokens = currentStaffTokens() ?? staffSession.tokens;
+      await authService.logout(staffTokens.refreshToken).catch(() => undefined);
+      saveStaffSession(null);
+      setSupportStaffTokens(null);
+    } else if (tokens?.refreshToken) {
+      await authService.logout(tokens.refreshToken).catch(() => undefined);
+    }
     setUser(null);
     setTokens(null);
     setApiTokens(null);
     setAvailableTenants([]);
     setPendingSelection(null);
     saveStoredSession(null);
-  }, [tokens]);
+  }, [tokens, user]);
+
+  const startImpersonation = useCallback(
+    async (tenantId: string, reason: string, durationMinutes: number) => {
+      if (!user || isDemoMode) return;
+      const result = await platformService.startImpersonation(tenantId, reason, durationMinutes);
+      const staffTokens = {
+        accessToken: currentAccessToken() ?? tokens?.accessToken ?? "",
+        refreshToken: currentRefreshToken() ?? tokens?.refreshToken ?? "",
+      };
+      // A sessão real fica guardada à parte; o cliente principal passa a
+      // carregar o token de suporte (curto, sem refresh).
+      saveStaffSession({ user, tokens: staffTokens });
+      setSupportStaffTokens(staffTokens);
+      const supportUser = await authService.me(result.accessToken);
+      applySession({
+        user: supportUser,
+        tokens: { accessToken: result.accessToken, refreshToken: "" },
+      });
+      // Recarrega: nada do estado da plataforma sobrevive dentro do tenant.
+      window.location.assign(ROUTES.dashboard);
+    },
+    [user, tokens, applySession],
+  );
+
+  const elevateImpersonation = useCallback(
+    async (reason: string) => {
+      const sessionId = user?.impersonation?.sessionId;
+      if (!sessionId || !tokens) return;
+      await platformService.elevateImpersonation(sessionId, reason);
+      const fresh = await authService.me(tokens.accessToken);
+      setUser(fresh);
+      saveStoredSession({ user: fresh, tokens });
+    },
+    [user, tokens],
+  );
+
+  const endImpersonation = useCallback(async () => {
+    const sessionId = user?.impersonation?.sessionId;
+    const staffSession = loadStaffSession();
+    if (sessionId) await platformService.endImpersonation(sessionId).catch(() => undefined);
+    if (staffSession) {
+      const staffTokens = currentStaffTokens() ?? staffSession.tokens;
+      saveStaffSession(null);
+      setSupportStaffTokens(null);
+      saveStoredSession({ user: staffSession.user, tokens: staffTokens });
+    }
+    window.location.assign(ROUTES.platformSessions);
+  }, [user]);
 
   // Único caminho real de troca/seleção de tenant — SEMPRE chama
   // POST /auth/select-tenant e substitui os tokens; nunca só estado local
@@ -299,6 +411,9 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       requestPasswordReset,
       confirmPasswordReset,
       changePassword,
+      startImpersonation,
+      elevateImpersonation,
+      endImpersonation,
     }),
     [
       user,
@@ -317,6 +432,9 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       requestPasswordReset,
       confirmPasswordReset,
       changePassword,
+      startImpersonation,
+      elevateImpersonation,
+      endImpersonation,
     ],
   );
 

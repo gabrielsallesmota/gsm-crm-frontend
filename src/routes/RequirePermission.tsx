@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { evaluateRouteAccess, type Permission } from "../auth/permissions";
+import { hasFeature, FEATURE_LABELS, type TenantFeature } from "../auth/features";
 import { EmptyState } from "../components/common/EmptyState";
 import { ROUTES } from "../constants/routes";
 import { useAuth } from "../hooks/useAuth";
@@ -28,6 +29,25 @@ export function RequirePermission({
     <EmptyState
       title="Acesso restrito"
       message="Seu perfil não tem permissão para acessar esta área. Fale com o administrador da sua empresa."
+    />
+  );
+}
+
+/** Rota de um módulo CONTRATÁVEL (Etapa 2): sem a feature, mostra "não
+ * contratado" em vez da tela (o backend responde 403 de qualquer jeito). */
+export function RequireFeature({
+  feature,
+  children,
+}: {
+  feature: TenantFeature;
+  children: ReactNode;
+}) {
+  const { user } = useAuth();
+  if (hasFeature(user, feature)) return <>{children}</>;
+  return (
+    <EmptyState
+      title={`${FEATURE_LABELS[feature]} não contratado`}
+      message="Este módulo não faz parte do plano da sua organização. Fale com a GSM para habilitá-lo."
     />
   );
 }

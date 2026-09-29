@@ -157,6 +157,11 @@ export function createSessionClient(
       } else {
         onSessionExpired?.();
       }
+    } else if (resp.status === 401 && belongsToSession && tokenUsed && !refreshTokenValue) {
+      // Sessão SEM refresh (token de suporte da GSM, Etapa 2): 401 é o fim
+      // dela (encerrada ou expirada). Avisa para o app voltar à sessão real
+      // do staff em vez de ficar só acumulando erros.
+      onSessionExpired?.();
     }
     return resp;
   }
