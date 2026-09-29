@@ -15,6 +15,7 @@ import type { AuthUser } from "../types/auth";
  * - users.view        → GET  /users           require_tenant_role(ADMIN, GESTOR)
  * - users.create      → POST /users           require_tenant_role(ADMIN)
  * - settings.manage   → escrita de pipelines/estágios/tags/templates (ADMIN, GESTOR)
+ * - integrations.manage → /integrations/* credenciais de API e webhooks (ADMIN)
  * - pipeline.reorder  → PATCH /stages/reorder (ADMIN, GESTOR)
  * - leads.assign      → PATCH /leads/{id} owner_id (ADMIN, GESTOR; vendedor → 403)
  * - leads.viewAll     → vendedor só enxerga os próprios leads (escopo no backend)
@@ -30,6 +31,7 @@ export type Permission =
   | "users.view"
   | "users.create"
   | "settings.manage"
+  | "integrations.manage"
   | "pipeline.reorder"
   | "leads.assign"
   | "leads.viewAll"
@@ -45,6 +47,7 @@ const ROLE_PERMISSIONS: Record<TenantRole, readonly Permission[]> = {
     "users.view",
     "users.create",
     "settings.manage",
+    "integrations.manage",
     "pipeline.reorder",
     "leads.assign",
     "leads.viewAll",

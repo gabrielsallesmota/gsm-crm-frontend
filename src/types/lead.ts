@@ -69,6 +69,7 @@ export type LeadTimelineType =
   | "task_created"
   | "task_completed"
   | "task_reopened"
+  | "activity"
   | "comment";
 
 export interface LeadTimelineItem {

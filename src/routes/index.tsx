@@ -62,6 +62,8 @@ const SdrProspectingQueuePage = lazyPage(
   () => import("../pages/SdrProspectingQueuePage"),
   "SdrProspectingQueuePage",
 );
+// Integrações (Etapa 3) — só Admin; chunk próprio.
+const IntegrationsPage = lazyPage(() => import("../pages/IntegrationsPage"), "IntegrationsPage");
 const SdrDashboardPage = lazyPage(() => import("../pages/SdrDashboardPage"), "SdrDashboardPage");
 function guarded(permission: Permission, page: ReactNode) {
   return (
@@ -143,6 +145,7 @@ export const router = createBrowserRouter([
       { path: ROUTES.agenda, element: contracted("crm", <AgendaPage />) },
       { path: ROUTES.relatorios, element: contracted("reports", <ReportsPage />) },
       { path: ROUTES.configuracoes, element: guarded("settings.manage", <SettingsPage />) },
+      { path: ROUTES.integracoes, element: guarded("integrations.manage", <IntegrationsPage />) },
       { path: ROUTES.usuarios, element: guarded("users.view", <UsersPage />) },
       { path: ROUTES.perfil, element: <ProfilePage /> },
       { path: "*", element: <NotFoundPage /> },

@@ -23,6 +23,15 @@ const FIELD_LABEL: Record<string, string> = {
   notes: "Notas",
 };
 
+const ACTIVITY_LABEL: Record<string, string> = {
+  note: "Nota",
+  whatsapp: "WhatsApp",
+  call: "Ligação",
+  email: "E-mail",
+  meeting: "Reunião",
+  form: "Formulário",
+};
+
 function str(value: unknown): string | null {
   return typeof value === "string" && value ? value : null;
 }
@@ -84,7 +93,9 @@ export function describeTimelineItem(item: LeadTimelineItem): TimelineView {
       const fields = Array.isArray(p["fields"]) ? (p["fields"] as unknown[]).map(String) : [];
       const others = fields.filter((f) => !(f in changes)).map((f) => FIELD_LABEL[f] ?? f);
       if (others.length) parts.push(`Editou: ${others.join(", ")}`);
-      const source = str(p["source"]) === "import" ? " (importação)" : "";
+      const origin = str(p["source"]);
+      const source =
+        origin === "import" ? " (importação)" : origin === "api" ? " (integração)" : "";
       return { icon: "✎", title: `Dados atualizados${source}`, detail: parts.join(" · ") || null };
     }
     case "task_created":
@@ -95,6 +106,15 @@ export function describeTimelineItem(item: LeadTimelineItem): TimelineView {
       return { icon: "↺", title: "Tarefa reaberta", detail: str(p["task_title"]) };
     case "comment":
       return { icon: "💬", title: "Comentário", detail: item.text };
+    case "activity": {
+      // Etapa 3 — interação registrada por integração (POST /public/leads/{id}/activities).
+      const kind = str(p["activity_type"]);
+      return {
+        icon: "⚡",
+        title: `Atividade: ${ACTIVITY_LABEL[kind ?? ""] ?? kind ?? "registro"}`,
+        detail: str(p["text"]),
+      };
+    }
     default:
       return { icon: "•", title: "Atividade registrada", detail: null };
   }

@@ -53,6 +53,12 @@ const NAV_ITEMS: {
     label: "Configurações",
     permission: "settings.manage",
   },
+  {
+    to: ROUTES.integracoes,
+    icon: "integrations",
+    label: "Integrações",
+    permission: "integrations.manage",
+  },
   { to: ROUTES.usuarios, icon: "users", label: "Usuários", permission: "users.view" },
   // Control plane — área própria (layout separado); só platform staff e
   // nunca durante uma sessão de suporte.

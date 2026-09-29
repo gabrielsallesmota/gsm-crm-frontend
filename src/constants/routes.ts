@@ -24,6 +24,7 @@ export const ROUTES = {
   agenda: "/agenda",
   relatorios: "/relatorios",
   configuracoes: "/configuracoes",
+  integracoes: "/configuracoes/integracoes",
   usuarios: "/usuarios",
   perfil: "/perfil",
   // Control plane da GSM (Etapa 2) — só platform staff.
