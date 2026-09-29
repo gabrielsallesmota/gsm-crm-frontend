@@ -114,7 +114,8 @@
   --text: #0f1720;
   --text-dim: #2a3540;
   --muted: #56626e;
-  --muted-2: #6b7682;
+  /* Etapa 4: era #6b7682 (4,2:1 sobre --bg, abaixo do AA 4,5:1). */
+  --muted-2: #636e7a;
   --faint: #8d98a3;
 
   --heading: #0b1218;

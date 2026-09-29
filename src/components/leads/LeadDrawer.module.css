@@ -327,3 +327,22 @@
   display: flex;
   justify-content: flex-end;
 }
+
+.drawer:focus {
+  outline: none;
+}
+
+/* Etapa 4: botão de fechar com área de toque real (antes era só o "✕"). */
+.close {
+  width: 36px;
+  height: 36px;
+  top: 14px;
+  right: 14px;
+  border-radius: 8px;
+  z-index: 1;
+}
+
+.close:hover {
+  color: var(--text);
+  background: var(--hover-bg-2, rgba(127, 127, 127, 0.1));
+}

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button } from "../common/Button";
 import { Modal } from "../common/Modal";
 import { ConfirmDialog } from "../common/ConfirmDialog";
+import { EmptyState } from "../common/EmptyState";
+import { SkeletonRows } from "../common/Skeleton";
 import form from "../common/Form.module.css";
 import { useApiCredentials } from "../../hooks/useIntegrations";
 import { useToast } from "../../hooks/useToast";
@@ -40,8 +42,17 @@ export function ApiCredentialsTab({ canManageSecrets }: { canManageSecrets: bool
   if (notImplemented) {
     return <p className={styles.empty}>Integrações não estão disponíveis na demonstração.</p>;
   }
-  if (loading && !data) return <p className={styles.empty}>Carregando…</p>;
-  if (error) return <p className={styles.empty}>{error.message}</p>;
+  if (loading && !data) return <SkeletonRows rows={3} label="Carregando credenciais" />;
+  if (error) {
+    return (
+      <EmptyState
+        tone="error"
+        title="Não foi possível carregar as credenciais"
+        message={error.message}
+        actions={[{ label: "Tentar de novo", onClick: reload }]}
+      />
+    );
+  }
   const credentials = data?.credentials ?? [];
   const scopes = data?.scopes ?? [];
   const scopeLabel = new Map(scopes.map((s) => [s.scope, s.label]));
@@ -63,7 +74,14 @@ export function ApiCredentialsTab({ canManageSecrets }: { canManageSecrets: bool
 
       <div className={styles.tableWrap}>
         {credentials.length === 0 ? (
-          <p className={styles.empty}>Nenhuma credencial criada ainda.</p>
+          <EmptyState
+            compact
+            title="Nenhuma credencial criada ainda"
+            message="Crie uma credencial para cada sistema que vai enviar leads (ex.: uma para o n8n, outra para o site). Assim você pode revogar uma sem afetar as outras."
+            actions={
+              canManageSecrets ? [{ label: "Nova credencial", onClick: () => setCreating(true) }] : []
+            }
+          />
         ) : (
           <table className={styles.table}>
             <thead>

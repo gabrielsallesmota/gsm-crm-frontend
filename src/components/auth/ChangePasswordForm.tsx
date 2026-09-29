@@ -42,8 +42,12 @@ export function ChangePasswordForm({ mode, loading, error, submitLabel, onSubmit
     <form onSubmit={handleSubmit}>
       {mode === "change" && (
         <>
-          <label className={styles.label}>Senha atual</label>
+          <label className={styles.label} htmlFor="pwd-current">
+            Senha atual
+          </label>
           <input
+            id="pwd-current"
+            autoComplete="current-password"
             className={styles.input}
             type="password"
             value={currentPassword}
@@ -53,8 +57,12 @@ export function ChangePasswordForm({ mode, loading, error, submitLabel, onSubmit
         </>
       )}
 
-      <label className={styles.label}>Nova senha</label>
+      <label className={styles.label} htmlFor="pwd-new">
+        Nova senha
+      </label>
       <input
+        id="pwd-new"
+        autoComplete="new-password"
         className={styles.input}
         type="password"
         value={newPassword}
@@ -63,8 +71,12 @@ export function ChangePasswordForm({ mode, loading, error, submitLabel, onSubmit
         minLength={MIN_PASSWORD_LENGTH}
       />
 
-      <label className={styles.label}>Confirmar nova senha</label>
+      <label className={styles.label} htmlFor="pwd-confirm">
+        Confirmar nova senha
+      </label>
       <input
+        id="pwd-confirm"
+        autoComplete="new-password"
         className={styles.input}
         type="password"
         value={confirmPassword}
@@ -73,7 +85,11 @@ export function ChangePasswordForm({ mode, loading, error, submitLabel, onSubmit
         minLength={MIN_PASSWORD_LENGTH}
       />
 
-      {(localError ?? error) && <div className={styles.error}>{localError ?? error}</div>}
+      {(localError ?? error) && (
+        <div className={styles.error} role="alert">
+          {localError ?? error}
+        </div>
+      )}
 
       <Button type="submit" variant="primary" disabled={loading} className={styles.submitBtn}>
         {loading ? "Salvando…" : submitLabel}

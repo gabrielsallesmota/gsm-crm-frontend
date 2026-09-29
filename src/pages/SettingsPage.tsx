@@ -6,6 +6,7 @@ import { useTagActions } from "../hooks/useTagActions";
 import { useProspectStages } from "../hooks/useProspectStages";
 import { useProspectStageActions } from "../hooks/useProspectStageActions";
 import { EmptyState } from "../components/common/EmptyState";
+import { usePageTitle } from "../hooks/usePageTitle";
 import { Button } from "../components/common/Button";
 import { Badge } from "../components/common/Badge";
 import { MessageTemplatesSettings } from "../components/prospects/MessageTemplatesSettings";
@@ -61,6 +62,7 @@ export function SettingsPage() {
   const { user } = useAuth();
   const isSuperAdmin = can(user, "platform.internal");
   const { toast, toastError } = useToast();
+  usePageTitle("Configurações");
   const [newName, setNewName] = useState("");
   const [newTagLabel, setNewTagLabel] = useState("");
   const [newTagColor, setNewTagColor] = useState("#4aa3ff");
@@ -307,7 +309,14 @@ export function SettingsPage() {
           </div>
         </div>
 
-        {error && <EmptyState title="Não foi possível carregar os pipelines" message={error.message} />}
+        {error && (
+          <EmptyState
+            tone="error"
+            title="Não foi possível carregar os pipelines"
+            message={error.message}
+            actions={[{ label: "Tentar de novo", onClick: reload }]}
+          />
+        )}
         {loading && !pipelines && <div className={styles.loading}>Carregando…</div>}
 
         <div className={styles.pipelineGrid}>
@@ -550,7 +559,14 @@ export function SettingsPage() {
           </div>
         </div>
 
-        {tagsError && <EmptyState title="Não foi possível carregar as tags" message={tagsError.message} />}
+        {tagsError && (
+          <EmptyState
+            tone="error"
+            title="Não foi possível carregar as tags"
+            message={tagsError.message}
+            actions={[{ label: "Tentar de novo", onClick: reloadTags }]}
+          />
+        )}
 
         <div className={styles.chipRow}>
           {tags?.map((tag) => (

@@ -2,6 +2,10 @@ import { useState } from "react";
 import { useUsers } from "../hooks/useUsers";
 import { useUserActions } from "../hooks/useUserActions";
 import { EmptyState } from "../components/common/EmptyState";
+import { HelpTip } from "../components/common/HelpTip";
+import { SkeletonRows } from "../components/common/Skeleton";
+import { usePageTitle } from "../hooks/usePageTitle";
+import { emailError } from "../utils/validation";
 import { Avatar } from "../components/common/Avatar";
 import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
@@ -42,6 +46,7 @@ export function UsersPage() {
   const [inviting, setInviting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmSuspend, setConfirmSuspend] = useState<User | null>(null);
+  usePageTitle("Equipe");
 
   async function handleRole(member: User, role: UserRole) {
     if (role === member.role) return;
@@ -89,14 +94,29 @@ export function UsersPage() {
     <div>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.pageTitle}>Usuários</h1>
+          <h1 className={styles.pageTitle}>Equipe</h1>
           <p className={styles.pageSubtitle}>
-            Equipe com acesso ao CRM{canManage ? "" : " (somente leitura — só administradores gerenciam)"}
+            Pessoas com acesso ao CRM{canManage ? "" : " (somente leitura — só administradores gerenciam)"}
+            <HelpTip label="Papéis da equipe">
+              <span>
+                <b>Vendedor</b>: vê e trabalha só os próprios leads e tarefas.
+              </span>
+              <span>
+                <b>Gestor</b>: vê toda a equipe, distribui leads e configura o funil.
+              </span>
+              <span>
+                <b>Admin</b>: tudo isso e também convida pessoas, muda papéis e cuida das
+                integrações.
+              </span>
+              <span>
+                Desativar remove o acesso sem apagar o histórico da pessoa.
+              </span>
+            </HelpTip>
           </p>
         </div>
         {canManage && (
           <Button variant="primary" onClick={() => setInviting(true)}>
-            + Convidar usuário
+            + Convidar pessoa
           </Button>
         )}
       </div>
@@ -108,11 +128,13 @@ export function UsersPage() {
           action={{ label: "Tentar de novo", onClick: reload }}
         />
       )}
-      {loading && !data && <div className={styles.loading}>Carregando…</div>}
+      {loading && !data && !error && <SkeletonRows rows={3} label="Carregando a equipe" />}
 
       {data && (
         <div className={styles.list}>
-          {data.length === 0 && <div className={styles.loading}>Nenhum usuário.</div>}
+          {data.length === 0 && (
+            <EmptyState compact title="Ninguém na equipe ainda" message="Convide as pessoas que vão usar o CRM." />
+          )}
           {data.map((member) => {
             const isSelf = member.id === currentUser?.id;
             const suspended = member.status === "suspended";
@@ -168,6 +190,17 @@ export function UsersPage() {
         </div>
       )}
 
+      {data && data.length === 1 && canManage && (
+        <div className={styles.soloHint}>
+          <EmptyState
+            compact
+            title="Por enquanto, só você"
+            message="Convide vendedores e gestores para distribuir leads e acompanhar a equipe no Dashboard."
+            actions={[{ label: "Convidar pessoa", onClick: () => setInviting(true) }]}
+          />
+        </div>
+      )}
+
       {inviting && <InviteModal onClose={() => setInviting(false)} onInvited={reload} />}
       {confirmSuspend && (
         <ConfirmDialog
@@ -193,7 +226,9 @@ function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: (
   const [submitting, setSubmitting] = useState(false);
 
   const passwordOk = !useTempPassword || password.length >= MIN_PASSWORD_LENGTH;
-  const valid = name.trim().length > 0 && /\S+@\S+\.\S+/.test(email.trim()) && passwordOk;
+  const emailProblem = emailError(email, { required: true });
+  const [emailTouched, setEmailTouched] = useState(false);
+  const valid = name.trim().length > 0 && !emailProblem && passwordOk;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -230,23 +265,44 @@ function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: (
 
   return (
     <Modal
-      title="Convidar usuário"
-      subtitle="A pessoa recebe um e-mail com um link para criar a própria senha."
+      title="Convidar pessoa"
+      subtitle="A pessoa recebe um e-mail com um link para criar a própria senha. Campos com * são obrigatórios."
       onClose={onClose}
     >
       <form className={form.form} onSubmit={(e) => void handleSubmit(e)} autoComplete="off">
         <label className={form.field}>
-          <span className={form.label}>Nome</span>
-          <input className={form.input} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          <span className={form.label}>
+            Nome <span aria-hidden="true">*</span>
+          </span>
+          <input
+            className={form.input}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            maxLength={200}
+            autoFocus
+          />
         </label>
         <label className={form.field}>
-          <span className={form.label}>E-mail</span>
+          <span className={form.label}>
+            E-mail <span aria-hidden="true">*</span>
+          </span>
           <input
             className={form.input}
             type="email"
+            inputMode="email"
+            required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => setEmailTouched(true)}
+            aria-invalid={emailTouched && Boolean(emailProblem)}
+            aria-describedby={emailTouched && emailProblem ? "invite-email-error" : undefined}
           />
+          {emailTouched && emailProblem && (
+            <span id="invite-email-error" className={form.error}>
+              {emailProblem}
+            </span>
+          )}
         </label>
         <label className={form.field}>
           <span className={form.label}>Papel</span>
@@ -266,7 +322,9 @@ function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: (
         </label>
         {useTempPassword && (
           <label className={form.field}>
-            <span className={form.label}>Senha temporária</span>
+            <span className={form.label}>
+              Senha temporária <span aria-hidden="true">*</span>
+            </span>
             <input
               className={form.input}
               type="password"

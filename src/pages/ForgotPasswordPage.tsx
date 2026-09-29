@@ -43,8 +43,13 @@ export function ForgotPasswordPage() {
           <>
             <p className={styles.subtitle}>Informe seu e-mail de acesso.</p>
             <form onSubmit={handleSubmit}>
-              <label className={styles.label}>E-mail</label>
+              <label className={styles.label} htmlFor="forgot-email">
+                E-mail
+              </label>
               <input
+                id="forgot-email"
+                autoComplete="username"
+                inputMode="email"
                 className={styles.input}
                 type="email"
                 value={email}
@@ -52,7 +57,11 @@ export function ForgotPasswordPage() {
                 required
               />
 
-              {error && <div className={styles.error}>{error}</div>}
+              {error && (
+                <div className={styles.error} role="alert">
+                  {error}
+                </div>
+              )}
 
               <Button type="submit" variant="primary" disabled={loading} className={styles.submitBtn}>
                 {loading ? "Enviando…" : "Enviar link"}

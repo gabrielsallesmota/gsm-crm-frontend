@@ -5,7 +5,11 @@ import { useTeamDirectory } from "../hooks/useTeamDirectory";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { can } from "../auth/permissions";
-import { EmptyState } from "../components/common/EmptyState";
+import { EmptyState, type EmptyAction } from "../components/common/EmptyState";
+import { SkeletonRows } from "../components/common/Skeleton";
+import { HelpTip } from "../components/common/HelpTip";
+import { usePageTitle } from "../hooks/usePageTitle";
+import { ROUTES } from "../constants/routes";
 import { Button } from "../components/common/Button";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { TaskFormModal } from "../components/tasks/TaskFormModal";
@@ -33,6 +37,42 @@ const SCOPES: { value: TaskScope; label: string }[] = [
 
 const PAGE_SIZE = 25;
 
+/** Texto do estado vazio por aba (Etapa 4) — "vazio" em Atrasadas é boa
+ * notícia; em "Todas em aberto" é hora de criar a primeira. */
+const EMPTY_COPY: Record<TaskScope, { title: string; message: string; good: boolean }> = {
+  overdue: {
+    title: "Nenhuma tarefa atrasada",
+    message: "Tudo em dia por aqui.",
+    good: true,
+  },
+  today: {
+    title: "Nada vencendo hoje",
+    message: "Veja as próximas ou crie um lembrete para um lead.",
+    good: true,
+  },
+  upcoming: {
+    title: "Nenhuma tarefa agendada para os próximos dias",
+    message: "Agende o próximo contato com seus leads para não perder o timing da venda.",
+    good: false,
+  },
+  open: {
+    title: "Nenhuma tarefa em aberto",
+    message:
+      "Tarefas são lembretes do próximo passo com um lead: ligar, enviar proposta, cobrar retorno. Crie uma aqui ou direto na ficha do lead.",
+    good: false,
+  },
+  done: {
+    title: "Nenhuma tarefa concluída ainda",
+    message: "Quando você marcar uma tarefa como feita, ela aparece aqui.",
+    good: false,
+  },
+  all: {
+    title: "Nenhuma tarefa",
+    message: "Crie a primeira tarefa para um lead.",
+    good: false,
+  },
+};
+
 export function TasksPage() {
   const { user } = useAuth();
   const canSeeTeam = can(user, "leads.viewAll");
@@ -54,6 +94,7 @@ export function TasksPage() {
   const [editing, setEditing] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  usePageTitle("Tarefas");
 
   function changeScope(next: TaskScope) {
     setScope(next);
@@ -95,7 +136,19 @@ export function TasksPage() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.pageTitle}>Tarefas</h1>
-          <p className={styles.pageSubtitle}>Follow-ups e pendências dos leads</p>
+          <p className={styles.pageSubtitle}>
+            Follow-ups e pendências dos leads
+            <HelpTip label="Tarefas">
+              <span>
+                Cada tarefa pertence a um lead e tem um responsável e um vencimento. Marque o
+                quadrado para concluir; o lápis edita ou reagenda.
+              </span>
+              <span>
+                &quot;Hoje&quot; e &quot;Atrasadas&quot; usam o horário de Brasília. Tarefas criadas
+                na ficha do lead aparecem aqui também.
+              </span>
+            </HelpTip>
+          </p>
         </div>
         <Button variant="primary" onClick={() => setCreating(true)}>
           + Nova tarefa
@@ -140,20 +193,32 @@ export function TasksPage() {
       </div>
 
       {error && (
-        <EmptyState title="Não foi possível carregar as tarefas" message={error.message} />
+        <EmptyState
+          tone="error"
+          title="Não foi possível carregar as tarefas"
+          message={error.message}
+          actions={[{ label: "Tentar de novo", onClick: reload }]}
+        />
       )}
-      {loading && !data && <div className={styles.loading}>Carregando…</div>}
+      {loading && !data && !error && <SkeletonRows rows={5} label="Carregando tarefas" />}
 
       {data && (
         <div className={styles.list} aria-busy={loading}>
           {tasks.length === 0 && (
-            <div className={styles.empty}>
-              {scope === "overdue"
-                ? "Nenhuma tarefa atrasada. 🎉"
-                : scope === "today"
-                  ? "Nada vencendo hoje."
-                  : "Nenhuma tarefa por aqui."}
-            </div>
+            <EmptyState
+              compact
+              tone={EMPTY_COPY[scope].good ? "done" : "empty"}
+              title={EMPTY_COPY[scope].title}
+              message={EMPTY_COPY[scope].message}
+              actions={
+                [
+                  { label: "Nova tarefa", onClick: () => setCreating(true) },
+                  ...(EMPTY_COPY[scope].good
+                    ? [{ label: "Ver próximas", onClick: () => changeScope("upcoming") }]
+                    : [{ label: "Ver leads", to: ROUTES.leads }]),
+                ] satisfies EmptyAction[]
+              }
+            />
           )}
           {tasks.map((task) => {
             const overdue = isOverdue(task.dueAt, task.done);
@@ -164,9 +229,10 @@ export function TasksPage() {
                   className={styles.checkbox}
                   onClick={() => void handleToggle(task)}
                   disabled={busyId === task.id}
-                  aria-label={task.done ? "Reabrir tarefa" : "Concluir tarefa"}
+                  aria-label={`${task.done ? "Reabrir" : "Concluir"} tarefa: ${task.title}`}
+                  aria-pressed={task.done}
                 >
-                  {task.done ? "☑" : "☐"}
+                  <span aria-hidden="true">{task.done ? "☑" : "☐"}</span>
                 </button>
                 <div className={styles.info}>
                   <div className={task.done ? `${styles.title} ${styles.done}` : styles.title}>
@@ -188,7 +254,7 @@ export function TasksPage() {
                   type="button"
                   className={styles.deleteBtn}
                   onClick={() => setEditing(task)}
-                  aria-label="Editar ou reagendar tarefa"
+                  aria-label={`Editar ou reagendar: ${task.title}`}
                   title="Editar / reagendar"
                 >
                   ✎
@@ -197,7 +263,7 @@ export function TasksPage() {
                   type="button"
                   className={styles.deleteBtn}
                   onClick={() => setDeleting(task)}
-                  aria-label="Excluir tarefa"
+                  aria-label={`Excluir tarefa: ${task.title}`}
                   title="Excluir"
                 >
                   ✕

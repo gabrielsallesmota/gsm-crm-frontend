@@ -53,3 +53,52 @@
     padding: 18px;
   }
 }
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.head .modalTitle {
+  margin-bottom: 4px;
+}
+
+.close {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  margin: -6px -8px 0 0;
+}
+
+.close:hover {
+  color: var(--text);
+  background: var(--hover-bg-2, rgba(127, 127, 127, 0.1));
+}
+
+.modal:focus {
+  outline: none;
+}
+
+/* Celular: o modal ocupa a largura toda e fica ancorado embaixo (mais
+   fácil de alcançar com o polegar); rola por dentro. */
+@media (max-width: 560px) {
+  .overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+}

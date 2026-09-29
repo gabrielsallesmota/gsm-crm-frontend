@@ -1,5 +1,10 @@
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useToast } from "../hooks/useToast";
+import { usePageTitle } from "../hooks/usePageTitle";
+import { resetOnboarding } from "../hooks/useOnboarding";
+import { roleLabel } from "../auth/permissions";
+import { Button } from "../components/common/Button";
 import { Avatar } from "../components/common/Avatar";
 import { ChangePasswordForm } from "../components/auth/ChangePasswordForm";
 import styles from "./ProfilePage.module.css";
@@ -10,6 +15,8 @@ export function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const { toast } = useToast();
+  usePageTitle("Meu perfil");
 
   if (!user) return null;
 
@@ -32,7 +39,7 @@ export function ProfilePage() {
 
   return (
     <div>
-      <h1 className={styles.pageTitle}>Perfil</h1>
+      <h1 className={styles.pageTitle}>Meu perfil</h1>
       <p className={styles.pageSubtitle}>Seus dados de acesso</p>
 
       <div className={styles.card}>
@@ -41,9 +48,24 @@ export function ProfilePage() {
           <div className={styles.name}>{user.name}</div>
           <div className={styles.email}>{user.email}</div>
           <div className={styles.meta}>
-            {user.role} · {currentTenantName}
+            {roleLabel(user.role)} · {currentTenantName}
           </div>
         </div>
+      </div>
+
+      <div className={styles.editSection}>
+        <h2 className={styles.sectionTitle}>Primeiros passos</h2>
+        <p className={styles.pageSubtitle}>
+          Pulou o tutorial? Reexiba o checklist de primeiros passos no Dashboard.
+        </p>
+        <Button
+          onClick={() => {
+            resetOnboarding(user.id, user.tenantId);
+            toast("Os primeiros passos voltaram a aparecer no Dashboard.");
+          }}
+        >
+          Mostrar primeiros passos
+        </Button>
       </div>
 
       <div className={styles.editSection}>

@@ -240,3 +240,10 @@
   cursor: pointer;
   padding: 0;
 }
+
+.boardEmpty {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  margin-bottom: 14px;
+}

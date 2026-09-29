@@ -6,6 +6,10 @@ import { OriginDonut } from "../components/charts/OriginDonut";
 import { SalesFunnel } from "../components/charts/SalesFunnel";
 import { Badge } from "../components/common/Badge";
 import { EmptyState } from "../components/common/EmptyState";
+import { SkeletonCards } from "../components/common/Skeleton";
+import { OnboardingChecklist } from "../components/onboarding/OnboardingChecklist";
+import { usePageTitle } from "../hooks/usePageTitle";
+import { ROUTES } from "../constants/routes";
 import { PeriodFilter } from "../components/common/PeriodFilter";
 // Dashboard de prospecção é INTERNO da GSM — chunk próprio (ver PipelinePage).
 const ProspectDashboardSection = lazy(() =>
@@ -39,9 +43,11 @@ export function DashboardPage() {
   const [period, setPeriod] = useState<Period>(EMPTY_PERIOD);
   const showPassivo = !isSuperAdmin || sourceFilter !== "ativo";
   const showAtivo = isSuperAdmin && sourceFilter !== "passivo";
+  usePageTitle("Dashboard");
 
   return (
     <div>
+      <OnboardingChecklist />
       {isSuperAdmin && (
         <div className={styles.sourceFilter}>
           {(["todos", "ativo", "passivo"] as const).map((option) => (
@@ -54,6 +60,7 @@ export function DashboardPage() {
                   : styles.sourceFilterBtn
               }
               onClick={() => setSourceFilter(option)}
+              aria-pressed={sourceFilter === option}
             >
               {SOURCE_FILTER_LABEL[option]}
             </button>
@@ -63,7 +70,13 @@ export function DashboardPage() {
 
       <PeriodFilter value={period} onChange={setPeriod} />
 
-      {showPassivo && <LeadsDashboardSection taggedPassivo={isSuperAdmin} period={period} />}
+      {showPassivo && (
+        <LeadsDashboardSection
+          taggedPassivo={isSuperAdmin}
+          period={period}
+          onClearPeriod={() => setPeriod(EMPTY_PERIOD)}
+        />
+      )}
 
       {showPassivo && showAtivo && <div className={styles.sourceDivider} />}
 
@@ -104,9 +117,11 @@ const KPI_DEFINITIONS = {
 function LeadsDashboardSection({
   taggedPassivo,
   period,
+  onClearPeriod,
 }: {
   taggedPassivo: boolean;
   period: Period;
+  onClearPeriod: () => void;
 }) {
   const { user } = useAuth();
   const ownOnly = !can(user, "leads.viewAll");
@@ -114,6 +129,11 @@ function LeadsDashboardSection({
   const [pipelineId, setPipelineId] = useState("");
   const { data, loading, error, reload } = useDashboard(period, pipelineId || undefined);
   const scopeHint = ownOnly ? "seus leads" : "toda a equipe";
+  const periodActive = JSON.stringify(period) !== JSON.stringify(EMPTY_PERIOD);
+  // Etapa 4: sem nenhum lead, 11 zeros não dizem nada — mostramos o que
+  // falta para o dashboard ganhar vida. Com filtro de período, "vazio" é
+  // só "nada neste período".
+  const empty = data !== null && data.totalLeads === 0;
 
   return (
     <div>
@@ -123,7 +143,8 @@ function LeadsDashboardSection({
             {taggedPassivo && <Badge {...PASSIVO_BADGE} />} Dashboard
           </h1>
           <p className={styles.pageSubtitle}>
-            Visão geral do funil · {scopeHint} · passe o mouse nos indicadores para ver a definição
+            Visão geral do funil · {scopeHint}
+            {empty ? "" : " · toque no ? de cada indicador para ver como é calculado"}
           </p>
         </div>
         {pipelines && pipelines.length > 1 && (
@@ -145,15 +166,42 @@ function LeadsDashboardSection({
 
       {error && (
         <EmptyState
+          tone="error"
           title="Não foi possível carregar o dashboard"
           message={error.message}
-          action={{ label: "Tentar de novo", onClick: reload }}
+          actions={[{ label: "Tentar de novo", onClick: reload }]}
         />
       )}
 
-      {loading && !data && <div className={styles.loading}>Carregando…</div>}
+      {loading && !data && !error && <SkeletonCards count={8} label="Carregando indicadores" />}
 
-      {data && (
+      {empty && periodActive && (
+        <EmptyState
+          title="Nenhum lead neste período"
+          message="Não há leads criados no intervalo escolhido. Tente um período maior ou veja todos."
+          actions={[{ label: "Ver todo o período", onClick: onClearPeriod }]}
+        />
+      )}
+
+      {empty && !periodActive && (
+        <EmptyState
+          title={ownOnly ? "Você ainda não tem leads" : "Seu dashboard aparece aqui"}
+          message={
+            ownOnly
+              ? "Assim que um lead for atribuído a você (ou você cadastrar um), os números da sua carteira aparecem aqui: novos leads, ganhos, conversão e receita."
+              : "Os indicadores são calculados a partir dos seus leads. Cadastre o primeiro, importe uma planilha ou conecte o formulário do seu site — os números aparecem aqui automaticamente."
+          }
+          actions={[
+            { label: "Adicionar lead", to: `${ROUTES.leads}?novo=1` },
+            ...(ownOnly ? [] : [{ label: "Importar planilha", to: `${ROUTES.pipeline}?importar=1` }]),
+            ...(can(user, "integrations.manage")
+              ? [{ label: "Conectar site ou WhatsApp", to: ROUTES.integracoes }]
+              : []),
+          ]}
+        />
+      )}
+
+      {data && !empty && (
         <>
           <div className={styles.kpiGrid}>
             <KpiCard

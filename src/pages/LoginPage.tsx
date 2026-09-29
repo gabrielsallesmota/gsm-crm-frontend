@@ -44,7 +44,7 @@ export function LoginPage() {
       // para garantir que nenhum dado do passo anterior fique em memória).
       await selectTenant(tenantId);
     } catch (err) {
-      setError(describeError(err, "Não foi possível selecionar o tenant."));
+      setError(describeError(err, "Não foi possível entrar nesta organização."));
     } finally {
       setLoading(false);
     }
@@ -57,7 +57,11 @@ export function LoginPage() {
           <h2 className={styles.title}>Escolha uma empresa</h2>
           <p className={styles.subtitle}>Sua conta tem acesso a mais de um ambiente.</p>
 
-          {error && <div className={styles.error}>{error}</div>}
+          {error && (
+            <div className={styles.error} role="alert">
+              {error}
+            </div>
+          )}
 
           <div className={styles.demoGrid}>
             {pendingTenantSelection.availableTenants.map((option) => (
@@ -84,18 +88,28 @@ export function LoginPage() {
         <p className={styles.subtitle}>Acesse o painel da sua empresa.</p>
 
         <form onSubmit={handleSubmit}>
-          <label className={styles.label}>E-mail</label>
+          <label className={styles.label} htmlFor="login-email">
+            E-mail
+          </label>
           <input
+            id="login-email"
             className={styles.input}
             type="email"
+            inputMode="email"
+            autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            autoFocus
           />
-          <label className={styles.label}>Senha</label>
+          <label className={styles.label} htmlFor="login-password">
+            Senha
+          </label>
           <input
+            id="login-password"
             className={styles.input}
             type="password"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePipelines } from "../hooks/usePipelines";
 import { usePipelineActions } from "../hooks/usePipelineActions";
 import { usePipelineBoard, type BoardFilter } from "../hooks/usePipelineBoard";
@@ -10,6 +11,11 @@ import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { can } from "../auth/permissions";
 import { EmptyState } from "../components/common/EmptyState";
+import { HelpTip } from "../components/common/HelpTip";
+import { SkeletonRows } from "../components/common/Skeleton";
+import { usePageTitle } from "../hooks/usePageTitle";
+import { useMarkOnboardingVisit } from "../hooks/useOnboarding";
+import { ROUTES } from "../constants/routes";
 import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
 import { PeriodFilter } from "../components/common/PeriodFilter";
@@ -49,6 +55,8 @@ export function PipelinePage() {
   const [period, setPeriod] = useState<Period>(EMPTY_PERIOD);
   const showPassivo = !isSuperAdmin || sourceFilter !== "ativo";
   const showAtivo = isSuperAdmin && sourceFilter !== "passivo";
+  usePageTitle("Pipeline");
+  useMarkOnboardingVisit("pipeline");
 
   return (
     <div>
@@ -64,6 +72,7 @@ export function PipelinePage() {
                   : styles.sourceFilterBtn
               }
               onClick={() => setSourceFilter(option)}
+              aria-pressed={sourceFilter === option}
             >
               {SOURCE_FILTER_LABEL[option]}
             </button>
@@ -134,7 +143,17 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
   // `ProspectionBoard.tsx`.
   const [dragColumnId, setDragColumnId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
+  // `?importar=1` (vindo do Dashboard/onboarding) já abre a importação.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [importing, setImporting] = useState(searchParams.get("importar") === "1");
+  const navigate = useNavigate();
+  function closeImport() {
+    setImporting(false);
+    if (searchParams.has("importar")) {
+      searchParams.delete("importar");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }
   const [sortOption, setSortOption] = useState<BoardSortOption>("none");
 
   const ownerNames = new Map((team ?? []).map((m) => [m.id, m.name]));
@@ -194,15 +213,32 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
     })();
   }
 
+  const canConfigure = can(user, "settings.manage");
+  const configureAction = canConfigure
+    ? [{ label: "Abrir Configurações", to: ROUTES.configuracoes }]
+    : [];
+
   if (pipelineError) {
-    return <EmptyState title="Não foi possível carregar os pipelines" message={pipelineError.message} />;
+    return (
+      <EmptyState
+        tone="error"
+        title="Não foi possível carregar o pipeline"
+        message={pipelineError.message}
+        actions={[{ label: "Tentar de novo", onClick: reloadPipelines }]}
+      />
+    );
   }
-  if (loadingPipelines && !pipelines) return <div className={styles.loading}>Carregando…</div>;
+  if (loadingPipelines && !pipelines) return <SkeletonRows rows={5} label="Carregando o pipeline" />;
   if (!pipeline) {
     return (
       <EmptyState
         title="Nenhum pipeline cadastrado ainda"
-        message="Crie o primeiro pipeline em Configurações para começar a usar o quadro."
+        message={
+          canConfigure
+            ? "O pipeline é o caminho da venda (ex.: Novo → Em contato → Proposta → Ganho). Crie o primeiro em Configurações."
+            : "Seu administrador ainda não configurou o funil de vendas. Fale com ele para começar."
+        }
+        actions={configureAction}
       />
     );
   }
@@ -210,13 +246,28 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
     return (
       <EmptyState
         title="Este pipeline ainda não tem etapas"
-        message="Cadastre as etapas do funil em Configurações → Pipelines."
+        message={
+          canConfigure
+            ? "Cadastre as etapas do funil (ex.: Novo, Em contato, Proposta, Ganho, Perdido) em Configurações."
+            : "Seu administrador ainda não cadastrou as etapas deste funil."
+        }
+        actions={configureAction}
       />
     );
   }
 
   const selectedLead = selectedLeadId ? findLead(board.board, selectedLeadId) : null;
   const firstOpenStage = stages.find((s) => !s.isWon && !s.isLost) ?? stages[0];
+  // Quadro sem nenhum lead (e sem filtro): orientar em vez de N colunas
+  // "Sem leads" (Etapa 4).
+  const columns = stages.map((s) => board.board[s.id]);
+  const boardLoaded = columns.every((c) => c && c.page > 0 && !c.loading);
+  const boardEmpty =
+    boardLoaded &&
+    columns.every((c) => (c?.total ?? 0) === 0) &&
+    !debouncedSearch &&
+    !ownerFilter &&
+    JSON.stringify(period) === JSON.stringify(EMPTY_PERIOD);
 
   return (
     <div>
@@ -227,6 +278,17 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
           </h1>
           <p className={styles.pageSubtitle}>
             Arraste os cards entre as etapas — ou abra o lead e escolha a etapa
+            <HelpTip label="Como funciona o pipeline">
+              <span>
+                Cada coluna é uma etapa da venda. Quando a negociação avança, mova o lead para a
+                próxima etapa: arrastando o card, pelo seletor de etapa do card (no celular) ou
+                abrindo o lead.
+              </span>
+              <span>
+                Etapas com 🏆 contam como <b>ganho</b> e com ✕ como <b>perda</b> — é isso que
+                alimenta a conversão e a receita do Dashboard.
+              </span>
+            </HelpTip>
           </p>
         </div>
         <div className={styles.toolbar}>
@@ -279,10 +341,24 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
               </option>
             ))}
           </select>
-          <Button onClick={() => setImporting(true)}>Importar CSV</Button>
+          <Button onClick={() => setImporting(true)}>Importar planilha</Button>
           <Button onClick={handleExport}>Exportar CSV</Button>
         </div>
       </div>
+
+      {boardEmpty && (
+        <div className={styles.boardEmpty}>
+          <EmptyState
+            compact
+            title="Seu funil ainda está vazio"
+            message="Cadastre um lead ou importe uma planilha (CSV do Excel/Google Planilhas). Os leads aparecem na primeira etapa e você os move conforme a venda avança."
+            actions={[
+              { label: "Adicionar lead", onClick: () => navigate(`${ROUTES.leads}?novo=1`) },
+              { label: "Importar planilha", onClick: () => setImporting(true) },
+            ]}
+          />
+        </div>
+      )}
 
       <div className={styles.board}>
         {stages.map((stage) => {
@@ -369,7 +445,7 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
           pipelineId={pipeline.id}
           stages={stages}
           defaultStageId={firstOpenStage.id}
-          onClose={() => setImporting(false)}
+          onClose={closeImport}
           onImported={() => board.reload()}
         />
       )}
@@ -403,6 +479,17 @@ function KanbanCard({
       draggable={!pending}
       onDragStart={onDragStart}
       onClick={onClick}
+      // Teclado: Tab chega no card, Enter/Espaço abre o lead (lá dá para
+      // trocar a etapa sem arrastar).
+      role="button"
+      tabIndex={0}
+      aria-label={`Abrir ${lead.name}`}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       aria-busy={pending}
     >
       <div className={styles.cardName}>{lead.name}</div>

@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ROUTES } from "../constants/routes";
 import { useAuth } from "../hooks/useAuth";
 import { Avatar } from "../components/common/Avatar";
@@ -10,65 +10,16 @@ import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { useToast } from "../hooks/useToast";
 import { isDemoMode } from "../services/factory";
 import type { AuthUser } from "../types/auth";
-import { can, roleLabel as labelForRole, type Permission } from "../auth/permissions";
-import { hasFeature, type TenantFeature } from "../auth/features";
+import { roleLabel as labelForRole } from "../auth/permissions";
+import { navSections } from "./navigation";
+import { DEFAULT_BRAND } from "../config/brand";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { SupportBanner } from "../components/common/SupportBanner";
 import styles from "./AppLayout.module.css";
 
 function roleLabel(user: AuthUser | null): string | undefined {
   return user ? labelForRole(user.role) : undefined;
 }
-
-const NAV_ITEMS: {
-  to: string;
-  icon: Parameters<typeof NavIcon>[0]["name"];
-  label: string;
-  /** Mesma permissão exigida pela ROTA (`routes/index.tsx`) — menu e rota
-   * nunca divergem. `platform.internal` = área interna da GSM ("Clientes"
-   * e SDR); as demais espelham os papéis do backend. Ver
-   * `auth/permissions.ts`. */
-  permission?: Permission;
-  /** Funcionalidade contratada exigida (Etapa 2) — some do menu quando o
-   * tenant não contratou (o backend recusa de qualquer jeito). */
-  feature?: TenantFeature;
-}[] = [
-  { to: ROUTES.dashboard, icon: "dashboard", label: "Dashboard", feature: "dashboard" },
-  // Prospecção GSM não tem item de menu próprio — para quem é super admin,
-  // ela aparece embutida dentro de Pipeline/Dashboard (filtro Ativo/
-  // Passivo/Todos), não como uma tela separada. Ver `PipelinePage.tsx`.
-  { to: ROUTES.pipeline, icon: "pipeline", label: "Pipeline", feature: "crm" },
-  { to: ROUTES.leads, icon: "leads", label: "Leads", feature: "crm" },
-  { to: ROUTES.clientes, icon: "clients", label: "Clientes", permission: "platform.internal" },
-  // SDR (Etapa 1) — pré-prospecção interna da GSM, mesmo gate de "Clientes"
-  // acima. Reaproveita o ícone "prospects" (alvo/crosshair) — hoje sem uso
-  // real em NAV_ITEMS (Prospecção GSM fica embutida em Pipeline, ver
-  // comentário acima), e "pré-prospecção" é exatamente a ideia de um alvo.
-  { to: ROUTES.sdrDashboard, icon: "prospects", label: "SDR", permission: "platform.internal" },
-  { to: ROUTES.tarefas, icon: "tasks", label: "Tarefas", feature: "crm" },
-  { to: ROUTES.agenda, icon: "agenda", label: "Agenda", feature: "crm" },
-  { to: ROUTES.relatorios, icon: "reports", label: "Relatórios", feature: "reports" },
-  {
-    to: ROUTES.configuracoes,
-    icon: "settings",
-    label: "Configurações",
-    permission: "settings.manage",
-  },
-  {
-    to: ROUTES.integracoes,
-    icon: "integrations",
-    label: "Integrações",
-    permission: "integrations.manage",
-  },
-  { to: ROUTES.usuarios, icon: "users", label: "Usuários", permission: "users.view" },
-  // Control plane — área própria (layout separado); só platform staff e
-  // nunca durante uma sessão de suporte.
-  {
-    to: ROUTES.platform,
-    icon: "platform",
-    label: "Plataforma GSM",
-    permission: "platform.console",
-  },
-];
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const {
@@ -89,6 +40,15 @@ export function AppLayout({ children }: { children: ReactNode }) {
   // `AppLayout.module.css`) — controlado só aqui porque em desktop o botão
   // que abre/fecha nem é renderizado (`.menuToggle` some via CSS).
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const online = useOnlineStatus();
+  const [query, setQuery] = useState("");
+
+  // Busca global (Etapa 4): Enter leva para Leads já filtrado.
+  function handleSearch(e: FormEvent) {
+    e.preventDefault();
+    const term = query.trim();
+    navigate(term ? `${ROUTES.leads}?busca=${encodeURIComponent(term)}` : ROUTES.leads);
+  }
 
   // Sidebar fixa (desktop/tablet) recolhida pra uma barra só de ícones —
   // independente do drawer mobile acima, que já resolve o espaço à sua
@@ -139,6 +99,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className={styles.shell}>
+      <a href="#conteudo" className="skip-link">
+        Pular para o conteúdo
+      </a>
       {isDemoMode && (
         <div className={`${styles.demoBanner} theme-dark`}>
           <span>
@@ -148,6 +111,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
       )}
 
       <SupportBanner />
+      {!online && (
+        <div className={styles.offlineBanner} role="status">
+          Você está sem conexão. O que estiver na tela continua visível, mas nada será salvo até a
+          internet voltar.
+        </div>
+      )}
 
       <div className={styles.body}>
         {mobileNavOpen && (
@@ -177,9 +146,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
             ) : (
               <>
                 <span className={styles.logoMark}>
-                  &lt;GSM <span className={styles.logoAccent}>/&gt;</span>
+                  &lt;{DEFAULT_BRAND.logoMark} <span className={styles.logoAccent}>/&gt;</span>
                 </span>
-                <span className={styles.logoSub}>CRM</span>
+                <span className={styles.logoSub}>{DEFAULT_BRAND.logoSuffix}</span>
               </>
             )}
             <button
@@ -192,26 +161,29 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </button>
           </div>
 
-          <nav className={styles.nav}>
-            {NAV_ITEMS.filter(
-              (item) =>
-                (!item.permission || can(user, item.permission)) &&
-                (!item.feature || hasFeature(user, item.feature)),
-            ).map(
-              (item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  title={item.label}
-                  className={({ isActive }) =>
-                    isActive ? `${styles.navItem} ${styles.navItemActive}` : styles.navItem
-                  }
-                >
-                  <NavIcon name={item.icon} />
-                  <span>{item.label}</span>
-                </NavLink>
-              ),
-            )}
+          <nav className={styles.nav} aria-label="Menu principal">
+            {navSections(user).map((section) => (
+              <div key={section.id} className={styles.navSection}>
+                {section.title && (
+                  <div className={styles.navSectionTitle} aria-hidden={collapsed}>
+                    {section.title}
+                  </div>
+                )}
+                {section.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    title={item.label}
+                    className={({ isActive }) =>
+                      isActive ? `${styles.navItem} ${styles.navItemActive}` : styles.navItem
+                    }
+                  >
+                    <NavIcon name={item.icon} />
+                    <span>{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            ))}
           </nav>
 
           <button
@@ -226,20 +198,23 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </button>
 
           <div className={styles.userBox}>
-            {user && (
-              <Avatar name={user.name} bg="var(--tone-green-bg)" color="var(--tone-green)" />
-            )}
-            <div className={styles.userInfo}>
-              <div className={styles.userName}>{user?.name}</div>
-              <div className={styles.userRole}>{roleLabel(user)}</div>
-            </div>
+            <Link to={ROUTES.perfil} className={styles.userLink} title="Meu perfil">
+              {user && (
+                <Avatar name={user.name} bg="var(--tone-green-bg)" color="var(--tone-green)" />
+              )}
+              <div className={styles.userInfo}>
+                <div className={styles.userName}>{user?.name}</div>
+                <div className={styles.userRole}>{roleLabel(user)} · Meu perfil</div>
+              </div>
+            </Link>
             <button
+              type="button"
               className={styles.logoutBtn}
-              onClick={handleLogout}
+              onClick={() => void handleLogout()}
               title="Sair"
-              aria-label="Sair"
+              aria-label="Sair da conta"
             >
-              ⏻
+              <span aria-hidden="true">⏻</span>
             </button>
           </div>
         </aside>
@@ -256,7 +231,20 @@ export function AppLayout({ children }: { children: ReactNode }) {
             >
               <NavIcon name="menu" size={19} />
             </button>
-            <input className={styles.search} placeholder="Buscar leads, empresas…" />
+            <form role="search" className={styles.searchForm} onSubmit={handleSearch}>
+              <label htmlFor="busca-global" className="sr-only">
+                Buscar leads
+              </label>
+              <input
+                id="busca-global"
+                type="search"
+                className={styles.search}
+                placeholder="Buscar leads, empresas, telefone…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                enterKeyHint="search"
+              />
+            </form>
             <div className={styles.topbarRight}>
               {isDemoMode && canSwitchTenant ? (
                 <select
@@ -273,11 +261,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
               ) : canSwitchRealTenant ? (
                 <select
                   className={styles.tenantSwitch}
+                  aria-label="Organização"
                   value={user?.tenantId}
                   onChange={(e) => {
                     const tenantId = e.target.value;
                     selectTenant(tenantId).catch((err: unknown) => {
-                      toastError(err, "Não foi possível trocar de tenant.");
+                      toastError(err, "Não foi possível trocar de organização.");
                     });
                   }}
                 >
@@ -301,13 +290,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 )
               )}
               <ThemeToggle />
-              <button className={styles.newLeadBtn} onClick={() => navigate(ROUTES.leads)}>
+              <button
+                type="button"
+                className={styles.newLeadBtn}
+                onClick={() => navigate(`${ROUTES.leads}?novo=1`)}
+                aria-label="Novo lead"
+              >
                 + Lead
               </button>
             </div>
           </header>
 
-          <main className={styles.content}>
+          <main id="conteudo" className={styles.content} tabIndex={-1}>
             <ErrorBoundary key={location.pathname} scope="page">
               {children}
             </ErrorBoundary>

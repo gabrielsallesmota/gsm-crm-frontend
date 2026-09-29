@@ -128,3 +128,9 @@
     justify-content: flex-start;
   }
 }
+
+.soloHint {
+  margin-top: 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-card);
+}

@@ -100,3 +100,11 @@
   padding: 8px 12px;
   font-size: 13px;
 }
+
+/* Etapa 4 — celular: 2 KPIs por linha em vez de 1 card por tela. */
+@media (max-width: 560px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}

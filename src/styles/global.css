@@ -92,3 +92,77 @@ button {
     opacity: 1;
   }
 }
+
+/* ---- Etapa 4: acessibilidade e toque ---------------------------------- */
+
+/* Foco visível só para teclado (mouse não ganha contorno). Inputs mantêm
+   a borda de foco acima + este contorno. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Texto só para leitor de tela. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* "Pular para o conteúdo" — aparece só quando recebe foco pelo teclado. */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 2000;
+  background: var(--accent);
+  color: var(--on-accent);
+  padding: 10px 14px;
+  border-radius: var(--radius-input);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 12px;
+  color: var(--on-accent);
+}
+
+/* Celular/tablet: alvos de toque de pelo menos 40px e sem zoom automático
+   do iOS ao focar campos (fonte >= 16px). */
+@media (pointer: coarse) {
+  button,
+  select,
+  [role="button"] {
+    min-height: 40px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Restaurando a sessão (ProtectedRoute): fundo do app com um brilho sutil
+   no lugar de uma página em branco. */
+.app-splash {
+  min-height: 100vh;
+  background: var(--bg);
+  background-image: radial-gradient(circle at 50% 42%, rgba(46, 230, 110, 0.12), transparent 38%);
+}

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useLeads } from "../hooks/useLeads";
 import { useLead } from "../hooks/useLead";
 import { useLeadActions } from "../hooks/useLeadActions";
@@ -13,6 +13,10 @@ import { LeadRow } from "../components/leads/LeadRow";
 import { LeadDrawer } from "../components/leads/LeadDrawer";
 import { Badge } from "../components/common/Badge";
 import { EmptyState } from "../components/common/EmptyState";
+import { SkeletonRows } from "../components/common/Skeleton";
+import { usePageTitle } from "../hooks/usePageTitle";
+import { useMarkOnboardingVisit } from "../hooks/useOnboarding";
+import { emailError, phoneError } from "../utils/validation";
 import { Button } from "../components/common/Button";
 import { CurrencyInput } from "../components/common/CurrencyInput";
 import { Modal } from "../components/common/Modal";
@@ -57,6 +61,8 @@ export function LeadsPage() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("todos");
   const showPassivo = !isSuperAdmin || sourceFilter !== "ativo";
   const showAtivo = isSuperAdmin && sourceFilter !== "passivo";
+  usePageTitle("Leads");
+  useMarkOnboardingVisit("leads");
 
   return (
     <div>
@@ -72,6 +78,7 @@ export function LeadsPage() {
                   : styles.sourceFilterBtn
               }
               onClick={() => setSourceFilter(option)}
+              aria-pressed={sourceFilter === option}
             >
               {SOURCE_FILTER_LABEL[option]}
             </button>
@@ -102,11 +109,34 @@ function LeadsTable({ taggedPassivo }: { taggedPassivo: boolean }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast, toastError } = useToast();
-  const [creating, setCreating] = useState(false);
+  // `?novo=1` (botão "+ Lead" da topbar, onboarding, estados vazios) abre o
+  // cadastro; `?busca=` (busca global da topbar) preenche a busca.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [creating, setCreating] = useState(searchParams.get("novo") === "1");
+  const urlSearch = searchParams.get("busca") ?? "";
+  const [lastUrlSearch, setLastUrlSearch] = useState(urlSearch);
 
   // Filtros (Etapa 1): tudo vai para o BACKEND — a lista não carrega mais
   // "os 100 primeiros" e filtra no cliente.
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(urlSearch);
+  if (urlSearch !== lastUrlSearch) {
+    setLastUrlSearch(urlSearch);
+    setSearch(urlSearch);
+  }
+  // Mesmo já estando em /leads, um novo "+ Lead" na topbar reabre o form.
+  const wantsNew = searchParams.get("novo") === "1";
+  const [lastWantsNew, setLastWantsNew] = useState(wantsNew);
+  if (wantsNew !== lastWantsNew) {
+    setLastWantsNew(wantsNew);
+    if (wantsNew) setCreating(true);
+  }
+  function closeCreate() {
+    setCreating(false);
+    if (searchParams.has("novo")) {
+      searchParams.delete("novo");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const [pipelineId, setPipelineId] = useState("");
   const [stageId, setStageId] = useState("");
@@ -176,7 +206,7 @@ function LeadsTable({ taggedPassivo }: { taggedPassivo: boolean }) {
         ...(form.stageId ? { stageId: form.stageId } : {}),
       });
       toast("Lead criado com sucesso");
-      setCreating(false);
+      closeCreate();
       reload();
       navigate(ROUTES.leadDetail(lead.id));
     } catch (err) {
@@ -299,9 +329,32 @@ function LeadsTable({ taggedPassivo }: { taggedPassivo: boolean }) {
       </div>
       <PeriodFilter value={period} onChange={setPeriod} />
 
-      {error && <EmptyState title="Não foi possível carregar os leads" message={error.message} />}
+      {error && (
+        <EmptyState
+          tone="error"
+          title="Não foi possível carregar os leads"
+          message={error.message}
+          actions={[{ label: "Tentar de novo", onClick: reload }]}
+        />
+      )}
 
-      {!error && (
+      {!error && loading && !data && <SkeletonRows rows={6} label="Carregando leads" />}
+
+      {!error && data && data.total === 0 && !hasFilters && (
+        <EmptyState
+          title="Nenhum lead ainda"
+          message="Leads são as pessoas e empresas interessadas no que você vende. Cadastre o primeiro, traga sua planilha atual ou conecte o formulário do site para eles entrarem sozinhos."
+          actions={[
+            ...(defaultPipeline ? [{ label: "Adicionar lead", onClick: () => setCreating(true) }] : []),
+            { label: "Importar planilha", onClick: () => navigate(`${ROUTES.pipeline}?importar=1`) },
+            ...(can(user, "integrations.manage")
+              ? [{ label: "Configurar integração", onClick: () => navigate(ROUTES.integracoes) }]
+              : []),
+          ]}
+        />
+      )}
+
+      {!error && data && (data.total > 0 || hasFilters) && (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
@@ -326,11 +379,13 @@ function LeadsTable({ taggedPassivo }: { taggedPassivo: boolean }) {
               ))}
             </tbody>
           </table>
-          {loading && leads.length === 0 && <div className={styles.empty}>Carregando…</div>}
           {!loading && leads.length === 0 && (
-            <div className={styles.empty}>
-              {hasFilters ? "Nenhum lead com esses filtros." : "Nenhum lead cadastrado ainda."}
-            </div>
+            <EmptyState
+              compact
+              title="Nenhum lead encontrado"
+              message="Nenhum lead corresponde à busca e aos filtros escolhidos."
+              actions={[{ label: "Limpar filtros", onClick: clearFilters }]}
+            />
           )}
         </div>
       )}
@@ -381,7 +436,7 @@ function LeadsTable({ taggedPassivo }: { taggedPassivo: boolean }) {
           canAssign={can(user, "leads.assign")}
           team={team ?? []}
           currentUserId={user?.id ?? ""}
-          onClose={() => setCreating(false)}
+          onClose={closeCreate}
           onSubmit={handleCreate}
         />
       )}
@@ -430,12 +485,22 @@ function QuickCreateModal({
     stageId: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  // Erros só aparecem depois de tentar salvar ou sair do campo (Etapa 4).
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const pipeline = pipelines.find((p) => p.id === form.pipelineId);
+  const errors = {
+    name: form.name.trim() ? null : "Informe o nome do lead.",
+    email: emailError(form.email),
+    phone: phoneError(form.phone),
+  };
+  const touch = (field: string) => setTouched((t) => ({ ...t, [field]: true }));
+  const show = (field: keyof typeof errors) => (touched[field] ? errors[field] : null);
   const set = (patch: Partial<QuickCreateForm>) => setForm((f) => ({ ...f, ...patch }));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    setTouched({ name: true, email: true, phone: true });
+    if (errors.name || errors.email || errors.phone) return;
     setSubmitting(true);
     try {
       await onSubmit({ ...form, name: form.name.trim() });
@@ -448,16 +513,29 @@ function QuickCreateModal({
   }
 
   return (
-    <Modal title="Novo lead" onClose={onClose}>
-      <form className={formStyles.form} onSubmit={(e) => void handleSubmit(e)}>
+    <Modal title="Novo lead" subtitle="Campos com * são obrigatórios." onClose={onClose}>
+      <form className={formStyles.form} onSubmit={(e) => void handleSubmit(e)} noValidate>
         <label className={formStyles.field}>
-          <span className={formStyles.label}>Nome *</span>
+          <span className={formStyles.label}>
+            Nome <span aria-hidden="true">*</span>
+          </span>
           <input
             className={formStyles.input}
             value={form.name}
             onChange={(e) => set({ name: e.target.value })}
+            onBlur={() => touch("name")}
+            required
+            aria-invalid={Boolean(show("name"))}
+            aria-describedby={show("name") ? "lead-name-error" : undefined}
+            autoComplete="name"
+            maxLength={200}
             autoFocus
           />
+          {show("name") && (
+            <span id="lead-name-error" className={formStyles.error}>
+              {show("name")}
+            </span>
+          )}
         </label>
         <div className={formStyles.row}>
           <label className={formStyles.field}>
@@ -466,15 +544,29 @@ function QuickCreateModal({
               className={formStyles.input}
               value={form.company}
               onChange={(e) => set({ company: e.target.value })}
+              autoComplete="organization"
+              maxLength={200}
             />
           </label>
           <label className={formStyles.field}>
-            <span className={formStyles.label}>Telefone</span>
+            <span className={formStyles.label}>Telefone / WhatsApp</span>
             <input
               className={formStyles.input}
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel-national"
+              placeholder="(11) 91234-5678"
               value={form.phone}
               onChange={(e) => set({ phone: formatPhone(e.target.value) })}
+              onBlur={() => touch("phone")}
+              aria-invalid={Boolean(show("phone"))}
+              aria-describedby={show("phone") ? "lead-phone-error" : undefined}
             />
+            {show("phone") && (
+              <span id="lead-phone-error" className={formStyles.error}>
+                {show("phone")}
+              </span>
+            )}
           </label>
         </div>
         <div className={formStyles.row}>
@@ -482,9 +574,21 @@ function QuickCreateModal({
             <span className={formStyles.label}>E-mail</span>
             <input
               className={formStyles.input}
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              placeholder="nome@empresa.com"
               value={form.email}
               onChange={(e) => set({ email: e.target.value })}
+              onBlur={() => touch("email")}
+              aria-invalid={Boolean(show("email"))}
+              aria-describedby={show("email") ? "lead-email-error" : undefined}
             />
+            {show("email") && (
+              <span id="lead-email-error" className={formStyles.error}>
+                {show("email")}
+              </span>
+            )}
           </label>
           <label className={formStyles.field}>
             <span className={formStyles.label}>Valor</span>
@@ -563,7 +667,7 @@ function QuickCreateModal({
           <Button type="button" onClick={onClose} disabled={submitting}>
             Cancelar
           </Button>
-          <Button type="submit" variant="primary" disabled={submitting || !form.name.trim()}>
+          <Button type="submit" variant="primary" disabled={submitting}>
             {submitting ? "Salvando…" : "Criar lead"}
           </Button>
         </div>

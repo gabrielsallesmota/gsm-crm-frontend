@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Lead, LeadMessageTemplate, UpdateLeadInput } from "../../types/lead";
 import type { PipelineStage } from "../../types/pipeline";
 import type { Task } from "../../types/task";
@@ -22,6 +22,7 @@ import { useTaskActions } from "../../hooks/useTaskActions";
 import { useTeamDirectory } from "../../hooks/useTeamDirectory";
 import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../hooks/useToast";
+import { useDialog } from "../../hooks/useDialog";
 import { can } from "../../auth/permissions";
 import { readableTextColor } from "../../utils/colors";
 import { formatPhone } from "../../utils/phone";
@@ -79,6 +80,10 @@ export function LeadDrawer({
   const [postingComment, setPostingComment] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  // Esc/clique fora não descartam edição nem comentário em andamento.
+  const hasUnsaved = () => editing || newComment.trim().length > 0;
+  useDialog(drawerRef, onClose, hasUnsaved);
 
   function afterChange(updated: Lead) {
     onSaved?.(updated);
@@ -195,15 +200,21 @@ export function LeadDrawer({
   );
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div
+      className={styles.overlay}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !hasUnsaved()) onClose();
+      }}
+    >
       <div
+        ref={drawerRef}
         className={styles.drawer}
-        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label={`Lead ${lead.name}`}
+        tabIndex={-1}
       >
-        <button className={styles.close} onClick={onClose} aria-label="Fechar">
+        <button type="button" className={styles.close} onClick={onClose} aria-label="Fechar lead">
           ✕
         </button>
 

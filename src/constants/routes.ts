@@ -25,6 +25,8 @@ export const ROUTES = {
   relatorios: "/relatorios",
   configuracoes: "/configuracoes",
   integracoes: "/configuracoes/integracoes",
+  // "Equipe" (Etapa 4). `/usuarios` continua redirecionando para cá.
+  equipe: "/equipe",
   usuarios: "/usuarios",
   perfil: "/perfil",
   // Control plane da GSM (Etapa 2) — só platform staff.

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button } from "../common/Button";
 import { Modal } from "../common/Modal";
 import { ConfirmDialog } from "../common/ConfirmDialog";
+import { EmptyState } from "../common/EmptyState";
+import { SkeletonRows } from "../common/Skeleton";
 import form from "../common/Form.module.css";
 import { useWebhookDeliveries, useWebhookDelivery, useWebhooks } from "../../hooks/useIntegrations";
 import { useToast } from "../../hooks/useToast";
@@ -48,8 +50,17 @@ export function WebhooksTab({
   if (notImplemented) {
     return <p className={styles.empty}>Integrações não estão disponíveis na demonstração.</p>;
   }
-  if (loading && !data) return <p className={styles.empty}>Carregando…</p>;
-  if (error) return <p className={styles.empty}>{error.message}</p>;
+  if (loading && !data) return <SkeletonRows rows={3} label="Carregando webhooks" />;
+  if (error) {
+    return (
+      <EmptyState
+        tone="error"
+        title="Não foi possível carregar os webhooks"
+        message={error.message}
+        actions={[{ label: "Tentar de novo", onClick: reload }]}
+      />
+    );
+  }
   const endpoints = data?.endpoints ?? [];
   const events = data?.events ?? [];
   const selected = endpoints.find((e) => e.id === selectedId) ?? null;
@@ -81,7 +92,14 @@ export function WebhooksTab({
 
       <div className={styles.tableWrap}>
         {endpoints.length === 0 ? (
-          <p className={styles.empty}>Nenhum webhook configurado.</p>
+          <EmptyState
+            compact
+            title="Nenhum webhook configurado"
+            message="Informe o endereço (https) do sistema que deve ser avisado — por exemplo, um fluxo do n8n — e escolha os eventos: lead criado, mudou de etapa, ganho ou perdido."
+            actions={
+              canManageSecrets ? [{ label: "Novo webhook", onClick: () => setEditing("new") }] : []
+            }
+          />
         ) : (
           <table className={styles.table}>
             <thead>

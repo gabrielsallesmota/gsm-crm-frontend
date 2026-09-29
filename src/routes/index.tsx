@@ -18,12 +18,6 @@ import { ForcedPasswordChangePage } from "../pages/ForcedPasswordChangePage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { PipelinePage } from "../pages/PipelinePage";
 import { LeadsPage } from "../pages/LeadsPage";
-import { TasksPage } from "../pages/TasksPage";
-import { AgendaPage } from "../pages/AgendaPage";
-import { ReportsPage } from "../pages/ReportsPage";
-import { SettingsPage } from "../pages/SettingsPage";
-import { UsersPage } from "../pages/UsersPage";
-import { ProfilePage } from "../pages/ProfilePage";
 
 /**
  * Carrega uma página sob demanda (chunk próprio). Usado para tudo que NÃO
@@ -40,6 +34,16 @@ function lazyPage<K extends string>(
     return { default: page };
   });
 }
+
+// Etapa 4 — telas do CRM menos usadas no primeiro acesso viram chunks
+// próprios (Dashboard, Pipeline e Leads continuam no bundle inicial: são a
+// primeira tela e as mais usadas).
+const TasksPage = lazyPage(() => import("../pages/TasksPage"), "TasksPage");
+const AgendaPage = lazyPage(() => import("../pages/AgendaPage"), "AgendaPage");
+const ReportsPage = lazyPage(() => import("../pages/ReportsPage"), "ReportsPage");
+const SettingsPage = lazyPage(() => import("../pages/SettingsPage"), "SettingsPage");
+const UsersPage = lazyPage(() => import("../pages/UsersPage"), "UsersPage");
+const ProfilePage = lazyPage(() => import("../pages/ProfilePage"), "ProfilePage");
 
 const ClientsPage = lazyPage(() => import("../pages/ClientsPage"), "ClientsPage");
 const SdrCampaignsPage = lazyPage(() => import("../pages/SdrCampaignsPage"), "SdrCampaignsPage");
@@ -75,7 +79,9 @@ function guarded(permission: Permission, page: ReactNode) {
 
 const internal = (page: ReactNode) => guarded("platform.internal", page);
 const contracted = (feature: TenantFeature, page: ReactNode) => (
-  <RequireFeature feature={feature}>{page}</RequireFeature>
+  <RequireFeature feature={feature}>
+    <Suspense fallback={<Loading />}>{page}</Suspense>
+  </RequireFeature>
 );
 
 // Control plane (Etapa 2) — chunk próprio, nunca baixado por quem não é staff.
@@ -146,8 +152,16 @@ export const router = createBrowserRouter([
       { path: ROUTES.relatorios, element: contracted("reports", <ReportsPage />) },
       { path: ROUTES.configuracoes, element: guarded("settings.manage", <SettingsPage />) },
       { path: ROUTES.integracoes, element: guarded("integrations.manage", <IntegrationsPage />) },
-      { path: ROUTES.usuarios, element: guarded("users.view", <UsersPage />) },
-      { path: ROUTES.perfil, element: <ProfilePage /> },
+      { path: ROUTES.equipe, element: guarded("users.view", <UsersPage />) },
+      { path: ROUTES.usuarios, element: <Navigate to={ROUTES.equipe} replace /> },
+      {
+        path: ROUTES.perfil,
+        element: (
+          <Suspense fallback={<Loading />}>
+            <ProfilePage />
+          </Suspense>
+        ),
+      },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

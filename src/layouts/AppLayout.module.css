@@ -405,3 +405,83 @@
     padding: 16px 16px 40px;
   }
 }
+
+/* ---- Etapa 4 ---------------------------------------------------------- */
+.navSection {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.navSection + .navSection {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.navSectionTitle {
+  padding: 0 12px 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.sidebarCollapsed .navSectionTitle {
+  display: none;
+}
+
+.searchForm {
+  flex: 1;
+  min-width: 0;
+  max-width: 380px;
+  display: flex;
+}
+
+.searchForm .search {
+  max-width: none;
+  width: 100%;
+}
+
+.offlineBanner {
+  padding: 8px 20px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5c3b00;
+  background: #ffd98a;
+}
+
+.content:focus {
+  outline: none;
+}
+
+@media (max-width: 900px) {
+  .searchForm {
+    flex: 1 1 160px;
+    max-width: none;
+  }
+
+  .sidebarCollapsed .navSectionTitle {
+    display: block;
+  }
+}
+
+.userLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 10px;
+  padding: 4px;
+  margin: -4px;
+}
+
+.userLink:hover {
+  background: var(--hover-bg-2, rgba(127, 127, 127, 0.1));
+  color: inherit;
+}

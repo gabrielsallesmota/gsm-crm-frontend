@@ -49,7 +49,8 @@ describe("readableDetail — corpo de erro do FastAPI", () => {
   });
   it("lista de validação (422) vira uma frase com o campo traduzido", () => {
     const detail = [{ loc: ["body", "due_at"], msg: "Input should have timezone info", type: "x" }];
-    assert.equal(readableDetail(detail, "fb"), "Vencimento: Input should have timezone info");
+    // Etapa 4: a mensagem do Pydantic (inglês) também é traduzida.
+    assert.equal(readableDetail(detail, "fb"), "Vencimento: data/hora inválida");
   });
   it("formato inesperado → fallback", () => {
     assert.equal(readableDetail({ weird: true }, "fb"), "fb");

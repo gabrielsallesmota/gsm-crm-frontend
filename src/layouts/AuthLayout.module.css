@@ -102,3 +102,7 @@
   justify-content: center;
   padding: clamp(28px, 5vw, 60px);
 }
+
+.footer a {
+  color: inherit;
+}

@@ -53,29 +53,41 @@ export function EventFormModal({
   }
 
   return (
-    <Modal title={event ? "Editar compromisso" : "Novo compromisso"} onClose={onClose}>
+    <Modal
+      title={event ? "Editar compromisso" : "Novo compromisso"}
+      subtitle="Campos com * são obrigatórios."
+      onClose={onClose}
+    >
       <form className={form.form} onSubmit={(e) => void handleSubmit(e)}>
         <div className={form.field}>
-          <span className={form.label}>Lead</span>
+          <span className={form.label}>
+            Lead <span aria-hidden="true">*</span>
+          </span>
           <LeadPicker value={lead} onChange={setLead} disabled={!!fixedLead || !!event} />
         </div>
         <label className={form.field}>
-          <span className={form.label}>Título</span>
+          <span className={form.label}>
+            Título <span aria-hidden="true">*</span>
+          </span>
           <input
             className={form.input}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={200}
             placeholder="Ex.: Reunião de apresentação"
+            required
             autoFocus
           />
         </label>
         <div className={form.row}>
           <label className={form.field}>
-            <span className={form.label}>Data e hora</span>
+            <span className={form.label}>
+              Data e hora <span aria-hidden="true">*</span>
+            </span>
             <input
               className={form.input}
               type="datetime-local"
+              required
               value={at}
               onChange={(e) => setAt(e.target.value)}
             />
@@ -94,7 +106,11 @@ export function EventFormModal({
             </select>
           </label>
         </div>
-        {at && atIso === null && <div className={form.error}>Data/hora inválida.</div>}
+        {at && atIso === null && (
+          <div className={form.error} role="alert">
+            Data/hora inválida. Escolha o dia e o horário no calendário.
+          </div>
+        )}
         <div className={form.actions}>
           <Button type="button" onClick={onClose} disabled={saving}>
             Cancelar

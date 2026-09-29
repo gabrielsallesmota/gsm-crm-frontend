@@ -153,3 +153,24 @@
   border-color: var(--accent);
   color: #fff;
 }
+
+/* Etapa 4 — alvos de toque e celular. */
+.deleteBtn {
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 8px;
+}
+
+@media (max-width: 560px) {
+  .eventRow {
+    flex-wrap: wrap;
+  }
+
+  .eventInfo {
+    flex-basis: calc(100% - 70px);
+  }
+
+  .windows {
+    overflow-x: auto;
+  }
+}

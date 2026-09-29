@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { usePageTitle } from "../hooks/usePageTitle";
+import { HelpTip } from "../components/common/HelpTip";
+import { EmptyState } from "../components/common/EmptyState";
 import { hasFeature } from "../auth/features";
 import { isImpersonating, isReadOnlySupport } from "../auth/impersonation";
 import { ApiCredentialsTab } from "../components/integrations/ApiCredentialsTab";
@@ -21,6 +24,7 @@ export function IntegrationsPage() {
   const [tab, setTab] = useState<Tab>(apiEnabled ? "api" : "webhooks");
   const supporting = isImpersonating(user);
   const readOnly = isReadOnlySupport(user?.impersonation);
+  usePageTitle("Integrações");
 
   const available: { id: Tab; label: string }[] = [
     ...(apiEnabled ? [{ id: "api" as const, label: "API" }] : []),
@@ -34,13 +38,26 @@ export function IntegrationsPage() {
         <h1 className={styles.title}>Integrações</h1>
         <p className={styles.subtitle}>
           Conecte Instagram, WhatsApp, landing pages e outros sistemas ao CRM (via n8n ou direto).
+          <HelpTip label="API ou Webhook?">
+            <span>
+              <b>API</b> = outro sistema ENVIA dados para o CRM (ex.: o formulário do site cria um
+              lead). Você gera uma credencial e entrega a quem faz a integração.
+            </span>
+            <span>
+              <b>Webhook</b> = o CRM AVISA outro sistema quando algo acontece (ex.: lead ganho →
+              planilha ou ERP). Você informa o endereço que vai receber os avisos.
+            </span>
+            <span>Na dúvida, fale com a GSM — a gente configura com você.</span>
+          </HelpTip>
         </p>
       </header>
 
       {available.length === 0 ? (
-        <p className={styles.empty}>
-          API e webhooks não estão contratados para esta organização. Fale com a GSM para ativar.
-        </p>
+        <EmptyState
+          tone="forbidden"
+          title="Integrações não contratadas"
+          message="API e webhooks não fazem parte do plano desta organização. Fale com a GSM para ativar."
+        />
       ) : (
         <>
           <div className={styles.tabs} role="tablist">

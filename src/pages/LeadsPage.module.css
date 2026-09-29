@@ -218,3 +218,22 @@
   align-items: center;
   gap: 10px;
 }
+
+/* Etapa 4 — celular: a lista mostra o essencial (lead + etapa); o resto
+   está a um toque, na ficha do lead. Sem rolagem horizontal. */
+@media (max-width: 640px) {
+  .table th:nth-child(n + 3),
+  .table td:nth-child(n + 3) {
+    display: none;
+  }
+
+  .filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filter {
+    min-width: 0;
+    width: 100%;
+  }
+}

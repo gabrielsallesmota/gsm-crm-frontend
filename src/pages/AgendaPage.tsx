@@ -3,6 +3,8 @@ import { useCalendar } from "../hooks/useCalendar";
 import { useCalendarActions } from "../hooks/useCalendarActions";
 import { useToast } from "../hooks/useToast";
 import { EmptyState } from "../components/common/EmptyState";
+import { SkeletonRows } from "../components/common/Skeleton";
+import { usePageTitle } from "../hooks/usePageTitle";
 import { Button } from "../components/common/Button";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { EventFormModal } from "../components/calendar/EventFormModal";
@@ -34,6 +36,7 @@ export function AgendaPage() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<CalEvent | null>(null);
   const [deleting, setDeleting] = useState<CalEvent | null>(null);
+  usePageTitle("Agenda");
 
   async function handleDelete(event: CalEvent): Promise<boolean> {
     try {
@@ -77,12 +80,29 @@ export function AgendaPage() {
       </div>
 
       {error && (
-        <EmptyState title="Não foi possível carregar a agenda" message={error.message} />
+        <EmptyState
+          tone="error"
+          title="Não foi possível carregar a agenda"
+          message={error.message}
+          actions={[{ label: "Tentar de novo", onClick: reload }]}
+        />
       )}
-      {loading && !data && <div className={styles.loading}>Carregando…</div>}
-
+      {loading && !data && !error && <SkeletonRows rows={4} label="Carregando a agenda" />}
       {data && days.length === 0 && (
-        <div className={styles.empty}>Nenhum compromisso neste período.</div>
+        <EmptyState
+          title={
+            agendaWindow === "past30"
+              ? "Nenhum compromisso nos últimos 30 dias"
+              : "Nenhum compromisso agendado"
+          }
+          message="Registre reuniões, visitas e retornos com seus leads para ver o dia organizado aqui."
+          actions={[
+            { label: "Novo compromisso", onClick: () => setCreating(true) },
+            ...(agendaWindow === "next7"
+              ? [{ label: "Ver próximos 30 dias", onClick: () => setAgendaWindow("next30") }]
+              : []),
+          ]}
+        />
       )}
 
       {days.map((group) => (
@@ -109,7 +129,7 @@ export function AgendaPage() {
                   type="button"
                   className={styles.deleteBtn}
                   onClick={() => setEditing(event)}
-                  aria-label="Editar compromisso"
+                  aria-label={`Editar compromisso: ${event.title}`}
                   title="Editar"
                 >
                   ✎
@@ -118,7 +138,7 @@ export function AgendaPage() {
                   type="button"
                   className={styles.deleteBtn}
                   onClick={() => setDeleting(event)}
-                  aria-label="Excluir compromisso"
+                  aria-label={`Excluir compromisso: ${event.title}`}
                   title="Excluir"
                 >
                   ✕

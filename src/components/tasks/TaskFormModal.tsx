@@ -74,29 +74,41 @@ export function TaskFormModal({
   }
 
   return (
-    <Modal title={task ? "Editar tarefa" : "Nova tarefa"} onClose={onClose}>
+    <Modal
+      title={task ? "Editar tarefa" : "Nova tarefa"}
+      subtitle="Campos com * são obrigatórios."
+      onClose={onClose}
+    >
       <form className={form.form} onSubmit={(e) => void handleSubmit(e)}>
         <div className={form.field}>
-          <span className={form.label}>Lead</span>
+          <span className={form.label}>
+            Lead <span aria-hidden="true">*</span>
+          </span>
           <LeadPicker value={lead} onChange={setLead} disabled={!!fixedLead || !!task} />
         </div>
         <label className={form.field}>
-          <span className={form.label}>Título</span>
+          <span className={form.label}>
+            Título <span aria-hidden="true">*</span>
+          </span>
           <input
             className={form.input}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={200}
             placeholder="Ex.: Ligar para confirmar proposta"
+            required
             autoFocus
           />
         </label>
         <div className={form.row}>
           <label className={form.field}>
-            <span className={form.label}>Vencimento</span>
+            <span className={form.label}>
+              Vencimento <span aria-hidden="true">*</span>
+            </span>
             <input
               className={form.input}
               type="datetime-local"
+              required
               value={due}
               onChange={(e) => setDue(e.target.value)}
             />
@@ -130,7 +142,14 @@ export function TaskFormModal({
             ))}
           </select>
         </label>
-        {due && dueIso === null && <div className={form.error}>Data/hora inválida.</div>}
+        {due && dueIso === null && (
+          <div className={form.error} role="alert">
+            Data/hora inválida. Escolha o dia e o horário no calendário.
+          </div>
+        )}
+        {!valid && !lead && !fixedLead && !task && (
+          <div className={form.hint}>Escolha o lead ao qual a tarefa pertence.</div>
+        )}
         <div className={form.actions}>
           <Button type="button" onClick={onClose} disabled={saving}>
             Cancelar
