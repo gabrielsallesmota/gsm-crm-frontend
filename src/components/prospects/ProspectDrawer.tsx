@@ -3,6 +3,7 @@ import type {
   ContactChannel,
   MessageTemplate,
   Prospect,
+  ProspectContactMethod,
   ProspectLossReason,
   ProspectStage,
   UpdateProspectInput,
@@ -138,13 +139,14 @@ export function ProspectDrawer({
 
   function fillMessages(messages: string[], opportunity: string) {
     const base = editing ? form : fromProspect(prospect);
-    const [m1 = "", m2 = "", m3 = "", m4 = ""] = messages;
+    const [m1 = "", m2 = "", m3 = "", m4 = "", m5 = ""] = messages;
     setForm({
       ...base,
       message1: m1,
       message2: m2,
       message3: m3,
       message4: m4,
+      message5: m5,
       opportunity: base.opportunity?.trim() ? base.opportunity : opportunity,
     });
     setDuplicateBlock(null);
@@ -158,9 +160,7 @@ export function ProspectDrawer({
 
   function hasFilledMessages() {
     const current = editing ? form : fromProspect(prospect);
-    return [current.message1, current.message2, current.message3, current.message4].some((m) =>
-      m?.trim(),
-    );
+    return MESSAGE_KEYS.some((key) => current[key]?.trim());
   }
 
   // IA externa, sem API key (uso interno da GSM): copia um prompt com os
@@ -272,6 +272,7 @@ export function ProspectDrawer({
         ...(form.message2 ? { message2: form.message2 } : {}),
         ...(form.message3 ? { message3: form.message3 } : {}),
         ...(form.message4 ? { message4: form.message4 } : {}),
+        ...(form.message5 ? { message5: form.message5 } : {}),
         // Resumo pode ser apagado (diferente dos campos acima): vai sempre
         // que mudou, inclusive vazio.
         ...(form.summary !== prospect.summary ? { summary: form.summary } : {}),
@@ -812,32 +813,42 @@ export function ProspectDrawer({
             <Button
               onClick={() => void handleDraftMessages()}
               disabled={draftingMessages}
-              title="Monta 4 mensagens (abordagem, retomada, valor e encerramento) com o que o SDR já sabe desta empresa. Não usa OpenAI."
+              title="Monta as 5 etapas da cadência (WhatsApp e ligação) com o que o SDR já sabe desta empresa. Não usa IA nem API key."
             >
               {draftingMessages ? "Gerando…" : "Gerar mensagens"}
             </Button>
           </div>
           <p className={styles.notes} style={{ marginBottom: 8 }}>
-            Uma mensagem própria por campo — configure em "Estágios" qual campo cada estágio usa no
-            lugar do template padrão. Aceita os mesmos placeholders (
+            Uma etapa da cadência por campo: WhatsApp = mensagem pronta, Ligação = roteiro. Em
+            "Estágios", cada estágio aponta o campo que usa e se é WhatsApp ou ligação. Aceita os
+            mesmos placeholders (
             {"{empresa}, {nicho}, {servico_principal}, {cidade}, {bairro}, {avaliacao_google}"}).
           </p>
-          {(["message1", "message2", "message3", "message4"] as const).map((key, i) => (
-            <div key={key} className={styles.field} style={{ marginBottom: 10 }}>
-              <div className={styles.fieldLabel}>Mensagem {i + 1}</div>
-              {editing ? (
-                <textarea
-                  className={styles.textarea}
-                  rows={2}
-                  value={form[key]}
-                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                  placeholder={`Texto da mensagem ${i + 1}…`}
-                />
-              ) : (
-                <p className={styles.notes}>{prospect[key] || "—"}</p>
-              )}
-            </div>
-          ))}
+          {MESSAGE_KEYS.map((key, i) => {
+            const step = cadenceStep(i, stages);
+            const isCall = step.channel === "ligacao";
+            return (
+              <div key={key} className={styles.field} style={{ marginBottom: 10 }}>
+                <div className={styles.fieldLabel}>
+                  {isCall ? "Roteiro" : "Mensagem"} {i + 1} · Dia {step.day} ·{" "}
+                  {isCall ? "📞 Ligação" : "💬 WhatsApp"}
+                </div>
+                {editing ? (
+                  <textarea
+                    className={styles.textarea}
+                    rows={isCall ? 4 : 2}
+                    value={form[key]}
+                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                    placeholder={isCall ? "Roteiro da ligação…" : `Texto da mensagem ${i + 1}…`}
+                  />
+                ) : (
+                  <p className={styles.notes} style={{ whiteSpace: "pre-wrap" }}>
+                    {prospect[key] || "—"}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className={styles.section}>
@@ -931,7 +942,7 @@ export function ProspectDrawer({
                 setAiResponse(e.target.value);
                 setAiImportError(null);
               }}
-              placeholder='{"oportunidade": "…", "mensagens": ["…", "…", "…", "…"]}'
+              placeholder='{"oportunidade": "…", "etapas": [{"dia": 1, "canal": "whatsapp", "mensagem": "…"}, …]}'
               aria-label="Resposta da IA"
               aria-invalid={aiImportError ? true : undefined}
               style={{ width: "100%", marginTop: 8, fontFamily: "monospace" }}
@@ -1056,6 +1067,25 @@ function formatTargetDate(iso: string | null): string {
   return `${day}/${month}/${year}`;
 }
 
+const MESSAGE_KEYS = ["message1", "message2", "message3", "message4", "message5"] as const;
+
+// Cadência padrão (igual ao backend, `sdr/domain/cadence.py`): D1 WhatsApp,
+// D2 ligação, D4 WhatsApp, D7 ligação, D10 WhatsApp. O canal de cada etapa
+// vem do estágio que usa aquele campo, quando existe.
+const DEFAULT_CADENCE: { day: number; channel: ProspectContactMethod }[] = [
+  { day: 1, channel: "whatsapp" },
+  { day: 2, channel: "ligacao" },
+  { day: 4, channel: "whatsapp" },
+  { day: 7, channel: "ligacao" },
+  { day: 10, channel: "whatsapp" },
+];
+
+function cadenceStep(index: number, stages: ProspectStage[]) {
+  const fallback = DEFAULT_CADENCE[index] ?? { day: index + 1, channel: "whatsapp" as const };
+  const stage = stages.find((s) => s.messageField === `message_${index + 1}`);
+  return { day: fallback.day, channel: stage?.contactMethod ?? fallback.channel };
+}
+
 function fromProspect(prospect: Prospect) {
   return {
     companyName: prospect.companyName,
@@ -1087,6 +1117,7 @@ function fromProspect(prospect: Prospect) {
     message2: prospect.message2,
     message3: prospect.message3,
     message4: prospect.message4,
+    message5: prospect.message5,
     summary: prospect.summary,
     initialContactDate: prospect.initialContactDate ?? "",
     targetDate: prospect.targetDate ?? "",

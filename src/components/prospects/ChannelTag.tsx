@@ -5,6 +5,7 @@ import { useToast } from "../../hooks/useToast";
 import { useProspectActions } from "../../hooks/useProspectActions";
 import { CONTACT_CHANNEL } from "../../constants/prospectEnums";
 import { WhatsappButton } from "./WhatsappButton";
+import { CallButton } from "./CallButton";
 import styles from "./ChannelTag.module.css";
 
 /** `Para: .../Assunto: ...` só entra se tiver dado — um prospect com canal
@@ -54,6 +55,11 @@ export function ChannelTag({
   const { sendEmail } = useProspectActions();
   const [sending, setSending] = useState(false);
   const channel = prospect.contactChannel || "whatsapp";
+
+  // Etapa de ligação da cadência: o estágio manda, não o canal do prospect.
+  if (stage?.contactMethod === "ligacao") {
+    return <CallButton prospect={prospect} stage={stage} templates={templates} size={size} />;
+  }
 
   if (channel === "whatsapp") {
     return <WhatsappButton prospect={prospect} stage={stage} templates={templates} size={size} />;

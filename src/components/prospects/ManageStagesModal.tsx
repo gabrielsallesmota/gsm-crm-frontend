@@ -3,7 +3,11 @@ import { Button } from "../common/Button";
 import { useProspectStageActions } from "../../hooks/useProspectStageActions";
 import { useToast } from "../../hooks/useToast";
 import { ApiError } from "../../types/common";
-import type { ProspectMessageField, ProspectStage } from "../../types/prospect";
+import type {
+  ProspectContactMethod,
+  ProspectMessageField,
+  ProspectStage,
+} from "../../types/prospect";
 import styles from "./ManageStagesModal.module.css";
 
 const COLOR_PRESETS = [
@@ -82,6 +86,15 @@ export function ManageStagesModal({
       onChanged();
     } catch (err) {
       toastError(err, "Não foi possível salvar a mensagem do estágio");
+    }
+  }
+
+  async function handleChangeContactMethod(stage: ProspectStage, value: ProspectContactMethod) {
+    try {
+      await update(stage.id, { contactMethod: value });
+      onChanged();
+    } catch (err) {
+      toastError(err, "Não foi possível salvar o tipo de contato do estágio");
     }
   }
 
@@ -231,6 +244,20 @@ export function ManageStagesModal({
                   <option value="message_2">Mensagem 2</option>
                   <option value="message_3">Mensagem 3</option>
                   <option value="message_4">Mensagem 4</option>
+                  <option value="message_5">Mensagem 5</option>
+                </select>
+                <select
+                  className={styles.input}
+                  style={{ width: 120 }}
+                  value={stage.contactMethod}
+                  onChange={(e) =>
+                    void handleChangeContactMethod(stage, e.target.value as ProspectContactMethod)
+                  }
+                  aria-label={`Tipo de contato em ${stage.name}`}
+                  title="WhatsApp: o card mostra a mensagem pronta. Ligação: o card mostra o botão de ligar e o roteiro."
+                >
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="ligacao">Ligação</option>
                 </select>
               </div>
               {rowError?.id === stage.id && <p className={styles.errorNote}>{rowError.message}</p>}

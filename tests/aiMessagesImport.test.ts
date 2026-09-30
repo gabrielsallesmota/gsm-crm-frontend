@@ -15,6 +15,36 @@ function error(raw: string): string {
 }
 
 describe("parseAiMessages", () => {
+  it("lê a cadência em etapas e põe os desvios no roteiro das ligações", () => {
+    const value = ok(
+      JSON.stringify({
+        oportunidade: "Agendamento online",
+        etapas: [
+          { dia: 1, canal: "whatsapp", mensagem: "Oi!", se_responder: "mandar a ideia" },
+          {
+            dia: 2,
+            canal: "ligacao",
+            mensagem: "Roteiro D2",
+            se_responder: "aprofundar",
+            se_nao_responder: "seguir para o D4",
+          },
+          { dia: 4, canal: "whatsapp", mensagem: "Valor" },
+          { dia: 7, canal: "ligação", roteiro: "Roteiro D7" },
+          { dia: 10, canal: "whatsapp", mensagem: "Última" },
+        ],
+        base_da_estrategia: "hipótese",
+      }),
+    );
+    assert.equal(value.opportunity, "Agendamento online");
+    assert.equal(value.messages.length, 5);
+    assert.equal(value.messages[0], "Oi!"); // WhatsApp: vai como está
+    assert.equal(
+      value.messages[1],
+      "Roteiro D2\n\n→ Se responder: aprofundar\n→ Se não responder: seguir para o D4",
+    );
+    assert.equal(value.messages[3], "Roteiro D7");
+  });
+
   it("lê o formato pedido no prompt", () => {
     const value = ok(
       '{"oportunidade": "Agendamento pelo WhatsApp", "mensagens": ["Oi", "Tudo bem?", "Prévia", "Tchau"]}',
@@ -39,9 +69,9 @@ describe("parseAiMessages", () => {
     assert.match(error("   "), /Cole a resposta/);
     assert.match(error("sem json aqui"), /Não encontrei um JSON/);
     assert.match(error('{"mensagens": ["a",]}'), /inválido/);
-    assert.match(error('{"outra": 1}'), /"mensagens"/);
+    assert.match(error('{"outra": 1}'), /"etapas"/);
     assert.match(error('{"mensagens": ["", "  "]}'), /nenhuma mensagem/);
-    assert.match(error('{"mensagens": ["1","2","3","4","5"]}'), /máximo é 4/);
+    assert.match(error('{"mensagens": ["1","2","3","4","5","6"]}'), /máximo é 5/);
     assert.match(error('{"mensagens": [1, 2]}'), /precisam ser texto/);
     assert.match(error(JSON.stringify({ mensagens: ["ok", "x".repeat(2001)] })), /mensagem 2 passa/);
   });

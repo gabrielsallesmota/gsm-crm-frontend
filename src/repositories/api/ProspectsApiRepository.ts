@@ -16,6 +16,7 @@ import type {
   ProspectDuplicateCheck,
   ProspectListFilter,
   ProspectLossReason,
+  ProspectContactMethod,
   ProspectMessageField,
   ProspectOrigin,
   ProspectPriority,
@@ -65,6 +66,7 @@ interface ProspectDto {
   message_2: string | null;
   message_3: string | null;
   message_4: string | null;
+  message_5?: string | null;
   summary?: string | null;
   initial_contact_date: string | null;
   target_date: string | null;
@@ -84,6 +86,7 @@ interface ProspectStageDto {
   followup_business_days: number | null;
   message_field: ProspectMessageField | null;
   is_prospecting_entry: boolean;
+  contact_method?: ProspectContactMethod;
 }
 
 function toProspect(dto: ProspectDto): Prospect {
@@ -121,6 +124,7 @@ function toProspect(dto: ProspectDto): Prospect {
     message2: dto.message_2 ?? "",
     message3: dto.message_3 ?? "",
     message4: dto.message_4 ?? "",
+    message5: dto.message_5 ?? "",
     summary: dto.summary ?? "",
     initialContactDate: dto.initial_contact_date,
     targetDate: dto.target_date,
@@ -144,6 +148,7 @@ function toProspectStage(dto: ProspectStageDto): ProspectStage {
     followupBusinessDays: dto.followup_business_days,
     messageField: dto.message_field,
     isProspectingEntry: dto.is_prospecting_entry,
+    contactMethod: dto.contact_method ?? "whatsapp",
   };
 }
 
@@ -179,6 +184,7 @@ function createBody(input: CreateProspectInput | UpdateProspectInput) {
     message_2: input.message2,
     message_3: input.message3,
     message_4: input.message4,
+    message_5: input.message5,
     summary: input.summary,
     initial_contact_date: input.initialContactDate,
     target_date: input.targetDate,
@@ -216,6 +222,7 @@ function importRowBody(row: ImportRowInput) {
     message_2: row.message2,
     message_3: row.message3,
     message_4: row.message4,
+    message_5: row.message5,
     initial_contact_date: row.initialContactDate,
   };
 }
@@ -382,6 +389,7 @@ export class ProspectsApiRepository implements ProspectsRepository {
           followup_business_days: input.followupBusinessDays ?? null,
           message_field: input.messageField ?? null,
           is_prospecting_entry: input.isProspectingEntry ?? false,
+          contact_method: input.contactMethod ?? "whatsapp",
         }),
       }),
     );
@@ -402,6 +410,7 @@ export class ProspectsApiRepository implements ProspectsRepository {
           message_field: input.messageField,
           clear_message_field: input.clearMessageField ?? false,
           is_prospecting_entry: input.isProspectingEntry,
+          contact_method: input.contactMethod,
         }),
       }),
     );

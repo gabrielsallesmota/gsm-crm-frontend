@@ -659,6 +659,8 @@ export interface SdrProspectingQueueFilter {
  * `POST /sdr/prospects/{id}/draft-messages`. `messages` na ordem de uso:
  * abordagem, retomada, valor, encerramento. */
 export interface SdrDraftMessages {
+  /** Canal de cada etapa, na ordem de `messages` (`ligacao` = roteiro). */
+  channels: ("whatsapp" | "ligacao")[];
   opportunities: string[];
   hook: string;
   messages: string[];

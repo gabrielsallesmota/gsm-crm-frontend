@@ -1243,12 +1243,14 @@ export class SdrApiRepository implements SdrRepository {
       hook: string;
       messages: string[];
       based_on: string[];
+      channels?: ("whatsapp" | "ligacao")[];
     }>(`/api/v1/sdr/prospects/${prospectId}/draft-messages`, { method: "POST" });
     return {
       opportunities: dto.opportunities ?? [],
       hook: dto.hook ?? "",
       messages: dto.messages ?? [],
       basedOn: dto.based_on ?? [],
+      channels: dto.channels ?? [],
     };
   }
 

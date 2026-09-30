@@ -65,6 +65,7 @@ const MESSAGE_FIELD_TO_PROSPECT_KEY: Record<ProspectMessageField, keyof Prospect
   message_2: "message2",
   message_3: "message3",
   message_4: "message4",
+  message_5: "message5",
 };
 
 /**

@@ -5,12 +5,21 @@
  *
  *   {"oportunidade": "...", "mensagens": ["...", "...", "...", "..."]}
  *
+ * Formato atual (cadência de 5 etapas):
+ *
+ *   {"oportunidade": "...", "etapas": [{"dia": 1, "canal": "whatsapp",
+ *     "mensagem": "...", "se_responder": "...", "se_nao_responder": "..."}]}
+ *
+ * Etapa i vai para `message{i}`. Em etapa de ligação, "se responder / se
+ * não responder" entram no fim do roteiro (é texto para quem liga); em
+ * WhatsApp ficam de fora (a mensagem é enviada como está).
+ *
  * O parser é tolerante porque a IA nem sempre obedece: aceita a resposta
  * dentro de cercas ```json, com texto antes/depois, só o array de mensagens,
- * objetos `{texto: ...}` no lugar de strings, ou chaves `mensagem_1..4`.
+ * objetos `{texto: ...}` no lugar de strings, ou chaves `mensagem_1..5`.
  */
 
-export const MAX_IMPORTED_MESSAGES = 4;
+export const MAX_IMPORTED_MESSAGES = 5;
 export const MAX_IMPORTED_MESSAGE_LENGTH = 2000;
 
 export interface ImportedAiMessages {
@@ -22,8 +31,8 @@ export type AiMessagesParseResult =
   | { ok: true; value: ImportedAiMessages }
   | { ok: false; error: string };
 
-const LIST_KEYS = ["mensagens", "messages", "follow_ups", "followups", "follow-ups"];
-const TEXT_KEYS = ["texto", "text", "mensagem", "message", "conteudo", "content"];
+const LIST_KEYS = ["etapas", "steps", "mensagens", "messages", "follow_ups", "followups", "follow-ups"];
+const TEXT_KEYS = ["mensagem", "roteiro", "texto", "text", "message", "script", "conteudo", "content"];
 const OPPORTUNITY_KEYS = ["oportunidade", "opportunity"];
 
 function extractJson(raw: string): string | null {
@@ -36,12 +45,27 @@ function extractJson(raw: string): string | null {
   return end > start ? text.slice(start, end + 1) : null;
 }
 
+function isCall(record: Record<string, unknown>): boolean {
+  const channel = typeof record.canal === "string" ? record.canal : record.channel;
+  return typeof channel === "string" && /liga/i.test(channel);
+}
+
 function asText(item: unknown): string | null {
   if (typeof item === "string") return item;
   if (item && typeof item === "object") {
     const record = item as Record<string, unknown>;
     for (const key of TEXT_KEYS) {
-      if (typeof record[key] === "string") return record[key];
+      const value = record[key];
+      if (typeof value !== "string") continue;
+      if (!isCall(record)) return value;
+      const branches: string[] = [];
+      for (const [label, text] of [
+        ["Se responder", record.se_responder],
+        ["Se não responder", record.se_nao_responder],
+      ] as const) {
+        if (typeof text === "string" && text.trim()) branches.push(`→ ${label}: ${text.trim()}`);
+      }
+      return branches.length > 0 ? `${value.trim()}\n\n${branches.join("\n")}` : value;
     }
   }
   return null;
@@ -90,7 +114,7 @@ export function parseAiMessages(raw: string): AiMessagesParseResult {
     items = listKey ? (record[listKey] as unknown[]) : numberedMessages(record);
   }
   if (!items) {
-    return { ok: false, error: 'O JSON não tem a lista "mensagens".' };
+    return { ok: false, error: 'O JSON não tem a lista "etapas".' };
   }
 
   const texts = items.map(asText);

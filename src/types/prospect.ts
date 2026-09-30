@@ -41,7 +41,16 @@ export type DedupeStrategy = "skip" | "update" | "duplicate";
 /** Qual dos 4 campos de mensagem livre do PRÓPRIO prospect
  * (`Prospect.message1`..`message4`) um estágio usa no botão de WhatsApp em
  * vez do template padrão — ver `ProspectStage.messageField`. */
-export type ProspectMessageField = "message_1" | "message_2" | "message_3" | "message_4";
+export type ProspectMessageField =
+  | "message_1"
+  | "message_2"
+  | "message_3"
+  | "message_4"
+  | "message_5";
+
+/** Como a GSM fala com o prospect num estágio da cadência: WhatsApp
+ * (mensagem pronta) ou ligação (roteiro + botão de ligar). */
+export type ProspectContactMethod = "whatsapp" | "ligacao";
 
 export interface ProspectStage {
   id: string;
@@ -64,6 +73,9 @@ export interface ProspectStage {
   // do template padrão — `null` = comportamento antigo (template por
   // estágio/área, ver `utils/messageTemplates.ts::resolveProspectMessage`).
   messageField: ProspectMessageField | null;
+  // WhatsApp ou ligação — decide o botão do card e o que a IA escreve para
+  // a etapa que usa `messageField` (ver backend `sdr/domain/cadence.py`).
+  contactMethod: ProspectContactMethod;
   // Estágio de entrada do funil ("A prospectar") — no máximo 1 por tenant
   // (marcar um novo desmarca o anterior sozinho, ver `ManageStagesModal.tsx`).
   // Um prospect aprovado/criado neste estágio ainda NÃO foi contatado:
@@ -142,6 +154,7 @@ export interface Prospect {
   message2: string;
   message3: string;
   message4: string;
+  message5: string;
   // Resumo livre do lead (uso interno da GSM) — entra no prompt copiado
   // para uma IA externa. `""` = sem resumo.
   summary: string;
@@ -213,6 +226,7 @@ export interface CreateProspectInput {
   message2?: string;
   message3?: string;
   message4?: string;
+  message5?: string;
   summary?: string;
   // P0 — data do primeiro contato. Não informado = ainda sem contato
   // registrado (`initialContactDate` fica `null` — "aprovar não significa
@@ -235,6 +249,7 @@ export type CreateProspectStageInput = Pick<ProspectStage, "name" | "color"> &
       | "followupBusinessDays"
       | "messageField"
       | "isProspectingEntry"
+      | "contactMethod"
     >
   >;
 
@@ -249,6 +264,7 @@ export type UpdateProspectStageInput = Partial<
     | "followupBusinessDays"
     | "messageField"
     | "isProspectingEntry"
+    | "contactMethod"
   >
 > & {
   // Ver backend `UpdateProspectStageCommand.clear_followup_business_days` —
@@ -294,6 +310,7 @@ export interface ImportRowInput {
   message2?: string;
   message3?: string;
   message4?: string;
+  message5?: string;
   // P0 — data do primeiro contato dessa linha ("YYYY-MM-DD"). Não mapeado
   // = sem contato registrado (fica `null`, ver backend
   // `BulkImportProspectsUseCase`).
@@ -346,6 +363,7 @@ export const IMPORTABLE_PROSPECT_FIELDS: { key: keyof ImportRowInput; label: str
   { key: "message2", label: "Mensagem 2" },
   { key: "message3", label: "Mensagem 3" },
   { key: "message4", label: "Mensagem 4" },
+  { key: "message5", label: "Mensagem 5" },
   { key: "offeredService", label: "Serviço ofertado" },
   { key: "noWhatsapp", label: "Sem WhatsApp" },
 ];
