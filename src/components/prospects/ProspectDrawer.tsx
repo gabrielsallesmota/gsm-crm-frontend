@@ -33,7 +33,9 @@ import {
   PRIORITY,
   PROSPECT_ORIGIN,
   SITE_STATUS,
+  SELECTABLE_PROSPECT_ORIGINS,
   WHATSAPP_STATUS,
+  enumMeta,
 } from "../../constants/prospectEnums";
 import styles from "./ProspectDrawer.module.css";
 
@@ -91,8 +93,8 @@ export function ProspectDrawer({
     }
   }
   const stage = stages.find((s) => s.id === prospect.stageId);
-  const priority = PRIORITY[prospect.priority];
-  const origin = PROSPECT_ORIGIN[prospect.origin];
+  const priority = enumMeta(PRIORITY, prospect.priority, "c", "prioridade");
+  const origin = enumMeta(PROSPECT_ORIGIN, prospect.origin, "outro", "origem");
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -501,7 +503,10 @@ export function ProspectDrawer({
               editing={editing}
               value={form.origin}
               display={origin.label}
-              options={Object.entries(PROSPECT_ORIGIN).map(([k, v]) => ({ value: k, label: v.label }))}
+              options={[
+                ...SELECTABLE_PROSPECT_ORIGINS,
+                ...(prospect.origin === "sdr" ? (["sdr"] as const) : []),
+              ].map((k) => ({ value: k, label: PROSPECT_ORIGIN[k].label }))}
               onChange={(v) => setForm((f) => ({ ...f, origin: v as FormState["origin"] }))}
             />
             <div className={`${styles.field} ${styles.fieldFull}`}>
@@ -539,7 +544,7 @@ export function ProspectDrawer({
               label="Tipo de telefone"
               editing={editing}
               value={form.phoneType}
-              display={PHONE_TYPE[prospect.phoneType].label}
+              display={enumMeta(PHONE_TYPE, prospect.phoneType, "nao_verificado", "tipo de telefone").label}
               options={Object.entries(PHONE_TYPE).map(([k, v]) => ({ value: k, label: v.label }))}
               onChange={(v) => setForm((f) => ({ ...f, phoneType: v as FormState["phoneType"] }))}
             />
@@ -547,7 +552,7 @@ export function ProspectDrawer({
               label="Status do WhatsApp"
               editing={editing}
               value={form.whatsappStatus}
-              display={WHATSAPP_STATUS[prospect.whatsappStatus].label}
+              display={enumMeta(WHATSAPP_STATUS, prospect.whatsappStatus, "nao_verificado", "status do WhatsApp").label}
               options={Object.entries(WHATSAPP_STATUS).map(([k, v]) => ({ value: k, label: v.label }))}
               onChange={(v) => setForm((f) => ({ ...f, whatsappStatus: v as FormState["whatsappStatus"] }))}
             />
@@ -562,7 +567,7 @@ export function ProspectDrawer({
               label="Canal de abordagem"
               editing={editing}
               value={form.contactChannel}
-              display={CONTACT_CHANNEL[prospect.contactChannel].label}
+              display={enumMeta(CONTACT_CHANNEL, prospect.contactChannel, "whatsapp", "canal").label}
               options={Object.entries(CONTACT_CHANNEL).map(([k, v]) => ({ value: k, label: v.label }))}
               onChange={(v) => setForm((f) => ({ ...f, contactChannel: v as FormState["contactChannel"] }))}
             />
@@ -602,7 +607,7 @@ export function ProspectDrawer({
               label="Status do site"
               editing={editing}
               value={form.siteStatus}
-              display={SITE_STATUS[prospect.siteStatus].label}
+              display={enumMeta(SITE_STATUS, prospect.siteStatus, "nao_verificado", "status do site").label}
               options={Object.entries(SITE_STATUS).map(([k, v]) => ({ value: k, label: v.label }))}
               onChange={(v) => setForm((f) => ({ ...f, siteStatus: v as FormState["siteStatus"] }))}
             />
@@ -672,7 +677,7 @@ export function ProspectDrawer({
               label="Objetivo da página"
               editing={editing}
               value={form.pageObjective}
-              display={prospect.pageObjective ? PAGE_OBJECTIVE[prospect.pageObjective].label : "—"}
+              display={prospect.pageObjective ? (PAGE_OBJECTIVE[prospect.pageObjective]?.label ?? prospect.pageObjective) : "—"}
               options={[
                 { value: "", label: "—" },
                 ...Object.entries(PAGE_OBJECTIVE).map(([k, v]) => ({ value: k, label: v.label })),

@@ -16,7 +16,13 @@ import { ChannelTag } from "./ChannelTag";
 import { useToast } from "../../hooks/useToast";
 import { prospectsService } from "../../services/ProspectsService";
 import { ApiError } from "../../types/common";
-import { PRIORITY, PROSPECT_ORIGIN, WHATSAPP_STATUS } from "../../constants/prospectEnums";
+import {
+  PRIORITY,
+  PROSPECT_ORIGIN,
+  SELECTABLE_PROSPECT_ORIGINS,
+  WHATSAPP_STATUS,
+  enumMeta,
+} from "../../constants/prospectEnums";
 import type { Period } from "../../utils/periods";
 import { computeStageTargetDate, nextStageByOrder } from "../../utils/prospectCadence";
 import { formatPhone } from "../../utils/phone";
@@ -690,8 +696,8 @@ function ProspectCard({
   onToggleNoWhatsapp: () => void;
   onEmailSent: () => void;
 }) {
-  const priority = PRIORITY[prospect.priority];
-  const whatsapp = WHATSAPP_STATUS[prospect.whatsappStatus];
+  const priority = enumMeta(PRIORITY, prospect.priority, "c", "prioridade");
+  const whatsapp = enumMeta(WHATSAPP_STATUS, prospect.whatsappStatus, "nao_verificado", "status do WhatsApp");
   return (
     <div className={styles.card} draggable onDragStart={onDragStart} onClick={onClick}>
       <div className={styles.cardTop}>
@@ -845,9 +851,9 @@ function QuickCreateModal({
           value={origin}
           onChange={(e) => setOrigin(e.target.value as ProspectOrigin)}
         >
-          {Object.entries(PROSPECT_ORIGIN).map(([key, meta]) => (
+          {SELECTABLE_PROSPECT_ORIGINS.map((key) => (
             <option key={key} value={key}>
-              {meta.label}
+              {PROSPECT_ORIGIN[key].label}
             </option>
           ))}
         </select>

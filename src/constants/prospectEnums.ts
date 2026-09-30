@@ -62,4 +62,31 @@ export const PROSPECT_ORIGIN: Record<ProspectOrigin, { label: string; color: str
   site: { label: "Site", color: "var(--tone-blue)", bg: "var(--tone-blue-bg)" },
   evento: { label: "Evento", color: "var(--tone-purple)", bg: "var(--tone-purple-bg)" },
   outro: { label: "Outro", color: "var(--tone-gray)", bg: "var(--tone-gray-bg)" },
+  sdr: { label: "SDR", color: "var(--tone-blue)", bg: "var(--tone-blue-bg)" },
 };
+
+/** Origens que dá pra escolher à mão (cadastro, importação, edição). "SDR"
+ * só o backend define, ao aprovar um candidato. */
+export const SELECTABLE_PROSPECT_ORIGINS = (
+  Object.keys(PROSPECT_ORIGIN) as (keyof typeof PROSPECT_ORIGIN)[]
+).filter((origin) => origin !== "sdr");
+
+/**
+ * Lê o rótulo/cores de um valor de enum sem derrubar a tela: valor fora do
+ * mapa (dado antigo, API numa versão diferente do front) cai no `fallback`
+ * e é avisado no console com o campo e o valor, pra dar pra corrigir a
+ * origem. Antes, `MAPA[valor].label` com valor desconhecido quebrava o
+ * drawer inteiro ("Cannot read properties of undefined (reading 'label')").
+ */
+export function enumMeta<K extends string, V>(
+  map: Record<K, V>,
+  value: string | null | undefined,
+  fallback: K,
+  field: string,
+): V {
+  const meta = value != null ? (map as Record<string, V | undefined>)[value] : undefined;
+  if (meta) return meta;
+  console.warn(`Valor inesperado em ${field}:`, value);
+  return map[fallback];
+}
+

@@ -14,7 +14,7 @@ import {
   PAGE_OBJECTIVE,
   PHONE_TYPE,
   PRIORITY,
-  PROSPECT_ORIGIN,
+  SELECTABLE_PROSPECT_ORIGINS,
   SITE_STATUS,
   WHATSAPP_STATUS,
 } from "../../constants/prospectEnums";
@@ -29,7 +29,7 @@ const ENUM_KEYS: Partial<Record<keyof ImportRowInput, string[]>> = {
   siteStatus: Object.keys(SITE_STATUS),
   pageObjective: Object.keys(PAGE_OBJECTIVE),
   priority: Object.keys(PRIORITY),
-  origin: Object.keys(PROSPECT_ORIGIN),
+  origin: SELECTABLE_PROSPECT_ORIGINS,
   // "WHATSAPP"/"INSTAGRAM"/"EMAIL" do CSV batem certinho — `buildRow` já
   // normaliza pra minúsculo antes de comparar (ver abaixo).
   contactChannel: Object.keys(CONTACT_CHANNEL),

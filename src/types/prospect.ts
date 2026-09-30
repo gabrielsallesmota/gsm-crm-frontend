@@ -25,7 +25,16 @@ export type ContactChannel = "whatsapp" | "instagram" | "email";
 
 /** De onde a GSM achou o prospect — diferente da "origem" de um Lead (canal
  * pelo qual um CLIENTE do CRM recebeu um lead de fora). */
-export type ProspectOrigin = "google_maps" | "indicacao" | "instagram" | "site" | "evento" | "outro";
+// "sdr" = aprovado a partir de um candidato do SDR (definido pelo backend,
+// nunca escolhido à mão — ver `SELECTABLE_PROSPECT_ORIGINS`).
+export type ProspectOrigin =
+  | "google_maps"
+  | "indicacao"
+  | "instagram"
+  | "site"
+  | "evento"
+  | "outro"
+  | "sdr";
 
 export type DedupeStrategy = "skip" | "update" | "duplicate";
 
