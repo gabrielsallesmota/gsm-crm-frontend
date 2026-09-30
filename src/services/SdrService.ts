@@ -21,6 +21,7 @@ import type {
   SdrCandidateScore,
   SdrOutreachChannel,
   SdrOutreachTone,
+  SdrDraftMessages,
   SdrProspectSdrContext,
   SdrProspectingQueueFilter,
   SdrDashboardOverview,
@@ -278,6 +279,16 @@ export class SdrService {
 
   getProspectOutreachContext(prospectId: string): Promise<SdrProspectSdrContext> {
     return repo.getProspectOutreachContext(prospectId);
+  }
+
+  draftProspectMessages(prospectId: string): Promise<SdrDraftMessages> {
+    return repo.draftProspectMessages(prospectId);
+  }
+
+  // Prompt para colar numa IA externa (sem API key). `summary` = o texto do
+  // campo Resumo na tela; omitido = usa o Resumo salvo.
+  buildProspectAiPrompt(prospectId: string, summary?: string): Promise<string> {
+    return repo.buildProspectAiPrompt(prospectId, summary);
   }
 
   // Etapa 8 — dashboard, funil real e custos.

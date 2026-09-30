@@ -18,6 +18,7 @@ import type {
   SdrCandidateScore,
   SdrOutreachChannel,
   SdrOutreachTone,
+  SdrDraftMessages,
   SdrProspectSdrContext,
   SdrDashboardOverview,
   SdrProviderCostSummary,
@@ -276,6 +277,14 @@ export class SdrMockRepository implements SdrRepository {
   }
 
   async getProspectOutreachContext(): Promise<SdrProspectSdrContext> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async draftProspectMessages(): Promise<SdrDraftMessages> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async buildProspectAiPrompt(): Promise<string> {
     throw new NotImplementedError("SDR", REASON);
   }
 

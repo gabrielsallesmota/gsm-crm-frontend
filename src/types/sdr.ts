@@ -655,6 +655,16 @@ export interface SdrProspectingQueueFilter {
   minPriority?: SdrPriority;
 }
 
+/** Rascunho de mensagens SEM IA (não grava nada) —
+ * `POST /sdr/prospects/{id}/draft-messages`. `messages` na ordem de uso:
+ * abordagem, retomada, valor, encerramento. */
+export interface SdrDraftMessages {
+  opportunities: string[];
+  hook: string;
+  messages: string[];
+  basedOn: string[];
+}
+
 export interface SdrProspectSdrContext {
   prospectId: string;
   companyName: string;

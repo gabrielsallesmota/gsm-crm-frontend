@@ -21,6 +21,7 @@ import type {
   SdrCandidateScore,
   SdrOutreachChannel,
   SdrOutreachTone,
+  SdrDraftMessages,
   SdrProspectSdrContext,
   SdrProspectingQueueFilter,
   SdrDashboardOverview,
@@ -1232,6 +1233,29 @@ export class SdrApiRepository implements SdrRepository {
         `/api/v1/sdr/prospects/${prospectId}/outreach-context`,
       ),
     );
+  }
+
+  async draftProspectMessages(prospectId: string): Promise<SdrDraftMessages> {
+    const dto = await apiRequest<{
+      opportunities: string[];
+      hook: string;
+      messages: string[];
+      based_on: string[];
+    }>(`/api/v1/sdr/prospects/${prospectId}/draft-messages`, { method: "POST" });
+    return {
+      opportunities: dto.opportunities ?? [],
+      hook: dto.hook ?? "",
+      messages: dto.messages ?? [],
+      basedOn: dto.based_on ?? [],
+    };
+  }
+
+  async buildProspectAiPrompt(prospectId: string, summary?: string): Promise<string> {
+    const dto = await apiRequest<{ prompt: string }>(
+      `/api/v1/sdr/prospects/${prospectId}/ai-prompt`,
+      { method: "POST", body: JSON.stringify({ summary: summary ?? null }) },
+    );
+    return dto.prompt;
   }
 
   // Etapa 8 — dashboard, funil real e custos.

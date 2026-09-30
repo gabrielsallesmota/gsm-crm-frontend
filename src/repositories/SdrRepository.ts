@@ -15,6 +15,7 @@ import type {
   SdrCandidateScore,
   SdrOutreachChannel,
   SdrOutreachTone,
+  SdrDraftMessages,
   SdrProspectSdrContext,
   SdrProspectingQueueFilter,
   SdrDashboardOverview,
@@ -124,6 +125,8 @@ export interface SdrRepository {
   // Etapa 7 — operação comercial ("Prospectar hoje").
   listProspectingQueue(filter?: SdrProspectingQueueFilter): Promise<SdrProspectSdrContext[]>;
   getProspectOutreachContext(prospectId: string): Promise<SdrProspectSdrContext>;
+  draftProspectMessages(prospectId: string): Promise<SdrDraftMessages>;
+  buildProspectAiPrompt(prospectId: string, summary?: string): Promise<string>;
 
   // Etapa 8 — dashboard, funil real e custos.
   getDashboardOverview(): Promise<SdrDashboardOverview>;

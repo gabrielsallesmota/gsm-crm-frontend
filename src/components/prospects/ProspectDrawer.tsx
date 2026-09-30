@@ -9,6 +9,9 @@ import type {
 } from "../../types/prospect";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
+import { ConfirmDialog } from "../common/ConfirmDialog";
+import { Modal } from "../common/Modal";
+import formStyles from "../common/Form.module.css";
 import { ChannelTag } from "./ChannelTag";
 import { useProspectActions } from "../../hooks/useProspectActions";
 import { useProspectComments } from "../../hooks/useProspectComments";
@@ -18,8 +21,9 @@ import { EmptyState } from "../common/EmptyState";
 import { useToast } from "../../hooks/useToast";
 import { ApiError } from "../../types/common";
 import { sdrService } from "../../services/SdrService";
-import { SDR_PRIORITY_LABEL, type SdrPriority } from "../../types/sdr";
+import { SDR_PRIORITY_LABEL, type SdrDraftMessages, type SdrPriority } from "../../types/sdr";
 import { formatPhone } from "../../utils/phone";
+import { parseAiMessages, type ImportedAiMessages } from "../../utils/aiMessagesImport";
 import { nextStageByOrder } from "../../utils/prospectCadence";
 import {
   CONTACT_CHANNEL,
@@ -123,6 +127,100 @@ export function ProspectDrawer({
     setEditing(true);
   }
 
+  // Mensagens SEM IA (não depende da OpenAI): rascunho a partir do Score
+  // GSM e dos dados do prospect, em qualquer etapa. Só preenche o
+  // formulário — nada é salvo até a pessoa revisar e clicar em Salvar.
+  const [draftingMessages, setDraftingMessages] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<SdrDraftMessages | null>(null);
+
+  function fillMessages(messages: string[], opportunity: string) {
+    const base = editing ? form : fromProspect(prospect);
+    const [m1 = "", m2 = "", m3 = "", m4 = ""] = messages;
+    setForm({
+      ...base,
+      message1: m1,
+      message2: m2,
+      message3: m3,
+      message4: m4,
+      opportunity: base.opportunity?.trim() ? base.opportunity : opportunity,
+    });
+    setDuplicateBlock(null);
+    setEditing(true);
+  }
+
+  function applyDraft(draft: SdrDraftMessages) {
+    fillMessages(draft.messages, draft.opportunities.join(" "));
+    toast("Mensagens geradas sem IA — revise e clique em Salvar.", "info");
+  }
+
+  function hasFilledMessages() {
+    const current = editing ? form : fromProspect(prospect);
+    return [current.message1, current.message2, current.message3, current.message4].some((m) =>
+      m?.trim(),
+    );
+  }
+
+  // IA externa, sem API key (uso interno da GSM): copia um prompt com os
+  // dados do prospect + o Resumo, a pessoa cola no ChatGPT/Claude e importa
+  // de volta o JSON da resposta. Como o rascunho acima, só preenche o
+  // formulário — salvar continua sendo manual.
+  const [copyingPrompt, setCopyingPrompt] = useState(false);
+  const [importingAi, setImportingAi] = useState(false);
+  const [aiResponse, setAiResponse] = useState("");
+  const [aiImportError, setAiImportError] = useState<string | null>(null);
+  const [pendingAiImport, setPendingAiImport] = useState<ImportedAiMessages | null>(null);
+
+  async function handleCopyAiPrompt() {
+    setCopyingPrompt(true);
+    try {
+      const prompt = await sdrService.buildProspectAiPrompt(
+        prospect.id,
+        editing ? form.summary : undefined,
+      );
+      await navigator.clipboard.writeText(prompt);
+      toast("Prompt copiado — cole no ChatGPT/Claude e depois importe a resposta.", "info");
+    } catch (err) {
+      toastError(err, "Não foi possível copiar o prompt.");
+    } finally {
+      setCopyingPrompt(false);
+    }
+  }
+
+  function applyAiImport(imported: ImportedAiMessages) {
+    fillMessages(imported.messages, imported.opportunity);
+    toast("Mensagens importadas da IA — revise e clique em Salvar.", "info");
+  }
+
+  function closeAiImport() {
+    setImportingAi(false);
+    setAiResponse("");
+    setAiImportError(null);
+  }
+
+  function handleImportAiResponse() {
+    const result = parseAiMessages(aiResponse);
+    if (!result.ok) {
+      setAiImportError(result.error);
+      return;
+    }
+    closeAiImport();
+    if (hasFilledMessages()) setPendingAiImport(result.value);
+    else applyAiImport(result.value);
+  }
+
+  async function handleDraftMessages() {
+    setDraftingMessages(true);
+    try {
+      const draft = await sdrService.draftProspectMessages(prospect.id);
+      if (hasFilledMessages()) setPendingDraft(draft);
+      else applyDraft(draft);
+    } catch (err) {
+      toastError(err, "Não foi possível gerar as mensagens.");
+    } finally {
+      setDraftingMessages(false);
+    }
+  }
+
   function cancelEdit() {
     setDuplicateBlock(null);
     setEditing(false);
@@ -160,6 +258,9 @@ export function ProspectDrawer({
         ...(form.message2 ? { message2: form.message2 } : {}),
         ...(form.message3 ? { message3: form.message3 } : {}),
         ...(form.message4 ? { message4: form.message4 } : {}),
+        // Resumo pode ser apagado (diferente dos campos acima): vai sempre
+        // que mudou, inclusive vazio.
+        ...(form.summary !== prospect.summary ? { summary: form.summary } : {}),
         ...(form.initialContactDate ? { initialContactDate: form.initialContactDate } : {}),
         ...(form.targetDate ? { targetDate: form.targetDate } : {}),
         ...(form.googleRating ? { googleRating: Number(form.googleRating) } : {}),
@@ -654,7 +755,51 @@ export function ProspectDrawer({
         </div>
 
         <div className={styles.section}>
-          <div className={styles.sectionTitle}>Mensagens do WhatsApp</div>
+          <div className={styles.sectionTitle}>Resumo para a IA</div>
+          {editing ? (
+            <textarea
+              className={styles.textarea}
+              rows={4}
+              maxLength={4000}
+              value={form.summary}
+              onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))}
+              placeholder="Contexto do lead: o que você viu, o que conversou, o que ele precisa…"
+            />
+          ) : (
+            <p className={styles.notes} style={{ whiteSpace: "pre-wrap" }}>
+              {prospect.summary || "—"}
+            </p>
+          )}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+            <Button
+              onClick={() => void handleCopyAiPrompt()}
+              disabled={copyingPrompt}
+              title="Copia um prompt com os dados deste prospect e o resumo acima, pronto para colar no ChatGPT ou no Claude. Não usa API key."
+            >
+              {copyingPrompt ? "Copiando…" : "Copiar prompt para IA"}
+            </Button>
+            <Button
+              onClick={() => setImportingAi(true)}
+              title="Cole a resposta (JSON) da IA para preencher as Mensagens 1–4."
+            >
+              Importar resposta da IA
+            </Button>
+          </div>
+        </div>
+
+        <div className={styles.section}>
+          <div
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+          >
+            <div className={styles.sectionTitle}>Mensagens do WhatsApp</div>
+            <Button
+              onClick={() => void handleDraftMessages()}
+              disabled={draftingMessages}
+              title="Monta 4 mensagens (abordagem, retomada, valor e encerramento) com o que o SDR já sabe desta empresa. Não usa OpenAI."
+            >
+              {draftingMessages ? "Gerando…" : "Gerar mensagens"}
+            </Button>
+          </div>
           <p className={styles.notes} style={{ marginBottom: 8 }}>
             Uma mensagem própria por campo — configure em "Estágios" qual campo cada estágio usa no
             lugar do template padrão. Aceita os mesmos placeholders (
@@ -743,6 +888,66 @@ export function ProspectDrawer({
           </div>
         )}
 
+        {pendingDraft && (
+          <ConfirmDialog
+            title="Substituir as mensagens?"
+            message="Este prospect já tem mensagens preenchidas. As novas (geradas sem IA) vão substituir as quatro no formulário — nada é salvo até você clicar em Salvar."
+            confirmLabel="Substituir"
+            onClose={() => setPendingDraft(null)}
+            onConfirm={async () => {
+              applyDraft(pendingDraft);
+              return true;
+            }}
+          />
+        )}
+        {importingAi && (
+          <Modal
+            title="Importar resposta da IA"
+            subtitle="Cole a resposta inteira — o JSON com as mensagens é encontrado sozinho. Nada é salvo até você clicar em Salvar."
+            onClose={closeAiImport}
+          >
+            <textarea
+              className={formStyles.textarea}
+              rows={10}
+              value={aiResponse}
+              onChange={(e) => {
+                setAiResponse(e.target.value);
+                setAiImportError(null);
+              }}
+              placeholder='{"oportunidade": "…", "mensagens": ["…", "…", "…", "…"]}'
+              aria-label="Resposta da IA"
+              aria-invalid={aiImportError ? true : undefined}
+              style={{ width: "100%", marginTop: 8, fontFamily: "monospace" }}
+            />
+            {aiImportError && (
+              <div className={formStyles.error} role="alert">
+                {aiImportError}
+              </div>
+            )}
+            <div className={formStyles.actions}>
+              <Button onClick={closeAiImport}>Cancelar</Button>
+              <Button
+                variant="primary"
+                onClick={handleImportAiResponse}
+                disabled={!aiResponse.trim()}
+              >
+                Importar
+              </Button>
+            </div>
+          </Modal>
+        )}
+        {pendingAiImport && (
+          <ConfirmDialog
+            title="Substituir as mensagens?"
+            message="Este prospect já tem mensagens preenchidas. As importadas da IA vão substituir as quatro no formulário — nada é salvo até você clicar em Salvar."
+            confirmLabel="Substituir"
+            onClose={() => setPendingAiImport(null)}
+            onConfirm={async () => {
+              applyAiImport(pendingAiImport);
+              return true;
+            }}
+          />
+        )}
         {confirmingDelete && (
           <div className={styles.duplicateWarning}>
             Excluir "{prospect.companyName}" definitivamente? Essa ação não pode ser desfeita.
@@ -865,6 +1070,7 @@ function fromProspect(prospect: Prospect) {
     message2: prospect.message2,
     message3: prospect.message3,
     message4: prospect.message4,
+    summary: prospect.summary,
     initialContactDate: prospect.initialContactDate ?? "",
     targetDate: prospect.targetDate ?? "",
   };

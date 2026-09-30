@@ -65,6 +65,7 @@ interface ProspectDto {
   message_2: string | null;
   message_3: string | null;
   message_4: string | null;
+  summary?: string | null;
   initial_contact_date: string | null;
   target_date: string | null;
   created_at: string;
@@ -120,6 +121,7 @@ function toProspect(dto: ProspectDto): Prospect {
     message2: dto.message_2 ?? "",
     message3: dto.message_3 ?? "",
     message4: dto.message_4 ?? "",
+    summary: dto.summary ?? "",
     initialContactDate: dto.initial_contact_date,
     targetDate: dto.target_date,
     createdAt: dto.created_at,
@@ -177,6 +179,7 @@ function createBody(input: CreateProspectInput | UpdateProspectInput) {
     message_2: input.message2,
     message_3: input.message3,
     message_4: input.message4,
+    summary: input.summary,
     initial_contact_date: input.initialContactDate,
     target_date: input.targetDate,
     force: input.force ?? false,
