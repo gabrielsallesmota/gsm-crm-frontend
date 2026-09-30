@@ -737,6 +737,34 @@ export interface SdrSearchTermCatalog {
   terms: string[];
 }
 
+/** IA dos textos de prospecção (`GET/PUT /api/v1/sdr/ai-settings`, uso
+ * interno da GSM). `apiProvider` = quem gera as mensagens automáticas;
+ * `chatTarget` = qual IA o "Copiar prompt" abre. As chaves nunca voltam —
+ * só se estão configuradas, de onde vêm e o final (`hint`). */
+export type AiApiProvider = "openai" | "anthropic";
+export type AiChatTarget = "chatgpt" | "claude" | "manus";
+
+export interface SdrAiKeyStatus {
+  configured: boolean;
+  source: "screen" | "server" | null;
+  hint: string | null;
+}
+
+export interface SdrAiSettings {
+  apiProvider: AiApiProvider;
+  chatTarget: AiChatTarget;
+  openai: SdrAiKeyStatus;
+  anthropic: SdrAiKeyStatus;
+}
+
+/** Campo ausente = não mexe. Nas chaves, `""` remove a cadastrada. */
+export interface UpdateSdrAiSettingsInput {
+  apiProvider?: AiApiProvider;
+  chatTarget?: AiChatTarget;
+  openaiApiKey?: string;
+  anthropicApiKey?: string;
+}
+
 export interface SdrProviderCostSummary {
   provider: string;
   totalUnits: number;

@@ -24,6 +24,7 @@ import { sdrService } from "../../services/SdrService";
 import { SDR_PRIORITY_LABEL, type SdrDraftMessages, type SdrPriority } from "../../types/sdr";
 import { formatPhone } from "../../utils/phone";
 import { parseAiMessages, type ImportedAiMessages } from "../../utils/aiMessagesImport";
+import { AI_CHAT_TARGET_LABEL, aiChatUrl } from "../../utils/aiChatTargets";
 import { nextStageByOrder } from "../../utils/prospectCadence";
 import {
   CONTACT_CHANNEL,
@@ -165,6 +166,10 @@ export function ProspectDrawer({
   // de volta o JSON da resposta. Como o rascunho acima, só preenche o
   // formulário — salvar continua sendo manual.
   const [copyingPrompt, setCopyingPrompt] = useState(false);
+  // IA que o botão abre — escolhida em Configurações → IA dos textos.
+  const { data: aiSettings } = useAsyncResource(() => sdrService.getAiSettings(), []);
+  const chatTarget = aiSettings?.chatTarget ?? "chatgpt";
+  const chatLabel = AI_CHAT_TARGET_LABEL[chatTarget];
   const [importingAi, setImportingAi] = useState(false);
   const [aiResponse, setAiResponse] = useState("");
   const [aiImportError, setAiImportError] = useState<string | null>(null);
@@ -178,7 +183,14 @@ export function ProspectDrawer({
         editing ? form.summary : undefined,
       );
       await navigator.clipboard.writeText(prompt);
-      toast("Prompt copiado — cole no ChatGPT/Claude e depois importe a resposta.", "info");
+      const tab = window.open(aiChatUrl(chatTarget, prompt), "_blank");
+      if (tab) tab.opener = null;
+      toast(
+        tab
+          ? `Prompt copiado — o ${chatLabel} abriu numa aba nova (se o texto não vier preenchido, cole). Depois importe a resposta.`
+          : `Prompt copiado — o navegador bloqueou a aba nova; abra o ${chatLabel} e cole.`,
+        "info",
+      );
     } catch (err) {
       toastError(err, "Não foi possível copiar o prompt.");
     } finally {
@@ -774,9 +786,9 @@ export function ProspectDrawer({
             <Button
               onClick={() => void handleCopyAiPrompt()}
               disabled={copyingPrompt}
-              title="Copia um prompt com os dados deste prospect e o resumo acima, pronto para colar no ChatGPT ou no Claude. Não usa API key."
+              title={`Copia um prompt com os dados deste prospect e o resumo acima e abre o ${chatLabel}. Não usa API key. Troque a IA em Configurações → IA dos textos.`}
             >
-              {copyingPrompt ? "Copiando…" : "Copiar prompt para IA"}
+              {copyingPrompt ? "Copiando…" : `Copiar prompt e abrir ${chatLabel}`}
             </Button>
             <Button
               onClick={() => setImportingAi(true)}

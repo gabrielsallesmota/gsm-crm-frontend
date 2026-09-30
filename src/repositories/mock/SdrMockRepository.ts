@@ -36,6 +36,8 @@ import type {
   UpdateSdrCoverageInput,
   UpdateSdrIcpPresetInput,
   SdrSearchTermCatalog,
+  SdrAiSettings,
+  UpdateSdrAiSettingsInput,
 } from "../../types/sdr";
 import type { Page } from "../../types/common";
 import { NotImplementedError } from "../../utils/errors";
@@ -285,6 +287,14 @@ export class SdrMockRepository implements SdrRepository {
   }
 
   async buildProspectAiPrompt(): Promise<string> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async getAiSettings(): Promise<SdrAiSettings> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
+  async updateAiSettings(_input: UpdateSdrAiSettingsInput): Promise<SdrAiSettings> {
     throw new NotImplementedError("SDR", REASON);
   }
 

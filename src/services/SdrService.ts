@@ -40,6 +40,8 @@ import type {
   UpdateSdrCampaignInput,
   UpdateSdrCoverageInput,
   UpdateSdrIcpPresetInput,
+  SdrAiSettings,
+  UpdateSdrAiSettingsInput,
 } from "../types/sdr";
 import type { Page } from "../types/common";
 
@@ -289,6 +291,14 @@ export class SdrService {
   // campo Resumo na tela; omitido = usa o Resumo salvo.
   buildProspectAiPrompt(prospectId: string, summary?: string): Promise<string> {
     return repo.buildProspectAiPrompt(prospectId, summary);
+  }
+
+  getAiSettings(): Promise<SdrAiSettings> {
+    return repo.getAiSettings();
+  }
+
+  updateAiSettings(input: UpdateSdrAiSettingsInput): Promise<SdrAiSettings> {
+    return repo.updateAiSettings(input);
   }
 
   // Etapa 8 — dashboard, funil real e custos.

@@ -44,6 +44,8 @@ import type {
   UpdateSdrCampaignInput,
   UpdateSdrCoverageInput,
   UpdateSdrIcpPresetInput,
+  SdrAiSettings,
+  UpdateSdrAiSettingsInput,
 } from "../../types/sdr";
 import type { Page } from "../../types/common";
 import { apiRequest } from "./ApiClient";
@@ -1258,6 +1260,24 @@ export class SdrApiRepository implements SdrRepository {
     return dto.prompt;
   }
 
+  async getAiSettings(): Promise<SdrAiSettings> {
+    return toAiSettings(await apiRequest<AiSettingsDto>("/api/v1/sdr/ai-settings"));
+  }
+
+  async updateAiSettings(input: UpdateSdrAiSettingsInput): Promise<SdrAiSettings> {
+    return toAiSettings(
+      await apiRequest<AiSettingsDto>("/api/v1/sdr/ai-settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          api_provider: input.apiProvider,
+          chat_target: input.chatTarget,
+          openai_api_key: input.openaiApiKey,
+          anthropic_api_key: input.anthropicApiKey,
+        }),
+      }),
+    );
+  }
+
   // Etapa 8 — dashboard, funil real e custos.
 
   async getDashboardOverview(): Promise<SdrDashboardOverview> {
@@ -1269,4 +1289,26 @@ export class SdrApiRepository implements SdrRepository {
     const dto = await apiRequest<ProviderCostSummaryDto[]>("/api/v1/sdr/dashboard/costs");
     return dto.map(toProviderCostSummary);
   }
+}
+
+interface AiKeyStatusDto {
+  configured: boolean;
+  source: "screen" | "server" | null;
+  hint: string | null;
+}
+
+interface AiSettingsDto {
+  api_provider: SdrAiSettings["apiProvider"];
+  chat_target: SdrAiSettings["chatTarget"];
+  openai: AiKeyStatusDto;
+  anthropic: AiKeyStatusDto;
+}
+
+function toAiSettings(dto: AiSettingsDto): SdrAiSettings {
+  return {
+    apiProvider: dto.api_provider,
+    chatTarget: dto.chat_target,
+    openai: dto.openai,
+    anthropic: dto.anthropic,
+  };
 }

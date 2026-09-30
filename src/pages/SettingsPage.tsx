@@ -11,6 +11,7 @@ import { Button } from "../components/common/Button";
 import { Badge } from "../components/common/Badge";
 import { MessageTemplatesSettings } from "../components/prospects/MessageTemplatesSettings";
 import { LeadMessageTemplatesSettings } from "../components/leads/LeadMessageTemplatesSettings";
+import { AiTextSettings } from "../components/sdr/AiTextSettings";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { can } from "../auth/permissions";
@@ -748,6 +749,13 @@ export function SettingsPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Prospecção — mensagens de WhatsApp</h2>
           <MessageTemplatesSettings />
+        </section>
+      )}
+
+      {isSuperAdmin && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Prospecção — IA dos textos</h2>
+          <AiTextSettings />
         </section>
       )}
     </div>

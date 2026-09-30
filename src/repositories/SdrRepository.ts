@@ -36,6 +36,8 @@ import type {
   UpdateSdrCampaignInput,
   UpdateSdrCoverageInput,
   UpdateSdrIcpPresetInput,
+  SdrAiSettings,
+  UpdateSdrAiSettingsInput,
 } from "../types/sdr";
 import type { Page } from "../types/common";
 
@@ -127,6 +129,8 @@ export interface SdrRepository {
   getProspectOutreachContext(prospectId: string): Promise<SdrProspectSdrContext>;
   draftProspectMessages(prospectId: string): Promise<SdrDraftMessages>;
   buildProspectAiPrompt(prospectId: string, summary?: string): Promise<string>;
+  getAiSettings(): Promise<SdrAiSettings>;
+  updateAiSettings(input: UpdateSdrAiSettingsInput): Promise<SdrAiSettings>;
 
   // Etapa 8 — dashboard, funil real e custos.
   getDashboardOverview(): Promise<SdrDashboardOverview>;
