@@ -567,6 +567,11 @@ export function SdrCandidateDetailPage() {
         {candidate.razaoSocial && (
           <p className={styles.pageSubtitle}>Razão social: {candidate.razaoSocial}</p>
         )}
+        {candidate.partners && (
+          <p className={styles.pageSubtitle} style={{ whiteSpace: "pre-wrap" }}>
+            Sócios: {candidate.partners}
+          </p>
+        )}
         {candidate.nomeFantasia && (
           <p className={styles.pageSubtitle}>Nome fantasia: {candidate.nomeFantasia}</p>
         )}

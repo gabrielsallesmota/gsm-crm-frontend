@@ -160,6 +160,8 @@ export interface Prospect {
   // Resumo livre do lead (uso interno da GSM) — entra no prompt copiado
   // para uma IA externa. `""` = sem resumo.
   summary: string;
+  // Sócios do CNPJ (um por linha) — vêm do SDR ao aprovar; editável.
+  partners: string;
   // Data do primeiro contato (P0, "YYYY-MM-DD") — âncora da cadência
   // automática, definida na criação/import. Ver `Prospect.targetDate` e
   // `ProspectStage.followupBusinessDays`.
@@ -230,6 +232,7 @@ export interface CreateProspectInput {
   message4?: string;
   message5?: string;
   summary?: string;
+  partners?: string;
   // P0 — data do primeiro contato. Não informado = ainda sem contato
   // registrado (`initialContactDate` fica `null` — "aprovar não significa
   // contatar", ver backend `CreateProspectUseCase`). Confirmar depois via

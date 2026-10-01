@@ -6,10 +6,16 @@ import { Button } from "../components/common/Button";
 import { EmptyState } from "../components/common/EmptyState";
 import { ROUTES } from "../constants/routes";
 import { useSdrCandidateActions } from "../hooks/useSdrCandidateActions";
+import { useSdrCampaigns } from "../hooks/useSdrCampaigns";
 import { useSdrCandidates } from "../hooks/useSdrCandidates";
 import { useSdrDiscardReasons } from "../hooks/useSdrDiscardReasons";
 import { useToast } from "../hooks/useToast";
-import { SDR_CANDIDATE_STATUS_LABEL, type SdrCandidateStatus } from "../types/sdr";
+import { sdrService } from "../services/SdrService";
+import {
+  SDR_CANDIDATE_STATUS_LABEL,
+  type SdrCandidateStatus,
+  type SdrPriority,
+} from "../types/sdr";
 import styles from "./SdrPages.module.css";
 
 const STATUS_COLOR: Record<SdrCandidateStatus, { color: string; bg: string }> = {
@@ -19,21 +25,74 @@ const STATUS_COLOR: Record<SdrCandidateStatus, { color: string; bg: string }> = 
   descartado: { color: "var(--muted)", bg: "var(--card-bg-alt)" },
 };
 
+const PRIORITY_COLOR: Record<SdrPriority, { color: string; bg: string }> = {
+  a: { color: "var(--tone-green)", bg: "var(--tone-green-bg)" },
+  b: { color: "var(--tone-amber)", bg: "var(--tone-amber-bg)" },
+  c: { color: "var(--tone-gray)", bg: "var(--tone-gray-bg)" },
+};
+
+const PAGE_SIZE = 50;
+
+type YesNo = "" | "yes" | "no";
+
+function yesNo(value: YesNo): boolean | undefined {
+  if (value === "") return undefined;
+  return value === "yes";
+}
+
 export function SdrCandidatesPage() {
   const navigate = useNavigate();
   const { toast, toastError } = useToast();
   const [status, setStatus] = useState<SdrCandidateStatus | "">("");
   const [search, setSearch] = useState("");
+  const [campaignId, setCampaignId] = useState("");
+  const [priority, setPriority] = useState<SdrPriority | "none" | "">("");
+  const [hasPhone, setHasPhone] = useState<YesNo>("");
+  const [hasSite, setHasSite] = useState<YesNo>("");
+  const [order, setOrder] = useState<"recent" | "score">("score");
+  const [page, setPage] = useState(1);
+  const [scoring, setScoring] = useState(false);
+  const { data: campaigns } = useSdrCampaigns();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkReason, setBulkReason] = useState("");
   const [bulkRunning, setBulkRunning] = useState(false);
 
+  const phoneFilter = yesNo(hasPhone);
+  const siteFilter = yesNo(hasSite);
   const { data, loading, error, notImplemented, reload } = useSdrCandidates({
     ...(status ? { status } : {}),
     ...(search ? { search } : {}),
-    page: 1,
-    pageSize: 100,
+    ...(campaignId ? { campaignId } : {}),
+    ...(priority ? { priority } : {}),
+    ...(phoneFilter !== undefined ? { hasPhone: phoneFilter } : {}),
+    ...(siteFilter !== undefined ? { hasSite: siteFilter } : {}),
+    order,
+    page,
+    pageSize: PAGE_SIZE,
   });
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
+
+  // Qualquer filtro novo volta para a 1ª página.
+  function filterChanged<T>(setter: (value: T) => void) {
+    return (value: T) => {
+      setter(value);
+      setPage(1);
+      setSelected(new Set());
+    };
+  }
+
+  async function handleComputeCampaignScores() {
+    if (!campaignId) return;
+    setScoring(true);
+    try {
+      await sdrService.computeCampaignScores(campaignId);
+      toast("Score da campanha em cálculo — atualize a lista em alguns segundos.", "info");
+    } catch (err) {
+      toastError(err, "Não foi possível calcular o Score da campanha");
+    } finally {
+      setScoring(false);
+    }
+  }
   const { data: discardReasons } = useSdrDiscardReasons();
   const { bulk } = useSdrCandidateActions();
 
@@ -89,8 +148,8 @@ export function SdrCandidatesPage() {
         <div>
           <h1 className={styles.pageTitle}>Candidates</h1>
           <p className={styles.pageSubtitle}>
-            {data ? `${data.total} candidates` : "Carregando…"} — triagem humana
-            (revisar/aprovar/descartar). Lista vazia até um futuro worker de busca existir.
+            {data ? `${data.total} candidates` : "Carregando…"} — o Score é calculado sozinho
+            quando o garimpo encontra a empresa. Filtre os A e B e aprove em lote.
           </p>
         </div>
       </div>
@@ -102,12 +161,75 @@ export function SdrCandidatesPage() {
           className={styles.search}
           placeholder="Buscar por nome da empresa ou telefone…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => filterChanged(setSearch)(e.target.value)}
         />
         <select
           className={styles.select}
+          value={campaignId}
+          onChange={(e) => filterChanged(setCampaignId)(e.target.value)}
+          aria-label="Campanha"
+        >
+          <option value="">Todas as campanhas</option>
+          {(campaigns ?? []).map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className={styles.select}
+          value={priority}
+          onChange={(e) => filterChanged(setPriority)(e.target.value as SdrPriority | "none" | "")}
+          aria-label="Prioridade"
+        >
+          <option value="">Todas as prioridades</option>
+          <option value="a">A — alta</option>
+          <option value="b">B — média</option>
+          <option value="c">C — baixa</option>
+          <option value="none">Sem Score ainda</option>
+        </select>
+        <select
+          className={styles.select}
+          value={hasPhone}
+          onChange={(e) => filterChanged(setHasPhone)(e.target.value as YesNo)}
+          aria-label="Telefone"
+        >
+          <option value="">Com ou sem telefone</option>
+          <option value="yes">Com telefone</option>
+          <option value="no">Sem telefone</option>
+        </select>
+        <select
+          className={styles.select}
+          value={hasSite}
+          onChange={(e) => filterChanged(setHasSite)(e.target.value as YesNo)}
+          aria-label="Site"
+        >
+          <option value="">Com ou sem site</option>
+          <option value="yes">Com site</option>
+          <option value="no">Sem site</option>
+        </select>
+        <select
+          className={styles.select}
+          value={order}
+          onChange={(e) => filterChanged(setOrder)(e.target.value as "recent" | "score")}
+          aria-label="Ordem"
+        >
+          <option value="score">Maior Score primeiro</option>
+          <option value="recent">Mais recentes primeiro</option>
+        </select>
+        {campaignId && (
+          <Button
+            onClick={() => void handleComputeCampaignScores()}
+            disabled={scoring}
+            title="Calcula (ou recalcula) o Score de todos os candidatos desta campanha. Sem custo de API."
+          >
+            {scoring ? "Enviando…" : "Calcular Score da campanha"}
+          </Button>
+        )}
+        <select
+          className={styles.select}
           value={status}
-          onChange={(e) => setStatus(e.target.value as SdrCandidateStatus | "")}
+          onChange={(e) => filterChanged(setStatus)(e.target.value as SdrCandidateStatus | "")}
         >
           <option value="">Todos os status</option>
           {(Object.entries(SDR_CANDIDATE_STATUS_LABEL) as [SdrCandidateStatus, string][]).map(
@@ -151,8 +273,8 @@ export function SdrCandidatesPage() {
 
       {!error && !loading && candidates.length === 0 && (
         <EmptyState
-          title="Nenhum candidate ainda"
-          message="Candidates chegam aqui quando uma campanha de busca (futuro worker, fora desta etapa) encontrar empresas. Até lá, esta lista fica vazia."
+          title="Nenhum candidate com esses filtros"
+          message="Candidates chegam aqui quando uma campanha de garimpo encontra empresas. Tente tirar algum filtro."
         />
       )}
 
@@ -163,7 +285,9 @@ export function SdrCandidatesPage() {
               <tr>
                 <th className={styles.checkboxCell}></th>
                 <th>Empresa</th>
-                <th>Nicho</th>
+                <th>Score</th>
+                <th>Contato</th>
+                <th>Google</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -178,8 +302,37 @@ export function SdrCandidatesPage() {
                       onChange={() => toggle(c.id)}
                     />
                   </td>
-                  <td onClick={() => navigate(ROUTES.sdrCandidateDetail(c.id))}>{c.companyName}</td>
-                  <td onClick={() => navigate(ROUTES.sdrCandidateDetail(c.id))}>{c.niche ?? "—"}</td>
+                  <td onClick={() => navigate(ROUTES.sdrCandidateDetail(c.id))}>
+                    {c.companyName}
+                    {(c.locality ?? c.city) && (
+                      <div className={styles.pageSubtitle} style={{ margin: 0 }}>
+                        {[c.locality, c.city].filter(Boolean).join(", ")}
+                      </div>
+                    )}
+                  </td>
+                  <td onClick={() => navigate(ROUTES.sdrCandidateDetail(c.id))}>
+                    {c.scorePriority && c.scoreTotal !== null ? (
+                      <Badge
+                        label={`${c.scoreTotal} · ${c.scorePriority.toUpperCase()}`}
+                        {...PRIORITY_COLOR[c.scorePriority]}
+                      />
+                    ) : (
+                      <span className={styles.pageSubtitle}>—</span>
+                    )}
+                  </td>
+                  <td onClick={() => navigate(ROUTES.sdrCandidateDetail(c.id))}>
+                    <span title={c.phoneRaw ?? "Sem telefone"} style={{ opacity: c.phoneRaw ? 1 : 0.25 }}>
+                      📞
+                    </span>{" "}
+                    <span title={c.domain ?? "Sem site"} style={{ opacity: c.domain ? 1 : 0.25 }}>
+                      🌐
+                    </span>
+                  </td>
+                  <td onClick={() => navigate(ROUTES.sdrCandidateDetail(c.id))}>
+                    {c.googleRating !== null
+                      ? `${c.googleRating.toFixed(1)}★ (${c.googleReviewsCount ?? 0})`
+                      : "—"}
+                  </td>
                   <td onClick={() => navigate(ROUTES.sdrCandidateDetail(c.id))}>
                     <Badge label={SDR_CANDIDATE_STATUS_LABEL[c.status]} {...STATUS_COLOR[c.status]} />
                     {(c.knownDuplicateProspectId ?? c.knownDuplicateClientId) && (
@@ -198,6 +351,23 @@ export function SdrCandidatesPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!error && data && data.total > PAGE_SIZE && (
+        <div className={styles.filterRow} style={{ justifyContent: "center", marginTop: 12 }}>
+          <Button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+            ‹ Anterior
+          </Button>
+          <span className={styles.pageSubtitle}>
+            Página {page} de {totalPages}
+          </span>
+          <Button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+          >
+            Próxima ›
+          </Button>
         </div>
       )}
     </div>

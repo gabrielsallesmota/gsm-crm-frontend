@@ -116,6 +116,14 @@ export interface SdrCandidate {
   dataAbertura: string | null;
   capitalSocialCents: number | null;
   lastEnrichmentAt: string | null;
+  /** Sócios do CNPJ (Receita), um por linha — "Nome (Cargo)". */
+  partners: string | null;
+  googleRating: number | null;
+  googleReviewsCount: number | null;
+  /** Último Score GSM (o histórico fica no detalhe do candidato). */
+  scoreTotal: number | null;
+  scorePriority: SdrPriority | null;
+  scoreComputedAt: string | null;
 }
 
 export interface SdrCandidateAppearance {
@@ -146,6 +154,12 @@ export interface SdrCandidateListFilter {
   campaignId?: string;
   niche?: string;
   search?: string;
+  /** "none" = ainda sem Score. */
+  priority?: SdrPriority | "none";
+  hasPhone?: boolean;
+  hasSite?: boolean;
+  /** "score" = maior Score primeiro. */
+  order?: "recent" | "score";
   page?: number;
   pageSize?: number;
 }
@@ -395,6 +409,7 @@ export interface SdrCandidateEnrichment {
   status: SdrEnrichmentStatus;
   confidence: SdrMatchConfidence | null;
   cnpjQueried: string | null;
+  partners: string | null;
   razaoSocial: string | null;
   nomeFantasia: string | null;
   cnae: string | null;

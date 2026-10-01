@@ -46,6 +46,7 @@ import type {
   UpdateSdrIcpPresetInput,
   SdrAiSettings,
   UpdateSdrAiSettingsInput,
+  SdrPriority,
 } from "../../types/sdr";
 import type { Page } from "../../types/common";
 import { apiRequest } from "./ApiClient";
@@ -142,6 +143,12 @@ interface CandidateDto {
   domain: string | null;
   email: string | null;
   instagram_handle: string | null;
+  partners?: string | null;
+  google_rating?: number | null;
+  google_reviews_count?: number | null;
+  score_total?: number | null;
+  score_priority?: SdrPriority | null;
+  score_computed_at?: string | null;
   razao_social: string | null;
   nome_fantasia: string | null;
   cnae: string | null;
@@ -287,6 +294,12 @@ function toCandidate(dto: CandidateDto): SdrCandidate {
     domain: dto.domain,
     email: dto.email,
     instagramHandle: dto.instagram_handle,
+    partners: dto.partners ?? null,
+    googleRating: dto.google_rating ?? null,
+    googleReviewsCount: dto.google_reviews_count ?? null,
+    scoreTotal: dto.score_total ?? null,
+    scorePriority: dto.score_priority ?? null,
+    scoreComputedAt: dto.score_computed_at ?? null,
     razaoSocial: dto.razao_social,
     nomeFantasia: dto.nome_fantasia,
     cnae: dto.cnae,
@@ -452,6 +465,7 @@ interface EnrichmentDto {
   status: SdrCandidateEnrichment["status"];
   confidence: SdrCandidateEnrichment["confidence"];
   cnpj_queried: string | null;
+  partners?: string | null;
   razao_social: string | null;
   nome_fantasia: string | null;
   cnae: string | null;
@@ -486,6 +500,7 @@ function toEnrichment(dto: EnrichmentDto): SdrCandidateEnrichment {
     status: dto.status,
     confidence: dto.confidence,
     cnpjQueried: dto.cnpj_queried,
+    partners: dto.partners ?? null,
     razaoSocial: dto.razao_social,
     nomeFantasia: dto.nome_fantasia,
     cnae: dto.cnae,
@@ -936,6 +951,10 @@ export class SdrApiRepository implements SdrRepository {
     if (filter.campaignId) params.set("campaign_id", filter.campaignId);
     if (filter.niche) params.set("niche", filter.niche);
     if (filter.search) params.set("search", filter.search);
+    if (filter.priority) params.set("priority", filter.priority);
+    if (filter.hasPhone !== undefined) params.set("has_phone", String(filter.hasPhone));
+    if (filter.hasSite !== undefined) params.set("has_site", String(filter.hasSite));
+    if (filter.order) params.set("order", filter.order);
     params.set("page", String(filter.page ?? 1));
     params.set("page_size", String(filter.pageSize ?? 20));
     const dto = await apiRequest<{

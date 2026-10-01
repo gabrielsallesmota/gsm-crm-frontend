@@ -291,6 +291,7 @@ export function ProspectDrawer({
         // Resumo pode ser apagado (diferente dos campos acima): vai sempre
         // que mudou, inclusive vazio.
         ...(form.summary !== prospect.summary ? { summary: form.summary } : {}),
+        ...(form.partners !== prospect.partners ? { partners: form.partners } : {}),
         ...(form.initialContactDate ? { initialContactDate: form.initialContactDate } : {}),
         ...(form.targetDate ? { targetDate: form.targetDate } : {}),
         ...(form.googleRating ? { googleRating: Number(form.googleRating) } : {}),
@@ -788,6 +789,27 @@ export function ProspectDrawer({
         </div>
 
         <div className={styles.section}>
+          <div className={styles.sectionTitle}>Sócios</div>
+          {editing ? (
+            <textarea
+              className={styles.textarea}
+              rows={2}
+              maxLength={2000}
+              value={form.partners}
+              onChange={(e) => setForm((f) => ({ ...f, partners: e.target.value }))}
+              placeholder="Um por linha — ex.: Kelly Souza (Sócio-Administrador)"
+            />
+          ) : (
+            <p className={styles.notes} style={{ whiteSpace: "pre-wrap" }}>
+              {prospect.partners || "— (vem do CNPJ do SDR, ou digite)"}
+            </p>
+          )}
+          <p className={styles.notes} style={{ marginTop: 4 }}>
+            O primeiro nome do sócio-administrador entra nas mensagens ("Oi, Kelly").
+          </p>
+        </div>
+
+        <div className={styles.section}>
           <div className={styles.sectionTitle}>Resumo para a IA</div>
           {editing ? (
             <textarea
@@ -1133,6 +1155,7 @@ function fromProspect(prospect: Prospect) {
     message4: prospect.message4,
     message5: prospect.message5,
     summary: prospect.summary,
+    partners: prospect.partners,
     initialContactDate: prospect.initialContactDate ?? "",
     targetDate: prospect.targetDate ?? "",
   };
