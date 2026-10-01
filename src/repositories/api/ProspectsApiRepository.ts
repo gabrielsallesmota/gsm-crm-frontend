@@ -86,7 +86,7 @@ interface ProspectStageDto {
   followup_business_days: number | null;
   message_field: ProspectMessageField | null;
   is_prospecting_entry: boolean;
-  contact_method?: ProspectContactMethod;
+  contact_method?: ProspectContactMethod | null;
 }
 
 function toProspect(dto: ProspectDto): Prospect {
@@ -148,7 +148,7 @@ function toProspectStage(dto: ProspectStageDto): ProspectStage {
     followupBusinessDays: dto.followup_business_days,
     messageField: dto.message_field,
     isProspectingEntry: dto.is_prospecting_entry,
-    contactMethod: dto.contact_method ?? "whatsapp",
+    contactMethod: dto.contact_method ?? null,
   };
 }
 
@@ -389,7 +389,7 @@ export class ProspectsApiRepository implements ProspectsRepository {
           followup_business_days: input.followupBusinessDays ?? null,
           message_field: input.messageField ?? null,
           is_prospecting_entry: input.isProspectingEntry ?? false,
-          contact_method: input.contactMethod ?? "whatsapp",
+          contact_method: input.contactMethod ?? null,
         }),
       }),
     );
@@ -410,7 +410,8 @@ export class ProspectsApiRepository implements ProspectsRepository {
           message_field: input.messageField,
           clear_message_field: input.clearMessageField ?? false,
           is_prospecting_entry: input.isProspectingEntry,
-          contact_method: input.contactMethod,
+          contact_method: input.contactMethod ?? undefined,
+          clear_contact_method: input.clearContactMethod ?? false,
         }),
       }),
     );

@@ -3,6 +3,7 @@ import { Button } from "../common/Button";
 import { useProspectStageActions } from "../../hooks/useProspectStageActions";
 import { useToast } from "../../hooks/useToast";
 import { ApiError } from "../../types/common";
+import { defaultChannelForField } from "../../utils/cadenceChannels";
 import type {
   ProspectContactMethod,
   ProspectMessageField,
@@ -89,9 +90,12 @@ export function ManageStagesModal({
     }
   }
 
-  async function handleChangeContactMethod(stage: ProspectStage, value: ProspectContactMethod) {
+  async function handleChangeContactMethod(stage: ProspectStage, value: ProspectContactMethod | "") {
     try {
-      await update(stage.id, { contactMethod: value });
+      await update(
+        stage.id,
+        value === "" ? { clearContactMethod: true } : { contactMethod: value },
+      );
       onChanged();
     } catch (err) {
       toastError(err, "Não foi possível salvar o tipo de contato do estágio");
@@ -249,13 +253,19 @@ export function ManageStagesModal({
                 <select
                   className={styles.input}
                   style={{ width: 120 }}
-                  value={stage.contactMethod}
+                  value={stage.contactMethod ?? ""}
                   onChange={(e) =>
-                    void handleChangeContactMethod(stage, e.target.value as ProspectContactMethod)
+                    void handleChangeContactMethod(
+                      stage,
+                      e.target.value as ProspectContactMethod | "",
+                    )
                   }
                   aria-label={`Tipo de contato em ${stage.name}`}
                   title="WhatsApp: o card mostra a mensagem pronta. Ligação: o card mostra o botão de ligar e o roteiro."
                 >
+                  <option value="">
+                    Padrão ({defaultChannelForField(stage.messageField) === "ligacao" ? "Ligação" : "WhatsApp"})
+                  </option>
                   <option value="whatsapp">WhatsApp</option>
                   <option value="ligacao">Ligação</option>
                 </select>

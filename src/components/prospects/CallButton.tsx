@@ -5,7 +5,7 @@ import { useToast } from "../../hooks/useToast";
 import styles from "./WhatsappButton.module.css";
 
 /**
- * Ação do card em estágio de LIGAÇÃO (`stage.contactMethod === "ligacao"`):
+ * Ação do card em estágio de LIGAÇÃO (ver `effectiveContactMethod`):
  * "Ligar" abre o discador (`tel:`) e "Roteiro" copia o texto do campo de
  * mensagem do estágio — ali fica o roteiro da ligação (gerado sem IA ou
  * importado da IA). Sem telefone, só o roteiro.

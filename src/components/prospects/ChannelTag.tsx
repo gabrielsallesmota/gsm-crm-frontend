@@ -6,6 +6,7 @@ import { useProspectActions } from "../../hooks/useProspectActions";
 import { CONTACT_CHANNEL } from "../../constants/prospectEnums";
 import { WhatsappButton } from "./WhatsappButton";
 import { CallButton } from "./CallButton";
+import { effectiveContactMethod } from "../../utils/cadenceChannels";
 import styles from "./ChannelTag.module.css";
 
 /** `Para: .../Assunto: ...` só entra se tiver dado — um prospect com canal
@@ -57,7 +58,7 @@ export function ChannelTag({
   const channel = prospect.contactChannel || "whatsapp";
 
   // Etapa de ligação da cadência: o estágio manda, não o canal do prospect.
-  if (stage?.contactMethod === "ligacao") {
+  if (stage && effectiveContactMethod(stage) === "ligacao") {
     return <CallButton prospect={prospect} stage={stage} templates={templates} size={size} />;
   }
 

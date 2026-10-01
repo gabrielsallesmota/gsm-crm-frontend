@@ -3,7 +3,6 @@ import type {
   ContactChannel,
   MessageTemplate,
   Prospect,
-  ProspectContactMethod,
   ProspectLossReason,
   ProspectStage,
   UpdateProspectInput,
@@ -25,6 +24,7 @@ import { sdrService } from "../../services/SdrService";
 import { SDR_PRIORITY_LABEL, type SdrDraftMessages, type SdrPriority } from "../../types/sdr";
 import { formatPhone } from "../../utils/phone";
 import { parseAiMessages, type ImportedAiMessages } from "../../utils/aiMessagesImport";
+import { cadenceStep } from "../../utils/cadenceChannels";
 import {
   AI_API_PROVIDER_LABEL,
   AI_CHAT_TARGET_LABEL,
@@ -1099,23 +1099,6 @@ function formatTargetDate(iso: string | null): string {
 }
 
 const MESSAGE_KEYS = ["message1", "message2", "message3", "message4", "message5"] as const;
-
-// Cadência padrão (igual ao backend, `sdr/domain/cadence.py`): D1 WhatsApp,
-// D2 ligação, D4 WhatsApp, D7 ligação, D10 WhatsApp. O canal de cada etapa
-// vem do estágio que usa aquele campo, quando existe.
-const DEFAULT_CADENCE: { day: number; channel: ProspectContactMethod }[] = [
-  { day: 1, channel: "whatsapp" },
-  { day: 2, channel: "ligacao" },
-  { day: 4, channel: "whatsapp" },
-  { day: 7, channel: "ligacao" },
-  { day: 10, channel: "whatsapp" },
-];
-
-function cadenceStep(index: number, stages: ProspectStage[]) {
-  const fallback = DEFAULT_CADENCE[index] ?? { day: index + 1, channel: "whatsapp" as const };
-  const stage = stages.find((s) => s.messageField === `message_${index + 1}`);
-  return { day: fallback.day, channel: stage?.contactMethod ?? fallback.channel };
-}
 
 function fromProspect(prospect: Prospect) {
   return {

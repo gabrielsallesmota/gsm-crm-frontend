@@ -75,7 +75,9 @@ export interface ProspectStage {
   messageField: ProspectMessageField | null;
   // WhatsApp ou ligação — decide o botão do card e o que a IA escreve para
   // a etapa que usa `messageField` (ver backend `sdr/domain/cadence.py`).
-  contactMethod: ProspectContactMethod;
+  // `null` = segue a cadência padrão para o `messageField` (D2 e D7 =
+  // ligação) — ver `utils/cadenceChannels.ts::effectiveContactMethod`.
+  contactMethod: ProspectContactMethod | null;
   // Estágio de entrada do funil ("A prospectar") — no máximo 1 por tenant
   // (marcar um novo desmarca o anterior sozinho, ver `ManageStagesModal.tsx`).
   // Um prospect aprovado/criado neste estágio ainda NÃO foi contatado:
@@ -274,6 +276,8 @@ export type UpdateProspectStageInput = Partial<
   // Mesmo racional acima, aplicado a `messageField` (ver
   // `UpdateProspectStageCommand.clear_message_field`).
   clearMessageField?: boolean;
+  // Volta o estágio para "padrão da cadência" (`contactMethod: null`).
+  clearContactMethod?: boolean;
 };
 
 export interface ProspectDuplicateCheck {
