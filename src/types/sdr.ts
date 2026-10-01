@@ -659,6 +659,11 @@ export interface SdrProspectingQueueFilter {
  * `POST /sdr/prospects/{id}/draft-messages`. `messages` na ordem de uso:
  * abordagem, retomada, valor, encerramento. */
 export interface SdrDraftMessages {
+  /** `template` = "Gerar mensagens (padrão)", sem IA; senão o provider da
+   * IA que escreveu ("openai" | "anthropic"). */
+  source: string;
+  /** Só na geração com IA: o que é benchmark, adaptação e hipótese. */
+  strategy: string | null;
   /** Canal de cada etapa, na ordem de `messages` (`ligacao` = roteiro). */
   channels: ("whatsapp" | "ligacao")[];
   opportunities: string[];

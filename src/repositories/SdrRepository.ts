@@ -128,6 +128,7 @@ export interface SdrRepository {
   listProspectingQueue(filter?: SdrProspectingQueueFilter): Promise<SdrProspectSdrContext[]>;
   getProspectOutreachContext(prospectId: string): Promise<SdrProspectSdrContext>;
   draftProspectMessages(prospectId: string): Promise<SdrDraftMessages>;
+  generateProspectMessagesWithAi(prospectId: string, summary?: string): Promise<SdrDraftMessages>;
   buildProspectAiPrompt(prospectId: string, summary?: string): Promise<string>;
   getAiSettings(): Promise<SdrAiSettings>;
   updateAiSettings(input: UpdateSdrAiSettingsInput): Promise<SdrAiSettings>;

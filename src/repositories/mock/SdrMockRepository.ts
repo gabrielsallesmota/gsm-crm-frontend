@@ -286,6 +286,10 @@ export class SdrMockRepository implements SdrRepository {
     throw new NotImplementedError("SDR", REASON);
   }
 
+  async generateProspectMessagesWithAi(): Promise<SdrDraftMessages> {
+    throw new NotImplementedError("SDR", REASON);
+  }
+
   async buildProspectAiPrompt(): Promise<string> {
     throw new NotImplementedError("SDR", REASON);
   }

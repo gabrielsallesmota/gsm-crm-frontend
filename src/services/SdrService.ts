@@ -287,6 +287,12 @@ export class SdrService {
     return repo.draftProspectMessages(prospectId);
   }
 
+  // Mesmo prompt do "Copiar prompt", enviado para a IA de Configurações
+  // (OpenAI ou Claude). `summary` = Resumo da tela; omitido = o salvo.
+  generateProspectMessagesWithAi(prospectId: string, summary?: string): Promise<SdrDraftMessages> {
+    return repo.generateProspectMessagesWithAi(prospectId, summary);
+  }
+
   // Prompt para colar numa IA externa (sem API key). `summary` = o texto do
   // campo Resumo na tela; omitido = usa o Resumo salvo.
   buildProspectAiPrompt(prospectId: string, summary?: string): Promise<string> {

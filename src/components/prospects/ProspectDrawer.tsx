@@ -25,7 +25,11 @@ import { sdrService } from "../../services/SdrService";
 import { SDR_PRIORITY_LABEL, type SdrDraftMessages, type SdrPriority } from "../../types/sdr";
 import { formatPhone } from "../../utils/phone";
 import { parseAiMessages, type ImportedAiMessages } from "../../utils/aiMessagesImport";
-import { AI_CHAT_TARGET_LABEL, aiChatUrl } from "../../utils/aiChatTargets";
+import {
+  AI_API_PROVIDER_LABEL,
+  AI_CHAT_TARGET_LABEL,
+  aiChatUrl,
+} from "../../utils/aiChatTargets";
 import { nextStageByOrder } from "../../utils/prospectCadence";
 import {
   CONTACT_CHANNEL,
@@ -134,7 +138,7 @@ export function ProspectDrawer({
   // Mensagens SEM IA (não depende da OpenAI): rascunho a partir do Score
   // GSM e dos dados do prospect, em qualquer etapa. Só preenche o
   // formulário — nada é salvo até a pessoa revisar e clicar em Salvar.
-  const [draftingMessages, setDraftingMessages] = useState(false);
+  const [draftingMessages, setDraftingMessages] = useState<"template" | "ai" | null>(null);
   const [pendingDraft, setPendingDraft] = useState<SdrDraftMessages | null>(null);
 
   function fillMessages(messages: string[], opportunity: string) {
@@ -155,7 +159,12 @@ export function ProspectDrawer({
 
   function applyDraft(draft: SdrDraftMessages) {
     fillMessages(draft.messages, draft.opportunities.join(" "));
-    toast("Mensagens geradas sem IA — revise e clique em Salvar.", "info");
+    toast(
+      draft.source === "template"
+        ? "Mensagens geradas sem IA — revise e clique em Salvar."
+        : "Mensagens geradas pela IA — revise e clique em Salvar.",
+      "info",
+    );
   }
 
   function hasFilledMessages() {
@@ -172,6 +181,7 @@ export function ProspectDrawer({
   const { data: aiSettings } = useAsyncResource(() => sdrService.getAiSettings(), []);
   const chatTarget = aiSettings?.chatTarget ?? "chatgpt";
   const chatLabel = AI_CHAT_TARGET_LABEL[chatTarget];
+  const apiProviderLabel = AI_API_PROVIDER_LABEL[aiSettings?.apiProvider ?? "openai"];
   const [importingAi, setImportingAi] = useState(false);
   const [aiResponse, setAiResponse] = useState("");
   const [aiImportError, setAiImportError] = useState<string | null>(null);
@@ -222,16 +232,21 @@ export function ProspectDrawer({
     else applyAiImport(result.value);
   }
 
-  async function handleDraftMessages() {
-    setDraftingMessages(true);
+  async function handleDraftMessages(withAi: boolean) {
+    setDraftingMessages(withAi ? "ai" : "template");
     try {
-      const draft = await sdrService.draftProspectMessages(prospect.id);
+      const draft = withAi
+        ? await sdrService.generateProspectMessagesWithAi(
+            prospect.id,
+            editing ? form.summary : undefined,
+          )
+        : await sdrService.draftProspectMessages(prospect.id);
       if (hasFilledMessages()) setPendingDraft(draft);
       else applyDraft(draft);
     } catch (err) {
       toastError(err, "Não foi possível gerar as mensagens.");
     } finally {
-      setDraftingMessages(false);
+      setDraftingMessages(null);
     }
   }
 
@@ -807,16 +822,32 @@ export function ProspectDrawer({
 
         <div className={styles.section}>
           <div
-            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 8,
+            }}
           >
-            <div className={styles.sectionTitle}>Mensagens do WhatsApp</div>
-            <Button
-              onClick={() => void handleDraftMessages()}
-              disabled={draftingMessages}
-              title="Monta as 5 etapas da cadência (WhatsApp e ligação) com o que o SDR já sabe desta empresa. Não usa IA nem API key."
-            >
-              {draftingMessages ? "Gerando…" : "Gerar mensagens"}
-            </Button>
+            <div className={styles.sectionTitle}>Cadência — WhatsApp e ligação</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end" }}>
+              <Button
+                onClick={() => void handleDraftMessages(false)}
+                disabled={draftingMessages !== null}
+                title="Monta as 5 etapas da cadência (WhatsApp e ligação) com modelos prontos e o que o SDR já sabe desta empresa. Não usa IA nem API key."
+              >
+                {draftingMessages === "template" ? "Gerando…" : "Gerar mensagens (padrão)"}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => void handleDraftMessages(true)}
+                disabled={draftingMessages !== null}
+                title={`Envia o mesmo prompt do "Copiar prompt" para ${apiProviderLabel} (API key de Configurações → IA dos textos) e preenche as 5 etapas. Leva alguns segundos.`}
+              >
+                {draftingMessages === "ai" ? "A IA está escrevendo…" : "Gerar mensagens com IA"}
+              </Button>
+            </div>
           </div>
           <p className={styles.notes} style={{ marginBottom: 8 }}>
             Uma etapa da cadência por campo: WhatsApp = mensagem pronta, Ligação = roteiro. Em
@@ -919,7 +950,7 @@ export function ProspectDrawer({
         {pendingDraft && (
           <ConfirmDialog
             title="Substituir as mensagens?"
-            message="Este prospect já tem mensagens preenchidas. As novas (geradas sem IA) vão substituir as quatro no formulário — nada é salvo até você clicar em Salvar."
+            message={`Este prospect já tem mensagens preenchidas. As novas (${pendingDraft.source === "template" ? "geradas sem IA" : "geradas pela IA"}) vão substituir as do formulário — nada é salvo até você clicar em Salvar.`}
             confirmLabel="Substituir"
             onClose={() => setPendingDraft(null)}
             onConfirm={async () => {

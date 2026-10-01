@@ -1238,20 +1238,23 @@ export class SdrApiRepository implements SdrRepository {
   }
 
   async draftProspectMessages(prospectId: string): Promise<SdrDraftMessages> {
-    const dto = await apiRequest<{
-      opportunities: string[];
-      hook: string;
-      messages: string[];
-      based_on: string[];
-      channels?: ("whatsapp" | "ligacao")[];
-    }>(`/api/v1/sdr/prospects/${prospectId}/draft-messages`, { method: "POST" });
-    return {
-      opportunities: dto.opportunities ?? [],
-      hook: dto.hook ?? "",
-      messages: dto.messages ?? [],
-      basedOn: dto.based_on ?? [],
-      channels: dto.channels ?? [],
-    };
+    return toDraftMessages(
+      await apiRequest<DraftMessagesDto>(`/api/v1/sdr/prospects/${prospectId}/draft-messages`, {
+        method: "POST",
+      }),
+    );
+  }
+
+  async generateProspectMessagesWithAi(
+    prospectId: string,
+    summary?: string,
+  ): Promise<SdrDraftMessages> {
+    return toDraftMessages(
+      await apiRequest<DraftMessagesDto>(`/api/v1/sdr/prospects/${prospectId}/ai-messages`, {
+        method: "POST",
+        body: JSON.stringify({ summary: summary ?? null }),
+      }),
+    );
   }
 
   async buildProspectAiPrompt(prospectId: string, summary?: string): Promise<string> {
@@ -1312,5 +1315,27 @@ function toAiSettings(dto: AiSettingsDto): SdrAiSettings {
     chatTarget: dto.chat_target,
     openai: dto.openai,
     anthropic: dto.anthropic,
+  };
+}
+
+interface DraftMessagesDto {
+  source?: string;
+  opportunities: string[];
+  hook: string;
+  messages: string[];
+  based_on: string[];
+  channels?: ("whatsapp" | "ligacao")[];
+  strategy?: string | null;
+}
+
+function toDraftMessages(dto: DraftMessagesDto): SdrDraftMessages {
+  return {
+    source: dto.source ?? "template",
+    strategy: dto.strategy ?? null,
+    opportunities: dto.opportunities ?? [],
+    hook: dto.hook ?? "",
+    messages: dto.messages ?? [],
+    basedOn: dto.based_on ?? [],
+    channels: dto.channels ?? [],
   };
 }
