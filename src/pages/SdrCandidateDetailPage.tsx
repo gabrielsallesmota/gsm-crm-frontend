@@ -17,6 +17,7 @@ import { useSdrCandidateAppearances, useSdrCandidateDecisions } from "../hooks/u
 import { useSdrCandidateOutreach } from "../hooks/useSdrCandidateOutreach";
 import { useSdrCandidateScores } from "../hooks/useSdrCandidateScores";
 import { useSdrDiscardReasons } from "../hooks/useSdrDiscardReasons";
+import { ManageDiscardReasonsModal } from "../components/sdr/ManageDiscardReasonsModal";
 import { useSdrEnrichmentActions } from "../hooks/useSdrEnrichmentActions";
 import { useToast } from "../hooks/useToast";
 import { sdrService } from "../services/SdrService";
@@ -103,7 +104,8 @@ export function SdrCandidateDetailPage() {
   const { data: candidate, loading, error, reload } = useSdrCandidate(id ?? "");
   const { data: decisions, reload: reloadDecisions } = useSdrCandidateDecisions(id ?? "");
   const { data: appearances } = useSdrCandidateAppearances(id ?? "");
-  const { data: discardReasons } = useSdrDiscardReasons();
+  const { data: discardReasons, reload: reloadDiscardReasons } = useSdrDiscardReasons();
+  const [managingReasons, setManagingReasons] = useState(false);
   const { review, approve, discard, reevaluate } = useSdrCandidateActions();
   const {
     data: enrichments,
@@ -850,10 +852,19 @@ export function SdrCandidateDetailPage() {
                 >
                   Descartar
                 </Button>
+                <Button onClick={() => setManagingReasons(true)}>Motivos de descarte</Button>
               </>
             )}
           </div>
         </div>
+      )}
+
+      {managingReasons && (
+        <ManageDiscardReasonsModal
+          reasons={discardReasons ?? []}
+          onClose={() => setManagingReasons(false)}
+          onChanged={reloadDiscardReasons}
+        />
       )}
 
       <div className={styles.card}>

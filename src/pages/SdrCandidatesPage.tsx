@@ -9,6 +9,7 @@ import { useSdrCandidateActions } from "../hooks/useSdrCandidateActions";
 import { useSdrCampaigns } from "../hooks/useSdrCampaigns";
 import { useSdrCandidates } from "../hooks/useSdrCandidates";
 import { useSdrDiscardReasons } from "../hooks/useSdrDiscardReasons";
+import { ManageDiscardReasonsModal } from "../components/sdr/ManageDiscardReasonsModal";
 import { useToast } from "../hooks/useToast";
 import { sdrService } from "../services/SdrService";
 import {
@@ -93,7 +94,8 @@ export function SdrCandidatesPage() {
       setScoring(false);
     }
   }
-  const { data: discardReasons } = useSdrDiscardReasons();
+  const { data: discardReasons, reload: reloadDiscardReasons } = useSdrDiscardReasons();
+  const [managingReasons, setManagingReasons] = useState(false);
   const { bulk } = useSdrCandidateActions();
 
   const candidates = data?.items ?? [];
@@ -266,7 +268,16 @@ export function SdrCandidatesPage() {
           <Button onClick={() => void runBulk("discard")} disabled={bulkRunning || !bulkReason}>
             Descartar
           </Button>
+          <Button onClick={() => setManagingReasons(true)}>Motivos de descarte</Button>
         </div>
+      )}
+
+      {managingReasons && (
+        <ManageDiscardReasonsModal
+          reasons={discardReasons ?? []}
+          onClose={() => setManagingReasons(false)}
+          onChanged={reloadDiscardReasons}
+        />
       )}
 
       {error && <EmptyState title="Não foi possível carregar os candidates" message={error.message} />}
