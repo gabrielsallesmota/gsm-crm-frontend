@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
 import { EmptyState } from "../components/common/EmptyState";
@@ -100,6 +100,7 @@ function fmtDateTime(iso: string): string {
 export function SdrCandidateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast, toastError } = useToast();
   const { data: candidate, loading, error, reload } = useSdrCandidate(id ?? "");
   const { data: decisions, reload: reloadDecisions } = useSdrCandidateDecisions(id ?? "");
@@ -353,7 +354,15 @@ export function SdrCandidateDetailPage() {
     <div>
       <div className={styles.header}>
         <div>
-          <Button onClick={() => navigate(ROUTES.sdrCandidates)}>‹ Voltar</Button>
+          <Button
+            onClick={() =>
+              // Volta para a lista como estava (filtros/página ficam na URL);
+              // aberto direto por link, cai na lista sem filtro.
+              location.key !== "default" ? navigate(-1) : navigate(ROUTES.sdrCandidates)
+            }
+          >
+            ‹ Voltar
+          </Button>
           <h1 className={styles.pageTitle} style={{ marginTop: 8 }}>
             {candidate.companyName}
           </h1>

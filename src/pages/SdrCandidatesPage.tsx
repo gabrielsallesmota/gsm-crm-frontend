@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { SdrSubNav } from "../components/sdr/SdrSubNav";
 import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
@@ -44,14 +44,39 @@ function yesNo(value: YesNo): boolean | undefined {
 export function SdrCandidatesPage() {
   const navigate = useNavigate();
   const { toast, toastError } = useToast();
-  const [status, setStatus] = useState<SdrCandidateStatus | "">("");
-  const [search, setSearch] = useState("");
-  const [campaignId, setCampaignId] = useState("");
-  const [priority, setPriority] = useState<SdrPriority | "none" | "">("");
-  const [hasPhone, setHasPhone] = useState<YesNo>("");
-  const [hasSite, setHasSite] = useState<YesNo>("");
-  const [order, setOrder] = useState<"recent" | "score">("score");
-  const [page, setPage] = useState(1);
+  // Filtros e página vivem na URL: ao abrir um candidato e voltar, a lista
+  // volta igual (e já sem quem foi descartado, se o filtro for "Novo").
+  const [params, setParams] = useSearchParams();
+  const status = (params.get("status") ?? "") as SdrCandidateStatus | "";
+  const search = params.get("q") ?? "";
+  const campaignId = params.get("campaign") ?? "";
+  const priority = (params.get("priority") ?? "") as SdrPriority | "none" | "";
+  const hasPhone = (params.get("phone") ?? "") as YesNo;
+  const hasSite = (params.get("site") ?? "") as YesNo;
+  const order: "recent" | "score" = params.get("order") === "recent" ? "recent" : "score";
+  const page = Math.max(1, Number(params.get("page")) || 1);
+
+  // Troca um parâmetro da URL (vazio = remove). Filtro novo volta à página 1.
+  function setParam(key: string, value: string) {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        if (key !== "page") next.delete("page");
+        return next;
+      },
+      { replace: true },
+    );
+  }
+  const setStatus = (v: SdrCandidateStatus | "") => setParam("status", v);
+  const setSearch = (v: string) => setParam("q", v);
+  const setCampaignId = (v: string) => setParam("campaign", v);
+  const setPriority = (v: SdrPriority | "none" | "") => setParam("priority", v);
+  const setHasPhone = (v: YesNo) => setParam("phone", v);
+  const setHasSite = (v: YesNo) => setParam("site", v);
+  const setOrder = (v: "recent" | "score") => setParam("order", v === "recent" ? "recent" : "");
+  const setPage = (v: number) => setParam("page", v > 1 ? String(v) : "");
   const [scoring, setScoring] = useState(false);
   const { data: campaigns } = useSdrCampaigns();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -73,11 +98,10 @@ export function SdrCandidatesPage() {
   });
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
-  // Qualquer filtro novo volta para a 1ª página.
+  // Qualquer filtro novo volta para a 1ª página (ver `setParam`) e limpa a seleção.
   function filterChanged<T>(setter: (value: T) => void) {
     return (value: T) => {
       setter(value);
-      setPage(1);
       setSelected(new Set());
     };
   }
@@ -367,14 +391,14 @@ export function SdrCandidatesPage() {
 
       {!error && data && data.total > PAGE_SIZE && (
         <div className={styles.filterRow} style={{ justifyContent: "center", marginTop: 12 }}>
-          <Button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+          <Button onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1}>
             ‹ Anterior
           </Button>
           <span className={styles.pageSubtitle}>
             Página {page} de {totalPages}
           </span>
           <Button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => setPage(Math.min(totalPages, page + 1))}
             disabled={page >= totalPages}
           >
             Próxima ›
