@@ -36,6 +36,7 @@ import type {
   ProspectOrigin,
   ProspectStage,
 } from "../../types/prospect";
+import { BulkMoveStageModal } from "./BulkMoveStageModal";
 import styles from "./ProspectionBoard.module.css";
 
 const ATIVO_BADGE = { label: "Ativo", color: "var(--tone-purple)", bg: "var(--tone-purple-bg)" };
@@ -104,6 +105,8 @@ export function ProspectionBoard({ period }: { period: Period }) {
   const [importing, setImporting] = useState(false);
   const [managingStages, setManagingStages] = useState(false);
   const [managingLossReasons, setManagingLossReasons] = useState(false);
+  // "Mover todos" de uma coluna (ver `BulkMoveStageModal`).
+  const [bulkFromStageId, setBulkFromStageId] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
   const [sortOption, setSortOption] = useState<BoardSortOption>("none");
   // Move pendente aguardando a data alvo (só quando o estágio de destino
@@ -407,6 +410,18 @@ export function ProspectionBoard({ period }: { period: Period }) {
                   <span className={styles.columnDot} style={{ background: stage.color }} />
                   <span className={styles.columnLabel}>{stage.name}</span>
                   <span className={styles.columnCount}>{stageProspects.length}</span>
+                  {stageProspects.length > 0 && (
+                    <button
+                      type="button"
+                      className={styles.columnCount}
+                      style={{ cursor: "pointer", border: "none", marginLeft: 4 }}
+                      onClick={() => setBulkFromStageId(stage.id)}
+                      title={`Mover todos os prospects de "${stage.name}" para outro estágio`}
+                      aria-label={`Mover todos de ${stage.name}`}
+                    >
+                      Mover todos
+                    </button>
+                  )}
                 </div>
                 <div className={styles.cards}>
                   {stageProspects.map((prospect) => (
@@ -477,6 +492,22 @@ export function ProspectionBoard({ period }: { period: Period }) {
           }}
         />
       )}
+
+      {bulkFromStageId && stages && (() => {
+        const fromStage = stages.find((s) => s.id === bulkFromStageId);
+        if (!fromStage) return null;
+        return (
+          <BulkMoveStageModal
+            fromStage={fromStage}
+            prospects={prospects.filter((p) => p.stageId === fromStage.id)}
+            stages={stages}
+            lossReasons={lossReasons ?? []}
+            move={move}
+            onClose={() => setBulkFromStageId(null)}
+            onDone={() => reload()}
+          />
+        );
+      })()}
 
       {managingLossReasons && (
         <ManageLossReasonsModal
