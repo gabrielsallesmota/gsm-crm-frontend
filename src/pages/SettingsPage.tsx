@@ -319,6 +319,12 @@ export function SettingsPage() {
           />
         )}
         {loading && !pipelines && <div className={styles.loading}>Carregando…</div>}
+        {pipelines && pipelines.length > 0 && !pipelines.some((p) => p.isDefault) && (
+          <p className={styles.warning} role="alert">
+            Nenhum pipeline está marcado como padrão — os leads que chegam pelas integrações
+            (site, formulários, n8n) não têm onde entrar. Use “Tornar padrão” em um deles.
+          </p>
+        )}
 
         <div className={styles.pipelineGrid}>
           {pipelines?.map((pipeline) => (
@@ -370,15 +376,17 @@ export function SettingsPage() {
                       >
                         Tornar padrão
                       </button>
-                      <button
-                        type="button"
-                        className={styles.editIconBtn}
-                        onClick={() => setConfirmDeletePipeline(pipeline)}
-                        aria-label={`Excluir pipeline ${pipeline.name}`}
-                        title="Excluir pipeline"
-                      >
-                        ✕
-                      </button>
+                      {pipelines.length > 1 && (
+                        <button
+                          type="button"
+                          className={styles.editIconBtn}
+                          onClick={() => setConfirmDeletePipeline(pipeline)}
+                          aria-label={`Excluir pipeline ${pipeline.name}`}
+                          title="Excluir pipeline"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </>
                   )}
                 </div>

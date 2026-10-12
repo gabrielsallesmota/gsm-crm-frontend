@@ -210,3 +210,14 @@
 .tagDeleteBtn:hover {
   color: var(--danger);
 }
+
+/* CRM-001 — tenant sem pipeline padrão (integrações sem destino). */
+.warning {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--tone-amber);
+  background: var(--tone-amber-bg);
+  color: var(--text);
+  font-size: 0.875rem;
+}
