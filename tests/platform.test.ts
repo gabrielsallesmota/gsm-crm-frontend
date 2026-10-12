@@ -52,6 +52,17 @@ describe("features contratadas", () => {
     assert.equal(hasFeature({}, "webhooks"), false);
     assert.equal(hasFeature(null, "reports"), FEATURE_DEFAULTS.reports);
   });
+  it("CRM-003B.1: notificações e integrações nascem desligadas", () => {
+    assert.equal(hasFeature({}, "notifications"), false);
+    assert.equal(hasFeature(null, "calendar_task_integrations"), false);
+    assert.equal(
+      hasFeature(
+        { features: { notifications: false, calendar_task_integrations: false } },
+        "notifications",
+      ),
+      false,
+    );
+  });
   it("o valor explícito do tenant vence", () => {
     assert.equal(hasFeature({ features: { crm: false } }, "crm"), false);
     assert.equal(hasFeature({ features: { reports: false } }, "crm"), true);
