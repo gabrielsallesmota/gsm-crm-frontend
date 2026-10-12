@@ -69,6 +69,15 @@ const SdrProspectingQueuePage = lazyPage(
 // Integrações (Etapa 3) — só Admin; chunk próprio.
 const IntegrationsPage = lazyPage(() => import("../pages/IntegrationsPage"), "IntegrationsPage");
 const SdrDashboardPage = lazyPage(() => import("../pages/SdrDashboardPage"), "SdrDashboardPage");
+// Central de Notificações (CRM-003B.3) — chunks próprios.
+const NotificationsSettingsPage = lazyPage(
+  () => import("../pages/NotificationsSettingsPage"),
+  "NotificationsSettingsPage",
+);
+const MyNotificationsPage = lazyPage(
+  () => import("../pages/MyNotificationsPage"),
+  "MyNotificationsPage",
+);
 function guarded(permission: Permission, page: ReactNode) {
   return (
     <RequirePermission permission={permission}>
@@ -102,6 +111,10 @@ const PlatformAuditPage = lazyPage(() => import("../platform/PlatformAuditPage")
 const SupportSessionsPage = lazyPage(
   () => import("../platform/SupportSessionsPage"),
   "SupportSessionsPage",
+);
+/** Feature contratada E permissão do papel (ex.: Configurações → Notificações). */
+const contractedAndGuarded = (feature: TenantFeature, permission: Permission, page: ReactNode) => (
+  <RequireFeature feature={feature}>{guarded(permission, page)}</RequireFeature>
 );
 const platformPage = (page: ReactNode) => <Suspense fallback={<Loading />}>{page}</Suspense>;
 
@@ -152,6 +165,18 @@ export const router = createBrowserRouter([
       { path: ROUTES.relatorios, element: contracted("reports", <ReportsPage />) },
       { path: ROUTES.configuracoes, element: guarded("settings.manage", <SettingsPage />) },
       { path: ROUTES.integracoes, element: guarded("integrations.manage", <IntegrationsPage />) },
+      {
+        path: ROUTES.notificacoes,
+        element: contractedAndGuarded(
+          "notifications",
+          "notifications.view",
+          <NotificationsSettingsPage />,
+        ),
+      },
+      {
+        path: ROUTES.minhasNotificacoes,
+        element: contracted("notifications", <MyNotificationsPage />),
+      },
       { path: ROUTES.equipe, element: guarded("users.view", <UsersPage />) },
       { path: ROUTES.usuarios, element: <Navigate to={ROUTES.equipe} replace /> },
       {

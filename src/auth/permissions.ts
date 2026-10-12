@@ -16,6 +16,8 @@ import type { AuthUser } from "../types/auth";
  * - users.create      → POST /users           require_tenant_role(ADMIN)
  * - settings.manage   → escrita de pipelines/estágios/tags/templates (ADMIN, GESTOR)
  * - integrations.manage → /integrations/* credenciais de API e webhooks (ADMIN)
+ * - notifications.view → GET /notifications/settings (todos) + /recipients (ADMIN, GESTOR)
+ * - notifications.manage → PATCH /notifications/settings (ADMIN; nunca em suporte)
  * - pipeline.reorder  → PATCH /stages/reorder (ADMIN, GESTOR)
  * - leads.assign      → PATCH /leads/{id} owner_id (ADMIN, GESTOR; vendedor → 403)
  * - leads.viewAll     → vendedor só enxerga os próprios leads (escopo no backend)
@@ -32,6 +34,8 @@ export type Permission =
   | "users.create"
   | "settings.manage"
   | "integrations.manage"
+  | "notifications.view"
+  | "notifications.manage"
   | "pipeline.reorder"
   | "leads.assign"
   | "leads.viewAll"
@@ -48,11 +52,20 @@ const ROLE_PERMISSIONS: Record<TenantRole, readonly Permission[]> = {
     "users.create",
     "settings.manage",
     "integrations.manage",
+    "notifications.view",
+    "notifications.manage",
     "pipeline.reorder",
     "leads.assign",
     "leads.viewAll",
   ],
-  gestor: ["users.view", "settings.manage", "pipeline.reorder", "leads.assign", "leads.viewAll"],
+  gestor: [
+    "users.view",
+    "settings.manage",
+    "notifications.view",
+    "pipeline.reorder",
+    "leads.assign",
+    "leads.viewAll",
+  ],
   vendedor: [],
 };
 
@@ -67,7 +80,8 @@ type Principal =
 
 // O suporte da GSM nunca gerencia usuários/papéis do cliente (bloqueado no
 // backend mesmo com escrita liberada).
-const BLOCKED_DURING_SUPPORT: readonly Permission[] = ["users.create"];
+// CRM-003B.3: a política de notificações também (`forbid_impersonation`).
+const BLOCKED_DURING_SUPPORT: readonly Permission[] = ["users.create", "notifications.manage"];
 
 export function can(user: Principal, permission: Permission): boolean {
   if (!user) return false;

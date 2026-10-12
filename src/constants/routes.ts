@@ -25,6 +25,9 @@ export const ROUTES = {
   relatorios: "/relatorios",
   configuracoes: "/configuracoes",
   integracoes: "/configuracoes/integracoes",
+  // Central de Notificações (CRM-003B.3).
+  notificacoes: "/configuracoes/notificacoes",
+  minhasNotificacoes: "/perfil/notificacoes",
   // "Equipe" (Etapa 4). `/usuarios` continua redirecionando para cá.
   equipe: "/equipe",
   usuarios: "/usuarios",

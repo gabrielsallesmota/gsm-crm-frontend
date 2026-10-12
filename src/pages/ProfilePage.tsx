@@ -4,6 +4,9 @@ import { useToast } from "../hooks/useToast";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { resetOnboarding } from "../hooks/useOnboarding";
 import { roleLabel } from "../auth/permissions";
+import { hasFeature } from "../auth/features";
+import { Link } from "react-router-dom";
+import { ROUTES } from "../constants/routes";
 import { Button } from "../components/common/Button";
 import { Avatar } from "../components/common/Avatar";
 import { ChangePasswordForm } from "../components/auth/ChangePasswordForm";
@@ -52,6 +55,16 @@ export function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {hasFeature(user, "notifications") && (
+        <div className={styles.editSection}>
+          <h2 className={styles.sectionTitle}>Minhas notificações</h2>
+          <p className={styles.pageSubtitle}>
+            Escolha o que receber, seu telefone, autorização e fuso.
+          </p>
+          <Link to={ROUTES.minhasNotificacoes}>Abrir minhas notificações</Link>
+        </div>
+      )}
 
       <div className={styles.editSection}>
         <h2 className={styles.sectionTitle}>Primeiros passos</h2>

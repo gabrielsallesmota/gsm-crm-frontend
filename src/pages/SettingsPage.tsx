@@ -15,6 +15,9 @@ import { AiTextSettings } from "../components/sdr/AiTextSettings";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { can } from "../auth/permissions";
+import { hasFeature } from "../auth/features";
+import { Link } from "react-router-dom";
+import { ROUTES } from "../constants/routes";
 import { ORIGIN } from "../constants/origins";
 import { hexToRgba, readableTextColor } from "../utils/colors";
 import type { Pipeline, PipelineStage } from "../types/pipeline";
@@ -293,6 +296,11 @@ export function SettingsPage() {
     <div>
       <h1 className={styles.pageTitle}>Configurações</h1>
       <p className={styles.pageSubtitle}>Pipelines, etapas, tags e origens</p>
+      {user && hasFeature(user, "notifications") && can(user, "notifications.view") && (
+        <p className={styles.pageSubtitle}>
+          <Link to={ROUTES.notificacoes}>Notificações</Link> — resumo diário e alertas da equipe
+        </p>
+      )}
 
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
