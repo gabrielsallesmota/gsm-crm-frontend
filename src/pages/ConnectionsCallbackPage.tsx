@@ -3,8 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { connectionsService } from "../services/ConnectionsService";
 import { ROUTES } from "../constants/routes";
-import { describeError } from "../utils/apiErrors";
 import {
+  describeConnectionError,
   FEATURE_LABEL,
   isUsableOAuthReturn,
   parseOAuthReturn,
@@ -71,7 +71,7 @@ export function ConnectionsCallbackPage() {
         .catch(
           (err: unknown): View => ({
             kind: "error",
-            message: describeError(err, "Não foi possível concluir a conexão."),
+            message: describeConnectionError(err, "Não foi possível concluir a conexão."),
           }),
         );
       handled.set(key, job);

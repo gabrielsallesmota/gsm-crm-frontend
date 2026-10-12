@@ -8,6 +8,7 @@ import { connectionsService } from "../../services/ConnectionsService";
 import { formatDateTime } from "../../utils/datetime";
 import {
   canSyncNow,
+  describeConnectionError,
   connectionAttention,
   FEATURE_LABEL,
   PROVIDER_LABEL,
@@ -32,7 +33,7 @@ export function ConnectionCard({
   onRemoved: (id: string) => void;
   onReconnect: (c: Connection) => void;
 }) {
-  const { toast, toastError } = useToast();
+  const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -52,7 +53,7 @@ export function ConnectionCard({
       onChanged(await connectionsService.update(connection.id, change));
       toast(message);
     } catch (err) {
-      toastError(err, "Não foi possível salvar a alteração.");
+      toast(describeConnectionError(err, "Não foi possível salvar a alteração."), "error");
     } finally {
       setBusy(false);
     }
@@ -64,7 +65,7 @@ export function ConnectionCard({
       onChanged(await connectionsService.syncNow(connection.id));
       toast("Sincronização solicitada. Os itens aparecem na Agenda e em Tarefas em instantes.");
     } catch (err) {
-      toastError(err, "Não foi possível solicitar a sincronização.");
+      toast(describeConnectionError(err, "Não foi possível solicitar a sincronização."), "error");
     } finally {
       setBusy(false);
     }
@@ -81,7 +82,7 @@ export function ConnectionCard({
       );
       return true;
     } catch (err) {
-      toastError(err, "Não foi possível desconectar.");
+      toast(describeConnectionError(err, "Não foi possível desconectar."), "error");
       return false;
     }
   }

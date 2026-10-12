@@ -5,6 +5,7 @@ import { ProviderLogo } from "./ProviderLogo";
 import { useToast } from "../../hooks/useToast";
 import { connectionsService } from "../../services/ConnectionsService";
 import {
+  describeConnectionError,
   FEATURE_LABEL,
   PROVIDER_LABEL,
   PROVIDER_SERVICES,
@@ -38,7 +39,7 @@ export function ProviderSection({
   onRemoved: (id: string) => void;
   redirect?: (url: string) => void;
 }) {
-  const { toastError } = useToast();
+  const { toast } = useToast();
   const [wanted, setWanted] = useState<ConnectionFeature[]>(["calendar", "tasks"]);
   const [starting, setStarting] = useState(false);
   const label = PROVIDER_LABEL[info.provider];
@@ -54,7 +55,7 @@ export function ProviderSection({
       if (state) rememberPendingProvider(state, provider);
       redirect(url);
     } catch (err) {
-      toastError(err, `Não foi possível iniciar a conexão com ${label}.`);
+      toast(describeConnectionError(err, `Não foi possível iniciar a conexão com ${label}.`), "error");
       setStarting(false);
     }
   }

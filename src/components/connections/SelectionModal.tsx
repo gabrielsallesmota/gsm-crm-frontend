@@ -5,7 +5,7 @@ import { SkeletonRows } from "../common/Skeleton";
 import { EmptyState } from "../common/EmptyState";
 import { useAsyncResource } from "../../hooks/useAsyncResource";
 import { connectionsService } from "../../services/ConnectionsService";
-import { describeError } from "../../utils/apiErrors";
+import { describeConnectionError } from "../../utils/connections";
 import type { Connection } from "../../types/connections";
 import form from "../common/Form.module.css";
 import styles from "./Connections.module.css";
@@ -61,7 +61,7 @@ export function SelectionModal({
       onSaved(updated);
       onClose();
     } catch (err) {
-      setError(describeError(err, "Não foi possível salvar a seleção."));
+      setError(describeConnectionError(err, "Não foi possível salvar a seleção."));
     } finally {
       setSaving(false);
     }
@@ -77,7 +77,7 @@ export function SelectionModal({
         <EmptyState
           tone="error"
           title="Não foi possível listar"
-          message={describeError(state.error, "Tente novamente em instantes.")}
+          message={describeConnectionError(state.error, "Tente novamente em instantes.")}
           actions={[{ label: "Tentar de novo", onClick: state.reload }]}
         />
       )}

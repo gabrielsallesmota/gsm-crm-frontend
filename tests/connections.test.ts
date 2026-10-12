@@ -216,3 +216,17 @@ describe("funcionalidade contratada", () => {
     );
   });
 });
+
+describe("mensagens de erro das conexões", () => {
+  it("503 mostra o motivo que a API devolve; o resto segue o padrão do app", async () => {
+    const { describeConnectionError } = await import("../src/utils/connections.ts");
+    const { ApiError } = await import("../src/types/common.ts");
+    assert.equal(
+      describeConnectionError(new ApiError(503, "A aplicação GSM foi recusada pelo provedor."), "x"),
+      "A aplicação GSM foi recusada pelo provedor.",
+    );
+    assert.match(describeConnectionError(new ApiError(503, ""), "x"), /temporariamente indisponível/);
+    assert.match(describeConnectionError(new ApiError(500, "detalhe interno"), "x"), /Erro inesperado/);
+    assert.equal(describeConnectionError(new ApiError(422, "Autorização inválida"), "x"), "Autorização inválida");
+  });
+});

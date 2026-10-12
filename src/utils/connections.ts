@@ -5,6 +5,8 @@
  * `mailto:`. Quem autoriza, valida e sincroniza é sempre o backend; nada aqui
  * guarda token ou segredo.
  */
+import { ApiError } from "../types/common.ts";
+import { describeError } from "./apiErrors.ts";
 import type {
   CalendarChoice,
   CallbackResult,
@@ -357,4 +359,17 @@ export function eligibleTargets(connections: Connection[], kind: "event" | "task
         ? c.calendarEnabled && c.selectedCalendars.length > 0
         : c.tasksEnabled && c.selectedTaskLists.length > 0,
   );
+}
+
+/**
+ * Mensagem de erro das rotas de conexão. Diferente do padrão do app, o 502/503/504
+ * mostra o motivo que a API devolve ("a integração não está configurada", "a
+ * aplicação foi recusada pelo provedor"...): essas mensagens são escritas para o
+ * usuário e nunca carregam segredo — esconder só dificultaria o diagnóstico.
+ */
+export function describeConnectionError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && [502, 503, 504].includes(err.status) && err.message.trim()) {
+    return err.message;
+  }
+  return describeError(err, fallback);
 }
