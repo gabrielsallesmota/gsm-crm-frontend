@@ -9,6 +9,7 @@ import {
   DELIVERY_KIND_LABELS,
   DELIVERY_REASON_LABELS,
   DELIVERY_STATUS_LABELS,
+  deliveryStageLabel,
   formatInZone,
 } from "../../utils/notifications";
 import type { DeliveryKind, DeliveryStatus } from "../../types/notifications";
@@ -26,7 +27,8 @@ const KIND_OPTIONS: DeliveryKind[] = ["daily_digest", "new_lead_alert"];
 
 /**
  * Histórico. `skipped` e `channel_unavailable` NUNCA aparecem como envio:
- * são estados finais sem mensagem (o WhatsApp só existe no B.8). Datas no
+ * são estados finais sem mensagem. `pending` aceita pelo n8n NÃO é envio:
+ * só “Enviada”/“Entregue” (confirmação do provedor) contam. Datas no
  * fuso efetivo de quem está vendo.
  */
 export function DeliveriesPanel({
@@ -47,6 +49,10 @@ export function DeliveriesPanel({
   );
   const { data, loading, error, reload } = useNotificationDeliveries(filters, page);
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  // Há entrega que realmente entrou no fluxo do n8n (pendente/enviada/falha)?
+  const channelLive = (data?.items ?? []).some((d) =>
+    ["pending", "sent", "failed"].includes(d.status),
+  );
 
   return (
     <section aria-labelledby="deliveries-title">
@@ -54,8 +60,9 @@ export function DeliveriesPanel({
         Histórico de notificações
       </h2>
       <p className={`${local.notice} ${local.info}`}>
-        O canal WhatsApp ainda não está disponível: nenhuma notificação foi enviada. Os registros
-        abaixo mostram o que o sistema teria enviado e por que não saiu.
+        {channelLive
+          ? "“Aceita” significa só que o pedido chegou ao n8n; a mensagem conta como enviada quando o provedor de WhatsApp confirma."
+          : "O canal WhatsApp ainda não está disponível: nenhuma notificação foi enviada. Os registros abaixo mostram o que o sistema teria enviado e por que não saiu."}
       </p>
       <div className={local.toolbarRow}>
         <select
@@ -137,7 +144,7 @@ export function DeliveriesPanel({
                     <span
                       className={`${styles.pill} ${d.status === "sent" ? styles.ok : d.status === "failed" ? styles.bad : styles.neutral}`}
                     >
-                      {DELIVERY_STATUS_LABELS[d.status]}
+                      {deliveryStageLabel(d)}
                     </span>
                   </td>
                   <td>

@@ -11,6 +11,7 @@ import type {
   ChannelStatus,
   Delivery,
   DeliveryKind,
+  DeliveryStage,
   DeliveryStatus,
   DigestPreview,
   DigestSection,
@@ -206,7 +207,26 @@ export function toDelivery(raw: unknown): Delivery {
     expiresAt: str(d.expires_at),
     sentAt: strOrNull(d.sent_at),
     createdAt: str(d.created_at),
+    stage: toStage(d.stage, str(d.status)),
+    failureCode: strOrNull(d.failure_code),
   };
+}
+
+const STAGES: DeliveryStage[] = [
+  "planned",
+  "accepted",
+  "processed",
+  "sent",
+  "confirmed",
+  "failed",
+  "skipped",
+  "channel_unavailable",
+  "expired",
+];
+
+function toStage(raw: unknown, status: string): DeliveryStage {
+  if ((STAGES as string[]).includes(String(raw))) return raw as DeliveryStage;
+  return (STAGES as string[]).includes(status) ? (status as DeliveryStage) : "planned";
 }
 
 // ---- PATCH parcial --------------------------------------------------------------
@@ -319,7 +339,35 @@ export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
   expired: "Expirada",
 };
 
+/** Etapas do despacho. “Aceita” só diz que o WhatsApp/n8n RECEBEU o pedido —
+ * ainda NÃO é envio. “Enviada” vem da confirmação do provedor. */
+export const DELIVERY_STAGE_LABELS: Record<DeliveryStage, string> = {
+  planned: "Aguardando envio",
+  accepted: "Aceita pelo n8n — aguardando confirmação de envio",
+  processed: "Processada — aguardando confirmação de envio",
+  sent: "Enviada",
+  confirmed: "Entregue",
+  failed: "Falhou",
+  skipped: "Não enviada",
+  channel_unavailable: "Não enviada — canal indisponível",
+  expired: "Expirada",
+};
+
+export function deliveryStageLabel(d: Pick<Delivery, "status" | "stage">): string {
+  return DELIVERY_STAGE_LABELS[d.stage ?? "planned"] ?? DELIVERY_STATUS_LABELS[d.status];
+}
+
 export const DELIVERY_REASON_LABELS: Record<string, string> = {
+  awaiting_dispatch: "na fila para ser enviada",
+  accepted_by_n8n: "o n8n recebeu o pedido; falta a confirmação do envio",
+  retry_scheduled: "falha temporária; nova tentativa agendada",
+  sent_confirmed: "envio confirmado pelo provedor de WhatsApp",
+  confirmation_timeout: "aceita, mas o envio não foi confirmado a tempo",
+  dispatch_attempts_exhausted: "tentativas esgotadas",
+  consent_missing_or_revoked: "a autorização do WhatsApp foi revogada ou não existe",
+  company_disabled: "a empresa desligou as notificações",
+  not_a_recipient: "a pessoa deixou de ser destinatária",
+  recipient_inactive: "a pessoa não está mais ativa na equipe",
   no_phone: "a pessoa não cadastrou telefone",
   no_consent: "a pessoa não autorizou o WhatsApp",
   channel_disabled: "a pessoa desligou o WhatsApp",

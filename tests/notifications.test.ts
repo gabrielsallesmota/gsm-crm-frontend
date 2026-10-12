@@ -360,3 +360,36 @@ describe("permissões e navegação", () => {
     );
   });
 });
+
+describe("CRM-003B.8 — etapas do despacho", () => {
+  const base = {
+    id: "d",
+    recipient_user_id: "u",
+    kind: "daily_digest",
+    channel: "whatsapp",
+    scheduled_for: "2026-10-12T11:00:00Z",
+    expires_at: "2026-10-12T17:00:00Z",
+    created_at: "2026-10-12T11:00:00Z",
+  };
+
+  it("mapeia a etapa enviada pelo backend e cai no status quando ela falta", async () => {
+    const { toDelivery, deliveryStageLabel } = await import("../src/utils/notifications.ts");
+    const accepted = toDelivery({ ...base, status: "pending", stage: "accepted" });
+    assert.equal(accepted.stage, "accepted");
+    assert.notEqual(deliveryStageLabel(accepted), "Enviada");
+    assert.match(deliveryStageLabel(accepted), /aguardando confirmação/);
+    // Backend antigo (sem `stage`): usa o status; pendente é "aguardando envio".
+    assert.equal(toDelivery({ ...base, status: "skipped" }).stage, "skipped");
+    assert.equal(deliveryStageLabel(toDelivery({ ...base, status: "pending" })), "Aguardando envio");
+    assert.equal(toDelivery({ ...base, status: "sent", stage: "inventada" }).stage, "sent");
+  });
+
+  it("enviada e entregue são rótulos distintos", async () => {
+    const { toDelivery, deliveryStageLabel } = await import("../src/utils/notifications.ts");
+    assert.equal(deliveryStageLabel(toDelivery({ ...base, status: "sent", stage: "sent" })), "Enviada");
+    assert.equal(
+      deliveryStageLabel(toDelivery({ ...base, status: "sent", stage: "confirmed" })),
+      "Entregue",
+    );
+  });
+});

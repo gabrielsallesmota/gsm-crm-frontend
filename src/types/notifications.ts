@@ -179,7 +179,21 @@ export interface Delivery {
   expiresAt: string;
   sentAt: string | null;
   createdAt: string;
+  /** Andamento do despacho (CRM-003B.8): aceita ≠ enviada. */
+  stage?: DeliveryStage;
+  failureCode?: string | null;
 }
+
+export type DeliveryStage =
+  | "planned"
+  | "accepted"
+  | "processed"
+  | "sent"
+  | "confirmed"
+  | "failed"
+  | "skipped"
+  | "channel_unavailable"
+  | "expired";
 
 export interface DeliveryFilters {
   recipientUserId?: string | undefined;

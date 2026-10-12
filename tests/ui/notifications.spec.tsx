@@ -737,6 +737,41 @@ describe("DeliveriesPanel", () => {
     expect(within(table).getAllByText(/08:00/).length).toBe(2); // 11:00 UTC em São Paulo
   });
 
+  it("CRM-003B.8: aceita pelo n8n NÃO é enviada; só a confirmação do provedor conta", async () => {
+    api.listDeliveries.mockResolvedValue({
+      items: [
+        delivery({ id: "a", status: "pending", status_reason: "accepted_by_n8n", stage: "accepted" }),
+        delivery({
+          id: "s",
+          status: "sent",
+          status_reason: "sent_confirmed",
+          stage: "sent",
+          sent_at: "2026-10-12T11:01:00Z",
+        }),
+        delivery({
+          id: "c",
+          status: "sent",
+          stage: "confirmed",
+          sent_at: "2026-10-12T11:01:00Z",
+          confirmed_at: "2026-10-12T11:02:00Z",
+        }),
+        delivery({ id: "f", status: "failed", status_reason: "confirmation_timeout", stage: "failed" }),
+      ],
+      total: 4,
+      page: 1,
+      pageSize: 25,
+    });
+    render(<DeliveriesPanel timezone="America/Sao_Paulo" showRecipient={false} />);
+    const table = await screen.findByRole("table");
+    expect(within(table).getByText(/Aceita pelo n8n — aguardando confirmação/)).toBeTruthy();
+    expect(within(table).getAllByText("Enviada").length).toBe(1); // só a confirmada pelo provedor
+    expect(within(table).getByText("Entregue")).toBeTruthy();
+    expect(within(table).getByText(/aceita, mas o envio não foi confirmado a tempo/)).toBeTruthy();
+    // Com entregas reais no fluxo, o aviso de "canal indisponível" não aparece.
+    expect(screen.queryByText(/nenhuma notificação foi enviada/)).toBeNull();
+    expect(screen.getByText(/só que o pedido chegou ao n8n/)).toBeTruthy();
+  });
+
   it("filtra e pagina chamando a API com os filtros suportados", async () => {
     api.listDeliveries.mockResolvedValue({ items: [delivery()], total: 60, page: 1, pageSize: 25 });
     render(<DeliveriesPanel timezone="America/Sao_Paulo" showRecipient={false} />);
