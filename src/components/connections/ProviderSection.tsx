@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "../common/Button";
 import { ConnectionCard } from "./ConnectionCard";
+import { ProviderLogo } from "./ProviderLogo";
 import { useToast } from "../../hooks/useToast";
 import { connectionsService } from "../../services/ConnectionsService";
 import {
@@ -66,7 +67,8 @@ export function ProviderSection({
     <section className={styles.section} aria-labelledby={`prov-${info.provider}`}>
       <div className={styles.sectionHead}>
         <div>
-          <h2 id={`prov-${info.provider}`} className={styles.sectionTitle}>
+          <h2 id={`prov-${info.provider}`} className={`${styles.sectionTitle} ${styles.providerTitle}`}>
+            <ProviderLogo provider={info.provider} />
             {label}
           </h2>
           <p className={styles.muted}>{PROVIDER_SERVICES[info.provider]}</p>

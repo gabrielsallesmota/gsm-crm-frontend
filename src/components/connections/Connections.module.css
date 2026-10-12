@@ -16,6 +16,12 @@
   margin-bottom: 8px;
 }
 
+.providerTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .sectionTitle {
   margin: 0;
   font-family: var(--font-heading);

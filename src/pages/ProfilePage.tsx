@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { ROUTES } from "../constants/routes";
 import { Button } from "../components/common/Button";
 import { Avatar } from "../components/common/Avatar";
+import { ProviderLogo } from "../components/connections/ProviderLogo";
 import { ChangePasswordForm } from "../components/auth/ChangePasswordForm";
 import styles from "./ProfilePage.module.css";
 import { describeError } from "../utils/apiErrors";
@@ -72,11 +73,30 @@ export function ProfilePage() {
         <div className={styles.editSection}>
           <h2 className={styles.sectionTitle}>Minhas conexões</h2>
           <p className={styles.pageSubtitle}>
-            Conecte seu Google ou Microsoft para ver agenda e tarefas junto com as do CRM.
+            Conecte sua conta para ver agenda e tarefas junto com as do CRM. Você escolhe o que sincronizar.
           </p>
-          <Link className={styles.actionLink} to={ROUTES.minhasConexoes}>
-            Abrir minhas conexões <span aria-hidden="true">→</span>
-          </Link>
+          <div className={styles.providerGrid}>
+            <Link className={styles.providerLink} to={ROUTES.minhasConexoes}>
+              <ProviderLogo provider="google" />
+              <span className={styles.providerText}>
+                <strong>Google</strong>
+                <span>Agenda e Tarefas</span>
+              </span>
+              <span className={styles.providerArrow} aria-hidden="true">
+                →
+              </span>
+            </Link>
+            <Link className={styles.providerLink} to={ROUTES.minhasConexoes}>
+              <ProviderLogo provider="microsoft" />
+              <span className={styles.providerText}>
+                <strong>Microsoft</strong>
+                <span>Outlook e To Do</span>
+              </span>
+              <span className={styles.providerArrow} aria-hidden="true">
+                →
+              </span>
+            </Link>
+          </div>
         </div>
       )}
 

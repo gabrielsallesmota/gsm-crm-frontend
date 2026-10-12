@@ -110,3 +110,64 @@
   color: var(--accent);
   margin-bottom: 14px;
 }
+
+/* "Minhas conexões": um botão por provedor, com logo */
+.providerGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.providerLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 14px;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.providerLink:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.providerLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.providerText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.3;
+}
+
+.providerText strong {
+  font-family: var(--font-heading);
+  font-size: 14.5px;
+  color: var(--heading);
+}
+
+.providerText span {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.providerArrow {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .providerGrid {
+    grid-template-columns: 1fr;
+  }
+}
