@@ -27,6 +27,7 @@ import { can } from "../../auth/permissions";
 import { readableTextColor } from "../../utils/colors";
 import { formatPhone } from "../../utils/phone";
 import { WhatsappButton } from "./WhatsappButton";
+import { EmailButton } from "./EmailButton";
 import styles from "./LeadDrawer.module.css";
 
 /**
@@ -196,7 +197,7 @@ export function LeadDrawer({
   }
 
   const taskItems = [...(tasks.data?.items ?? [])].sort(
-    (a, b) => Number(a.done) - Number(b.done) || a.dueAt.localeCompare(b.dueAt),
+    (a, b) => Number(a.done) - Number(b.done) || (a.dueAt ?? "9999").localeCompare(b.dueAt ?? "9999"),
   );
 
   return (
@@ -256,6 +257,7 @@ export function LeadDrawer({
             />
           )}
           <WhatsappButton lead={lead} templates={templates} />
+          <EmailButton lead={lead} />
           {!editing && (
             <button className={styles.editToggle} onClick={() => (setForm(fromLead(lead)), setEditing(true))}>
               ✎ Editar

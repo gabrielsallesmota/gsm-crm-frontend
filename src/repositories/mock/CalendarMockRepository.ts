@@ -16,7 +16,7 @@ export class CalendarMockRepository implements CalendarRepository {
       mockState.leads.filter((l) => l.tenantId === mockState.currentTenantId).map((l) => l.id),
     );
     return mockState.events
-      .filter((e) => tenantLeads.has(e.leadId))
+      .filter((e) => e.leadId !== null && tenantLeads.has(e.leadId))
       .filter((e) => !range?.from || e.at >= range.from)
       .filter((e) => !range?.to || e.at < range.to)
       .filter((e) => !range?.leadId || e.leadId === range.leadId)

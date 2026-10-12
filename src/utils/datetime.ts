@@ -38,7 +38,8 @@ export function defaultDueInput(now: Date = new Date()): string {
   return isoToLocalInput(d.toISOString());
 }
 
-export function formatDateTime(iso: string): string {
+export function formatDateTime(iso: string | null): string {
+  if (iso === null) return "sem data";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("pt-BR", {
@@ -50,8 +51,8 @@ export function formatDateTime(iso: string): string {
   });
 }
 
-export function isOverdue(iso: string, done: boolean, now: Date = new Date()): boolean {
-  return !done && new Date(iso).getTime() < now.getTime();
+export function isOverdue(iso: string | null, done: boolean, now: Date = new Date()): boolean {
+  return !done && iso !== null && new Date(iso).getTime() < now.getTime();
 }
 
 /** Nome do fuso do navegador — exibido nos formulários ("horário de ..."). */

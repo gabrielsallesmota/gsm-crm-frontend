@@ -74,6 +74,14 @@ const NotificationsSettingsPage = lazyPage(
   () => import("../pages/NotificationsSettingsPage"),
   "NotificationsSettingsPage",
 );
+const MyConnectionsPage = lazyPage(
+  () => import("../pages/MyConnectionsPage"),
+  "MyConnectionsPage",
+);
+const ConnectionsCallbackPage = lazyPage(
+  () => import("../pages/ConnectionsCallbackPage"),
+  "ConnectionsCallbackPage",
+);
 const MyNotificationsPage = lazyPage(
   () => import("../pages/MyNotificationsPage"),
   "MyNotificationsPage",
@@ -176,6 +184,14 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.minhasNotificacoes,
         element: contracted("notifications", <MyNotificationsPage />),
+      },
+      {
+        path: ROUTES.minhasConexoes,
+        element: contracted("calendar_task_integrations", <MyConnectionsPage />),
+      },
+      {
+        path: ROUTES.conexoesRetorno,
+        element: contracted("calendar_task_integrations", <ConnectionsCallbackPage />),
       },
       { path: ROUTES.equipe, element: guarded("users.view", <UsersPage />) },
       { path: ROUTES.usuarios, element: <Navigate to={ROUTES.equipe} replace /> },

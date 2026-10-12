@@ -22,6 +22,7 @@ import { PeriodFilter } from "../components/common/PeriodFilter";
 import { LeadDrawer } from "../components/leads/LeadDrawer";
 import { LeadImportModal } from "../components/leads/LeadImportModal";
 import { WhatsappButton } from "../components/leads/WhatsappButton";
+import { EmailButton } from "../components/leads/EmailButton";
 // Prospecção é funil INTERNO da GSM (só platform staff) — chunk próprio,
 // nunca baixado por usuário de tenant. Não é controle de acesso: o backend
 // recusa /prospects para quem não é staff.
@@ -525,6 +526,7 @@ function KanbanCard({
         ))}
       </select>
       <WhatsappButton lead={lead} templates={templates} size="small" />
+      <EmailButton lead={lead} size="small" />
     </div>
   );
 }

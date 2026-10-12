@@ -10,11 +10,16 @@ import { shortTimeLabel } from "../../utils/dates";
 
 interface CalendarEventDto {
   id: string;
-  lead_id: string;
-  lead_name: string;
+  lead_id: string | null;
+  lead_name: string | null;
   title: string;
   type: CalEvent["type"];
   at: string;
+  ends_at?: string | null;
+  all_day?: boolean;
+  source?: CalEvent["source"];
+  read_only?: boolean;
+  external_url?: string | null;
 }
 
 function toCalEvent(dto: CalendarEventDto): CalEvent {
@@ -27,6 +32,11 @@ function toCalEvent(dto: CalendarEventDto): CalEvent {
     at: dto.at,
     // O backend não guarda um `time` separado — só `at` (datetime completo).
     time: shortTimeLabel(dto.at),
+    endsAt: dto.ends_at ?? null,
+    allDay: dto.all_day === true,
+    source: dto.source ?? "crm",
+    readOnly: dto.read_only === true,
+    externalUrl: dto.external_url ?? null,
   };
 }
 
@@ -36,6 +46,7 @@ export class CalendarApiRepository implements CalendarRepository {
     if (range?.from) params.set("date_from", range.from);
     if (range?.to) params.set("date_to", range.to);
     if (range?.leadId) params.set("lead_id", range.leadId);
+    if (range?.source) params.set("source", range.source);
     const query = params.toString();
     const dtos = await apiRequest<CalendarEventDto[]>(
       query ? `/api/v1/calendar/events?${query}` : "/api/v1/calendar/events",
@@ -51,6 +62,7 @@ export class CalendarApiRepository implements CalendarRepository {
         title: input.title,
         type: input.type,
         at: input.at,
+        ends_at: input.endsAt,
       }),
     });
     return toCalEvent(dto);

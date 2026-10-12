@@ -1,22 +1,35 @@
+import type { ItemSource } from "./connections";
+
 export type CalEventType = "retorno" | "reuniao" | "visita";
 
 export interface CalEvent {
   id: string;
-  leadId: string;
-  leadName: string;
+  /** `null` = compromisso pessoal ou importado (sem lead). */
+  leadId: string | null;
+  leadName: string | null;
   title: string;
   type: CalEventType;
   /** ISO 8601 (UTC) — exibido no fuso do navegador. */
   at: string;
   time: string;
+  endsAt?: string | null;
+  allDay?: boolean;
+  /** Origem na agenda unificada; ausente = CRM. */
+  source?: ItemSource;
+  /** Cópia do Google/Microsoft: só leitura aqui. */
+  readOnly?: boolean;
+  /** Link para abrir o evento no provedor de origem. */
+  externalUrl?: string | null;
 }
 
 export interface CreateCalEventInput {
-  leadId: string;
+  /** Omitido = compromisso pessoal. */
+  leadId?: string;
   title: string;
   type: CalEventType;
   /** ISO 8601 COM fuso. */
   at: string;
+  endsAt?: string;
 }
 
 export type UpdateCalEventInput = Partial<Pick<CreateCalEventInput, "title" | "type" | "at">>;
@@ -26,4 +39,5 @@ export interface CalendarRange {
   from?: string;
   to?: string;
   leadId?: string;
+  source?: ItemSource;
 }

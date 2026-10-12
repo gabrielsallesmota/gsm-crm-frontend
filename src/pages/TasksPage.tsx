@@ -5,6 +5,8 @@ import { useTeamDirectory } from "../hooks/useTeamDirectory";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { can } from "../auth/permissions";
+import { hasFeature } from "../auth/features";
+import { SourceBadge } from "../components/connections/SourceBadge";
 import { EmptyState, type EmptyAction } from "../components/common/EmptyState";
 import { SkeletonRows } from "../components/common/Skeleton";
 import { HelpTip } from "../components/common/HelpTip";
@@ -16,6 +18,8 @@ import { TaskFormModal } from "../components/tasks/TaskFormModal";
 import { formatDateTime, isOverdue } from "../utils/datetime";
 import { pageCount, rangeLabel } from "../utils/pagination";
 import type { Task, TaskScope } from "../types/task";
+
+type SourceFilter = "" | "crm" | "google" | "microsoft";
 import styles from "./TasksPage.module.css";
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -80,10 +84,13 @@ export function TasksPage() {
   // "" = todos que eu posso ver; senão o id do responsável.
   const [assignee, setAssignee] = useState(canSeeTeam ? "" : (user?.id ?? ""));
   const [page, setPage] = useState(1);
+  const [source, setSource] = useState<SourceFilter>("");
+  const integrations = !!user && hasFeature(user, "calendar_task_integrations");
   const { data, loading, error, reload } = useTasks({
     scope,
     page,
     pageSize: PAGE_SIZE,
+    ...(source ? { source } : {}),
     ...(assignee ? { assigneeUserId: assignee } : {}),
   });
   const { data: team } = useTeamDirectory();
@@ -140,8 +147,9 @@ export function TasksPage() {
             Follow-ups e pendências dos leads
             <HelpTip label="Tarefas">
               <span>
-                Cada tarefa pertence a um lead e tem um responsável e um vencimento. Marque o
-                quadrado para concluir; o lápis edita ou reagenda.
+                Tarefas de lead têm responsável e vencimento; as pessoais (sem lead) só você vê.
+                Marque o quadrado para concluir; o lápis edita ou reagenda. Tarefas do Google ou
+                Microsoft aparecem com a origem e são somente leitura aqui.
               </span>
               <span>
                 &quot;Hoje&quot; e &quot;Atrasadas&quot; usam o horário de Brasília. Tarefas criadas
@@ -190,6 +198,22 @@ export function TasksPage() {
                 </option>
               ))}
         </select>
+        {integrations && (
+          <select
+            className={styles.select}
+            value={source}
+            onChange={(e) => {
+              setSource(e.target.value as SourceFilter);
+              setPage(1);
+            }}
+            aria-label="Origem"
+          >
+            <option value="">Todas as origens</option>
+            <option value="crm">Somente CRM</option>
+            <option value="google">Google</option>
+            <option value="microsoft">Microsoft</option>
+          </select>
+        )}
       </div>
 
       {error && (
@@ -228,7 +252,8 @@ export function TasksPage() {
                   type="button"
                   className={styles.checkbox}
                   onClick={() => void handleToggle(task)}
-                  disabled={busyId === task.id}
+                  disabled={busyId === task.id || task.readOnly === true}
+                  title={task.readOnly ? "Tarefa do Google/Microsoft: conclua no app de origem" : undefined}
                   aria-label={`${task.done ? "Reabrir" : "Concluir"} tarefa: ${task.title}`}
                   aria-pressed={task.done}
                 >
@@ -239,17 +264,22 @@ export function TasksPage() {
                     {task.title}
                   </div>
                   <div className={styles.meta}>
-                    {task.leadName} ·{" "}
+                    {task.leadName ?? "Pessoal"} ·{" "}
                     <span className={overdue ? styles.overdue : undefined}>
-                      {overdue ? "atrasada — " : ""}vence {formatDateTime(task.dueAt)}
+                      {task.dueAt === null
+                        ? "sem data"
+                        : `${overdue ? "atrasada — " : ""}vence ${formatDateTime(task.dueAt)}`}
                     </span>
                     {task.assigneeName ? ` · ${task.assigneeName}` : ""}
-                    {task.done && task.completedAt ? ` · concluída ${formatDateTime(task.completedAt)}` : ""}
+                    {task.done && task.completedAt ? ` · concluída ${formatDateTime(task.completedAt)}` : ""}{" "}
+                    <SourceBadge source={task.source} url={task.externalUrl} readOnly={task.readOnly} />
                   </div>
                 </div>
                 <span className={styles.priority} style={{ color: PRIORITY_COLOR[task.priority] }}>
                   {PRIORITY_LABEL[task.priority] ?? task.priority}
                 </span>
+                {!task.readOnly && (
+                  <>
                 <button
                   type="button"
                   className={styles.deleteBtn}
@@ -268,6 +298,8 @@ export function TasksPage() {
                 >
                   ✕
                 </button>
+                  </>
+                )}
               </div>
             );
           })}
@@ -301,7 +333,7 @@ export function TasksPage() {
       {deleting && (
         <ConfirmDialog
           title="Excluir tarefa?"
-          message={`"${deleting.title}" (${deleting.leadName}) será excluída. Esta ação não pode ser desfeita.`}
+          message={`"${deleting.title}"${deleting.leadName ? ` (${deleting.leadName})` : ""} será excluída. Esta ação não pode ser desfeita.`}
           onConfirm={() => handleDelete(deleting)}
           onClose={() => setDeleting(null)}
         />

@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import { useAuth } from "../hooks/useAuth";
+import { hasFeature } from "../auth/features";
+import { SourceBadge } from "../components/connections/SourceBadge";
 import { useCalendar } from "../hooks/useCalendar";
 import { useCalendarActions } from "../hooks/useCalendarActions";
 import { useToast } from "../hooks/useToast";
@@ -10,6 +13,8 @@ import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { EventFormModal } from "../components/calendar/EventFormModal";
 import { agendaRange, groupEventsByLocalDay, type AgendaWindow } from "../utils/agenda";
 import type { CalEvent } from "../types/event";
+
+type SourceFilter = "" | "crm" | "google" | "microsoft";
 import styles from "./AgendaPage.module.css";
 
 const TYPE_LABEL: Record<string, { label: string; color: string }> = {
@@ -29,7 +34,11 @@ export function AgendaPage() {
   // A janela é calculada UMA vez por escolha (não a cada render — senão o
   // "agora" mudaria e refaria a busca sem parar).
   const range = useMemo(() => agendaRange(agendaWindow, new Date()), [agendaWindow]);
-  const { data, loading, error, reload } = useCalendar(range);
+  const { user } = useAuth();
+  const integrations = !!user && hasFeature(user, "calendar_task_integrations");
+  const [source, setSource] = useState<SourceFilter>("");
+  const filtered = useMemo(() => (source ? { ...range, source } : range), [range, source]);
+  const { data, loading, error, reload } = useCalendar(filtered);
   const { delete: deleteEvent } = useCalendarActions();
   const { toast, toastError } = useToast();
 
@@ -57,7 +66,9 @@ export function AgendaPage() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.pageTitle}>Agenda</h1>
-          <p className={styles.pageSubtitle}>Compromissos com leads (horários no seu fuso)</p>
+          <p className={styles.pageSubtitle}>
+            Compromissos com leads, pessoais e dos calendários conectados (horários no seu fuso)
+          </p>
         </div>
         <Button variant="primary" onClick={() => setCreating(true)}>
           + Novo compromisso
@@ -78,6 +89,23 @@ export function AgendaPage() {
           </button>
         ))}
       </div>
+
+      {integrations && (
+          <select
+            className={styles.select}
+            value={source}
+            onChange={(e) => {
+              setSource(e.target.value as SourceFilter);
+              
+            }}
+            aria-label="Origem"
+          >
+            <option value="">Todas as origens</option>
+            <option value="crm">Somente CRM</option>
+            <option value="google">Google</option>
+            <option value="microsoft">Microsoft</option>
+          </select>
+      )}
 
       {error && (
         <EmptyState
@@ -116,15 +144,25 @@ export function AgendaPage() {
             return (
               <div key={event.id} className={styles.eventRow}>
                 <span className={styles.eventTime}>
-                  {new Date(event.at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  {event.allDay
+                    ? "Dia todo"
+                    : new Date(event.at).toLocaleTimeString("pt-BR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                 </span>
                 <div className={styles.eventInfo}>
                   <div className={styles.eventTitle}>{event.title}</div>
-                  <div className={styles.eventLead}>{event.leadName}</div>
+                  <div className={styles.eventLead}>
+                    {event.leadName ?? "Pessoal"}{" "}
+                    <SourceBadge source={event.source} url={event.externalUrl} readOnly={event.readOnly} />
+                  </div>
                 </div>
                 <span className={styles.eventType} style={{ color: type?.color }}>
                   {type?.label}
                 </span>
+                {!event.readOnly && (
+                  <>
                 <button
                   type="button"
                   className={styles.deleteBtn}
@@ -143,6 +181,8 @@ export function AgendaPage() {
                 >
                   ✕
                 </button>
+                  </>
+                )}
               </div>
             );
           })}
@@ -156,7 +196,7 @@ export function AgendaPage() {
       {deleting && (
         <ConfirmDialog
           title="Excluir compromisso?"
-          message={`"${deleting.title}" com ${deleting.leadName} será excluído.`}
+          message={`"${deleting.title}"${deleting.leadName ? ` com ${deleting.leadName}` : ""} será excluído.`}
           onConfirm={() => handleDelete(deleting)}
           onClose={() => setDeleting(null)}
         />

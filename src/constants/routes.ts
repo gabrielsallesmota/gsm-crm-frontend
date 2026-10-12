@@ -28,6 +28,10 @@ export const ROUTES = {
   // Central de Notificações (CRM-003B.3).
   notificacoes: "/configuracoes/notificacoes",
   minhasNotificacoes: "/perfil/notificacoes",
+  // Conexões Google/Microsoft (CRM-003B.4/B.5).
+  minhasConexoes: "/perfil/conexoes",
+  // Redirect URI fixo do OAuth (o backend valida; não leva o provedor).
+  conexoesRetorno: "/perfil/conexoes/callback",
   // "Equipe" (Etapa 4). `/usuarios` continua redirecionando para cá.
   equipe: "/equipe",
   usuarios: "/usuarios",

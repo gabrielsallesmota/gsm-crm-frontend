@@ -10,15 +10,20 @@ import { apiRequest } from "./ApiClient";
 
 interface TaskDto {
   id: string;
-  lead_id: string;
-  lead_name: string;
+  lead_id: string | null;
+  lead_name: string | null;
   title: string;
   priority: Task["priority"];
   done: boolean;
-  due_at: string;
+  due_at: string | null;
   assignee_user_id: string | null;
   assignee_name: string | null;
   completed_at: string | null;
+  description?: string | null;
+  due_date_only?: boolean;
+  source?: Task["source"];
+  read_only?: boolean;
+  external_url?: string | null;
 }
 
 function toTask(dto: TaskDto): Task {
@@ -33,6 +38,11 @@ function toTask(dto: TaskDto): Task {
     assigneeUserId: dto.assignee_user_id,
     assigneeName: dto.assignee_name,
     completedAt: dto.completed_at,
+    description: dto.description ?? null,
+    dueDateOnly: dto.due_date_only === true,
+    source: dto.source ?? "crm",
+    readOnly: dto.read_only === true,
+    externalUrl: dto.external_url ?? null,
   };
 }
 
@@ -41,6 +51,7 @@ export class TasksApiRepository implements TasksRepository {
     const params = new URLSearchParams({ scope: query.scope });
     if (query.leadId) params.set("lead_id", query.leadId);
     if (query.assigneeUserId) params.set("assignee_user_id", query.assigneeUserId);
+    if (query.source) params.set("source", query.source);
     params.set("page", String(query.page ?? 1));
     params.set("page_size", String(query.pageSize ?? 25));
     const dto = await apiRequest<{ items: TaskDto[]; total: number; page: number; page_size: number }>(
@@ -58,6 +69,7 @@ export class TasksApiRepository implements TasksRepository {
         priority: input.priority,
         due_at: input.dueAt,
         assignee_user_id: input.assigneeUserId,
+        description: input.description,
       }),
     });
     return toTask(dto);

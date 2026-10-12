@@ -66,6 +66,16 @@ export function ProfilePage() {
         </div>
       )}
 
+      {hasFeature(user, "calendar_task_integrations") && (
+        <div className={styles.editSection}>
+          <h2 className={styles.sectionTitle}>Minhas conexões</h2>
+          <p className={styles.pageSubtitle}>
+            Conecte seu Google ou Microsoft para ver agenda e tarefas junto com as do CRM.
+          </p>
+          <Link to={ROUTES.minhasConexoes}>Abrir minhas conexões</Link>
+        </div>
+      )}
+
       <div className={styles.editSection}>
         <h2 className={styles.sectionTitle}>Primeiros passos</h2>
         <p className={styles.pageSubtitle}>

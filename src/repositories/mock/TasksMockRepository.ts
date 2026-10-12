@@ -11,6 +11,9 @@ function endOfToday(): number {
 }
 
 function matchesScope(task: Task, scope: TaskListQuery["scope"]): boolean {
+  if (task.dueAt === null) {
+    return scope === "all" || scope === "upcoming" || (scope === "open" && !task.done);
+  }
   const due = new Date(task.dueAt).getTime();
   const now = Date.now();
   switch (scope) {
@@ -36,11 +39,11 @@ export class TasksMockRepository implements TasksRepository {
       mockState.leads.filter((l) => l.tenantId === mockState.currentTenantId).map((l) => l.id),
     );
     const items = mockState.tasks
-      .filter((t) => tenantLeads.has(t.leadId))
+      .filter((t) => t.leadId !== null && tenantLeads.has(t.leadId))
       .filter((t) => !query.leadId || t.leadId === query.leadId)
       .filter((t) => !query.assigneeUserId || t.assigneeUserId === query.assigneeUserId)
       .filter((t) => matchesScope(t, query.scope))
-      .sort((a, b) => a.dueAt.localeCompare(b.dueAt));
+      .sort((a, b) => (a.dueAt ?? "9999").localeCompare(b.dueAt ?? "9999"));
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
     const start = (page - 1) * pageSize;
@@ -49,17 +52,17 @@ export class TasksMockRepository implements TasksRepository {
 
   async create(input: CreateTaskInput): Promise<Task> {
     await delay(200);
-    const lead = mockState.leads.find((l) => l.id === input.leadId);
-    if (!lead) throw new Error(`Lead ${input.leadId} não encontrado.`);
+    const lead = input.leadId ? mockState.leads.find((l) => l.id === input.leadId) : null;
+    if (input.leadId && !lead) throw new Error(`Lead ${input.leadId} não encontrado.`);
     const assignee = input.assigneeUserId ?? mockState.users[0]?.id ?? null;
     const task: Task = {
       id: nextTaskId(),
-      leadId: lead.id,
-      leadName: lead.name,
+      leadId: lead?.id ?? null,
+      leadName: lead?.name ?? null,
       title: input.title,
       priority: input.priority,
       done: false,
-      dueAt: input.dueAt,
+      dueAt: input.dueAt ?? null,
       assigneeUserId: assignee,
       assigneeName: mockState.users.find((u) => u.id === assignee)?.name ?? null,
       completedAt: null,

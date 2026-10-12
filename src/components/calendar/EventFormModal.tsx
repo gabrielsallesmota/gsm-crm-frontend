@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { LeadPicker, type PickedLead } from "../leads/LeadPicker";
+import { PublishTargetSelect } from "../connections/PublishTargetSelect";
+import { connectionsService } from "../../services/ConnectionsService";
 import { useCalendarActions } from "../../hooks/useCalendarActions";
 import { useToast } from "../../hooks/useToast";
 import { browserTimeZone, defaultDueInput, isoToLocalInput, localInputToIso } from "../../utils/datetime";
@@ -19,29 +21,58 @@ export function EventFormModal({
   event?: CalEvent;
   fixedLead?: PickedLead;
   onClose: () => void;
-  onSaved: (event: CalEvent) => void;
+  /** `null` quando o item foi criado também no provedor (a tela só recarrega). */
+  onSaved: (event: CalEvent | null) => void;
 }) {
   const { create, update } = useCalendarActions();
   const { toast, toastError } = useToast();
   const [lead, setLead] = useState<PickedLead | null>(
-    fixedLead ?? (event ? { id: event.leadId, name: event.leadName } : null),
+    fixedLead ?? (event?.leadId ? { id: event.leadId, name: event.leadName ?? "—" } : null),
   );
   const [title, setTitle] = useState(event?.title ?? "");
   const [type, setType] = useState<CalEventType>(event?.type ?? "reuniao");
   const [at, setAt] = useState(event ? isoToLocalInput(event.at) : defaultDueInput());
   const [saving, setSaving] = useState(false);
+  const [target, setTarget] = useState("");
+  // Uma chave por abertura do formulário: reenviar não cria outro evento.
+  const publishKey = useRef(crypto.randomUUID());
 
   const atIso = localInputToIso(at);
-  const valid = !!lead && title.trim().length > 0 && atIso !== null;
+  // Sem lead = compromisso pessoal (só você vê).
+  const valid = title.trim().length > 0 && atIso !== null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!valid || !lead || !atIso) return;
+    if (!valid || !atIso) return;
     setSaving(true);
     try {
-      const saved = event
-        ? await update(event.id, { title: title.trim(), type, at: atIso })
-        : await create({ leadId: lead.id, title: title.trim(), type, at: atIso });
+      let saved: CalEvent | null = null;
+      if (event) {
+        saved = await update(event.id, { title: title.trim(), type, at: atIso });
+      } else if (target) {
+        const ends = new Date(new Date(atIso).getTime() + 60 * 60 * 1000).toISOString();
+        const published = await connectionsService.publishEvent({
+          connectionId: target,
+          title: title.trim(),
+          startsAt: atIso,
+          endsAt: ends,
+          ...(lead ? { leadId: lead.id } : {}),
+          idempotencyKey: publishKey.current,
+        });
+        if (published.pushStatus === "failed") {
+          toast("Salvo no CRM, mas não foi possível criar no calendário externo. Tente de novo mais tarde.");
+          onSaved(null);
+          onClose();
+          return;
+        }
+      } else {
+        saved = await create({
+          ...(lead ? { leadId: lead.id } : {}),
+          title: title.trim(),
+          type,
+          at: atIso,
+        });
+      }
       toast(event ? "Compromisso atualizado" : "Compromisso criado");
       onSaved(saved);
       onClose();
@@ -60,10 +91,11 @@ export function EventFormModal({
     >
       <form className={form.form} onSubmit={(e) => void handleSubmit(e)}>
         <div className={form.field}>
-          <span className={form.label}>
-            Lead <span aria-hidden="true">*</span>
-          </span>
+          <span className={form.label}>Lead</span>
           <LeadPicker value={lead} onChange={setLead} disabled={!!fixedLead || !!event} />
+          {!lead && !event && (
+            <span className={form.hint}>Sem lead, o compromisso é pessoal (só você vê).</span>
+          )}
         </div>
         <label className={form.field}>
           <span className={form.label}>
@@ -106,6 +138,7 @@ export function EventFormModal({
             </select>
           </label>
         </div>
+        {!event && <PublishTargetSelect kind="event" value={target} onChange={setTarget} />}
         {at && atIso === null && (
           <div className={form.error} role="alert">
             Data/hora inválida. Escolha o dia e o horário no calendário.
