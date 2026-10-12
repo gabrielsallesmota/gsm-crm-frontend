@@ -62,7 +62,9 @@ export function ProfilePage() {
           <p className={styles.pageSubtitle}>
             Escolha o que receber, seu telefone, autorização e fuso.
           </p>
-          <Link to={ROUTES.minhasNotificacoes}>Abrir minhas notificações</Link>
+          <Link className={styles.actionLink} to={ROUTES.minhasNotificacoes}>
+            Abrir minhas notificações <span aria-hidden="true">→</span>
+          </Link>
         </div>
       )}
 
@@ -72,7 +74,9 @@ export function ProfilePage() {
           <p className={styles.pageSubtitle}>
             Conecte seu Google ou Microsoft para ver agenda e tarefas junto com as do CRM.
           </p>
-          <Link to={ROUTES.minhasConexoes}>Abrir minhas conexões</Link>
+          <Link className={styles.actionLink} to={ROUTES.minhasConexoes}>
+            Abrir minhas conexões <span aria-hidden="true">→</span>
+          </Link>
         </div>
       )}
 
