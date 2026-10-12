@@ -17,5 +17,6 @@
     "erasableSyntaxOnly": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["tests"]
+  "include": ["tests"],
+  "exclude": ["tests/ui"]
 }

@@ -1,5 +1,5 @@
-import type { Lead, LeadMessageTemplate } from "../types/lead";
-import { buildWhatsappUrl } from "./messageTemplates";
+import type { Lead, LeadMessageTemplate } from "../types/lead.ts";
+import { buildWhatsappUrl } from "./messageTemplates.ts";
 
 export { buildWhatsappUrl };
 

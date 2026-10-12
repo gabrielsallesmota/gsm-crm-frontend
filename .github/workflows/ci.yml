@@ -1,0 +1,29 @@
+name: CI
+
+# CRM-008 — antes deste workflow os testes do frontend não rodavam em lugar
+# nenhum além da máquina de quem desenvolve (a Vercel só faz build). Para
+# BLOQUEAR merge com teste quebrado, marque o job `quality` como obrigatório
+# em Settings → Branches → Branch protection rules (main).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Vite 8 exige ^20.19 ou >=22.12; type stripping do `node --test`
+          # (testes .ts sem build) está estável a partir do 22.18.
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Testes (node --test + Vitest/Testing Library)
+        run: npm test
+      - name: Build de produção
+        run: npm run build
