@@ -162,7 +162,11 @@ export interface DigestPreview {
   delivered: false;
 }
 
-export type DeliveryKind = "daily_digest" | "new_lead_alert";
+export type DeliveryKind =
+  | "daily_digest"
+  | "new_lead_alert"
+  | "overdue_task_alert"
+  | "stalled_lead_alert";
 export type DeliveryStatus =
   "skipped" | "channel_unavailable" | "pending" | "sent" | "failed" | "expired";
 

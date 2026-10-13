@@ -23,7 +23,12 @@ const STATUS_OPTIONS: DeliveryStatus[] = [
   "failed",
   "expired",
 ];
-const KIND_OPTIONS: DeliveryKind[] = ["daily_digest", "new_lead_alert"];
+const KIND_OPTIONS: DeliveryKind[] = [
+  "daily_digest",
+  "new_lead_alert",
+  "overdue_task_alert",
+  "stalled_lead_alert",
+];
 
 /**
  * Histórico. `skipped` e `channel_unavailable` NUNCA aparecem como envio:

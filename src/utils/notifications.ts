@@ -192,12 +192,23 @@ export function toPreview(raw: unknown): DigestPreview {
   };
 }
 
+const DELIVERY_KINDS: readonly DeliveryKind[] = [
+  "daily_digest",
+  "new_lead_alert",
+  "overdue_task_alert",
+  "stalled_lead_alert",
+];
+
+function toKind(value: unknown): DeliveryKind {
+  return DELIVERY_KINDS.find((k) => k === value) ?? "daily_digest";
+}
+
 export function toDelivery(raw: unknown): Delivery {
   const d = obj(raw);
   return {
     id: str(d.id),
     recipientUserId: str(d.recipient_user_id),
-    kind: (d.kind === "new_lead_alert" ? "new_lead_alert" : "daily_digest") as DeliveryKind,
+    kind: toKind(d.kind),
     channel: str(d.channel, "whatsapp"),
     status: str(d.status) as DeliveryStatus,
     statusReason: strOrNull(d.status_reason),
@@ -326,6 +337,8 @@ export const CHANNEL_STATUS_LABELS: Record<ChannelStatus, string> = {
 export const DELIVERY_KIND_LABELS: Record<DeliveryKind, string> = {
   daily_digest: "Resumo diário",
   new_lead_alert: "Alerta de novos leads",
+  overdue_task_alert: "Aviso de tarefa atrasada",
+  stalled_lead_alert: "Aviso de oportunidade parada",
 };
 
 /** Nenhum destes é "enviado": `skipped`/`channel_unavailable` são estados
@@ -373,6 +386,7 @@ export const DELIVERY_REASON_LABELS: Record<string, string> = {
   channel_disabled: "a pessoa desligou o WhatsApp",
   whatsapp_not_integrated: "o WhatsApp ainda não está integrado",
   expired_before_dispatch: "venceu antes do envio",
+  no_content: "não havia mais nada a avisar (tarefa concluída, lead movido ou regra desligada)",
 };
 
 const RESTRICTED_LABELS: Record<string, string> = {

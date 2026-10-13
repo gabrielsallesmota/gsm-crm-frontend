@@ -296,6 +296,12 @@ export function SettingsPage() {
     <div>
       <h1 className={styles.pageTitle}>Configurações</h1>
       <p className={styles.pageSubtitle}>Pipelines, etapas, tags e origens</p>
+      {user && hasFeature(user, "crm") && can(user, "automations.view") && (
+        <p className={styles.pageSubtitle}>
+          <Link to={ROUTES.automacoes}>Automações comerciais</Link> — follow-up, tarefas atrasadas e
+          oportunidades paradas
+        </p>
+      )}
       {user && hasFeature(user, "notifications") && can(user, "notifications.view") && (
         <p className={styles.pageSubtitle}>
           <Link to={ROUTES.notificacoes}>Notificações</Link> — resumo diário e alertas da equipe

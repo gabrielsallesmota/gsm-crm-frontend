@@ -1,0 +1,118 @@
+/* Configurações → Automações comerciais (CRM-003C). Avisos e cabeçalho reaproveitam
+   Notifications.module.css / Integrations.module.css — aqui só o que é próprio. */
+
+.list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  padding: 14px 16px;
+  background: var(--surface, transparent);
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cardTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  color: var(--heading);
+}
+
+.summary {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.detail {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--tone-blue-bg);
+  color: var(--tone-blue);
+  white-space: nowrap;
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.params {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.param label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--heading);
+  margin-bottom: 4px;
+}
+
+.paramRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.paramRow input {
+  width: 96px;
+}
+
+.unit {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.fieldError {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--tone-red);
+}
+
+.cardActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.linkRow {
+  margin: 10px 0 0;
+  font-size: 13px;
+}

@@ -13,11 +13,14 @@ import { describeError } from "../../utils/apiErrors";
 export function ResourceGate<T>({
   state,
   value,
+  demoMessage = "A Central de Notificações usa a API real e não funciona no modo demonstração.",
   children,
 }: {
   state: GateState;
   /** Dado já tratado pelo pai (ex.: com override de salvamento). */
   value: T | null;
+  /** Texto do estado "demonstração" (cada tela diz o que não está disponível). */
+  demoMessage?: string;
   children: (data: T) => ReactNode;
 }) {
   if (state.notImplemented) {
@@ -25,7 +28,7 @@ export function ResourceGate<T>({
       <EmptyState
         tone="empty"
         title="Indisponível na demonstração"
-        message="A Central de Notificações usa a API real e não funciona no modo demonstração."
+        message={demoMessage}
       />
     );
   }

@@ -70,6 +70,7 @@ const SdrProspectingQueuePage = lazyPage(
 const IntegrationsPage = lazyPage(() => import("../pages/IntegrationsPage"), "IntegrationsPage");
 const SdrDashboardPage = lazyPage(() => import("../pages/SdrDashboardPage"), "SdrDashboardPage");
 // Central de Notificações (CRM-003B.3) — chunks próprios.
+const AutomationsPage = lazyPage(() => import("../pages/AutomationsPage"), "AutomationsPage");
 const NotificationsSettingsPage = lazyPage(
   () => import("../pages/NotificationsSettingsPage"),
   "NotificationsSettingsPage",
@@ -173,6 +174,10 @@ export const router = createBrowserRouter([
       { path: ROUTES.relatorios, element: contracted("reports", <ReportsPage />) },
       { path: ROUTES.configuracoes, element: guarded("settings.manage", <SettingsPage />) },
       { path: ROUTES.integracoes, element: guarded("integrations.manage", <IntegrationsPage />) },
+      {
+        path: ROUTES.automacoes,
+        element: contractedAndGuarded("crm", "automations.view", <AutomationsPage />),
+      },
       {
         path: ROUTES.notificacoes,
         element: contractedAndGuarded(
