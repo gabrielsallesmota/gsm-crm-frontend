@@ -15,11 +15,14 @@ import form from "../common/Form.module.css";
 export function EventFormModal({
   event,
   fixedLead,
+  initialAt,
   onClose,
   onSaved,
 }: {
   event?: CalEvent;
   fixedLead?: PickedLead;
+  /** Horário sugerido ao criar (ex.: clique numa hora da grade da agenda). */
+  initialAt?: Date;
   onClose: () => void;
   /** `null` quando o item foi criado também no provedor (a tela só recarrega). */
   onSaved: (event: CalEvent | null) => void;
@@ -31,7 +34,9 @@ export function EventFormModal({
   );
   const [title, setTitle] = useState(event?.title ?? "");
   const [type, setType] = useState<CalEventType>(event?.type ?? "reuniao");
-  const [at, setAt] = useState(event ? isoToLocalInput(event.at) : defaultDueInput());
+  const [at, setAt] = useState(
+    event ? isoToLocalInput(event.at) : initialAt ? isoToLocalInput(initialAt.toISOString()) : defaultDueInput(),
+  );
   const [saving, setSaving] = useState(false);
   const [target, setTarget] = useState("");
   // Uma chave por abertura do formulário: reenviar não cria outro evento.
