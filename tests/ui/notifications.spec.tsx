@@ -600,6 +600,46 @@ describe("PreviewPanel", () => {
     await waitFor(() => expect(api.preview).toHaveBeenCalledTimes(2));
   });
 
+  it("item pessoal (sem lead) aparece sem o sufixo de lead", async () => {
+    api.preview.mockResolvedValue(
+      toPreview({
+        recipient_name: "Ana",
+        empty: false,
+        sections: [
+          {
+            key: "tasks",
+            mode: "list",
+            total: 1,
+            counts: { today: 1 },
+            items: [
+              {
+                id: "t9",
+                title: "Ligar para o contador",
+                lead_name: null,
+                due_local: "12/10 18:00",
+                category: "today",
+              },
+            ],
+            truncated: 0,
+          },
+          {
+            key: "calendar",
+            mode: "list",
+            total: 1,
+            counts: { today: 1 },
+            items: [{ id: "e9", title: "Reunião pessoal", lead_name: null, time_local: "10:00" }],
+            truncated: 0,
+          },
+        ],
+        text: "*Resumo do dia*",
+      }),
+    );
+    render(<PreviewPanel />);
+    expect(await screen.findByText("Ligar para o contador (12/10 18:00)")).toBeTruthy();
+    expect(screen.getByText("10:00 Reunião pessoal")).toBeTruthy();
+    expect(screen.queryByText(/null/)).toBeNull();
+  });
+
   it("sem dados mostra a ausência explicitamente", async () => {
     api.preview.mockResolvedValue(
       toPreview({
@@ -740,7 +780,12 @@ describe("DeliveriesPanel", () => {
   it("CRM-003B.8: aceita pelo n8n NÃO é enviada; só a confirmação do provedor conta", async () => {
     api.listDeliveries.mockResolvedValue({
       items: [
-        delivery({ id: "a", status: "pending", status_reason: "accepted_by_n8n", stage: "accepted" }),
+        delivery({
+          id: "a",
+          status: "pending",
+          status_reason: "accepted_by_n8n",
+          stage: "accepted",
+        }),
         delivery({
           id: "s",
           status: "sent",
@@ -755,7 +800,12 @@ describe("DeliveriesPanel", () => {
           sent_at: "2026-10-12T11:01:00Z",
           confirmed_at: "2026-10-12T11:02:00Z",
         }),
-        delivery({ id: "f", status: "failed", status_reason: "confirmation_timeout", stage: "failed" }),
+        delivery({
+          id: "f",
+          status: "failed",
+          status_reason: "confirmation_timeout",
+          stage: "failed",
+        }),
       ],
       total: 4,
       page: 1,

@@ -16,8 +16,10 @@ const SECTION_TITLES: Record<string, string> = {
 };
 
 function itemLabel(key: string, item: Record<string, unknown>): string {
-  if (key === "tasks") return `${item.title} — ${item.lead_name} (${item.due_local})`;
-  if (key === "calendar") return `${item.time_local} ${item.title} — ${item.lead_name}`;
+  // Item pessoal (sem lead) não leva o sufixo " — Lead".
+  const ofLead = item.lead_name ? ` — ${item.lead_name}` : "";
+  if (key === "tasks") return `${item.title}${ofLead} (${item.due_local})`;
+  if (key === "calendar") return `${item.time_local} ${item.title}${ofLead}`;
   return String(item.name ?? item.title ?? "");
 }
 
