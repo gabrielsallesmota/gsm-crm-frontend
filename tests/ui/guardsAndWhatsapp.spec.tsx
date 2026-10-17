@@ -39,23 +39,35 @@ const SECRET = <p>conteúdo protegido</p>;
 
 describe("RequirePermission", () => {
   it("mostra a tela para quem tem a permissão", () => {
-    renderAs(user({ role: "gestor" }), <RequirePermission permission="settings.manage">{SECRET}</RequirePermission>);
+    renderAs(
+      user({ role: "gestor" }),
+      <RequirePermission permission="settings.manage">{SECRET}</RequirePermission>,
+    );
     expect(screen.getByText("conteúdo protegido")).toBeTruthy();
   });
 
   it("papel sem permissão vê 'Acesso restrito', nunca o conteúdo", () => {
-    renderAs(user({ role: "vendedor" }), <RequirePermission permission="settings.manage">{SECRET}</RequirePermission>);
+    renderAs(
+      user({ role: "vendedor" }),
+      <RequirePermission permission="settings.manage">{SECRET}</RequirePermission>,
+    );
     expect(screen.queryByText("conteúdo protegido")).toBeNull();
     expect(screen.getByText("Acesso restrito")).toBeTruthy();
   });
 
   it("gestor não acessa Integrações (só admin)", () => {
-    renderAs(user({ role: "gestor" }), <RequirePermission permission="integrations.manage">{SECRET}</RequirePermission>);
+    renderAs(
+      user({ role: "gestor" }),
+      <RequirePermission permission="integrations.manage">{SECRET}</RequirePermission>,
+    );
     expect(screen.queryByText("conteúdo protegido")).toBeNull();
   });
 
   it("área interna da GSM 'não existe' para cliente (404, não 403)", () => {
-    renderAs(user({ role: "admin" }), <RequirePermission permission="platform.internal">{SECRET}</RequirePermission>);
+    renderAs(
+      user({ role: "admin" }),
+      <RequirePermission permission="platform.internal">{SECRET}</RequirePermission>,
+    );
     expect(screen.queryByText("conteúdo protegido")).toBeNull();
     expect(screen.getByText("Página não encontrada")).toBeTruthy();
     expect(screen.queryByText("Acesso restrito")).toBeNull();
@@ -66,7 +78,10 @@ describe("RequirePermission", () => {
       isPlatformStaff: true,
       impersonation: { sessionId: "s" } as unknown as AuthUser["impersonation"],
     });
-    renderAs(staffSupporting, <RequirePermission permission="platform.internal">{SECRET}</RequirePermission>);
+    renderAs(
+      staffSupporting,
+      <RequirePermission permission="platform.internal">{SECRET}</RequirePermission>,
+    );
     expect(screen.queryByText("conteúdo protegido")).toBeNull();
   });
 
@@ -78,12 +93,18 @@ describe("RequirePermission", () => {
 
 describe("RequireFeature", () => {
   it("módulo contratado aparece", () => {
-    renderAs(user({ features: { reports: true } }), <RequireFeature feature="reports">{SECRET}</RequireFeature>);
+    renderAs(
+      user({ features: { reports: true } }),
+      <RequireFeature feature="reports">{SECRET}</RequireFeature>,
+    );
     expect(screen.getByText("conteúdo protegido")).toBeTruthy();
   });
 
   it("módulo não contratado mostra o aviso, não a tela", () => {
-    renderAs(user({ features: { reports: false } }), <RequireFeature feature="reports">{SECRET}</RequireFeature>);
+    renderAs(
+      user({ features: { reports: false } }),
+      <RequireFeature feature="reports">{SECRET}</RequireFeature>,
+    );
     expect(screen.queryByText("conteúdo protegido")).toBeNull();
     expect(screen.getByText("Relatórios não contratado")).toBeTruthy();
   });
@@ -117,13 +138,17 @@ describe("WhatsappButton do lead", () => {
     expect(link.getAttribute("rel")).toContain("noopener");
   });
 
-  it("sem telefone ou sem template o botão não aparece", () => {
-    const { container: noPhone } = renderAs(user(), (
-      <WhatsappButton lead={{ ...lead, phoneNormalized: "" }} templates={templates} />
-    ));
+  it("sem telefone o botão não aparece; sem template abre a conversa em branco", () => {
+    const { container: noPhone } = renderAs(
+      user(),
+      <WhatsappButton lead={{ ...lead, phoneNormalized: "" }} templates={templates} />,
+    );
     expect(noPhone.querySelector("a")).toBeNull();
     cleanup();
-    const { container: noTemplate } = renderAs(user(), <WhatsappButton lead={lead} templates={[]} />);
-    expect(noTemplate.querySelector("a")).toBeNull();
+    const { container: noTemplate } = renderAs(
+      user(),
+      <WhatsappButton lead={lead} templates={[]} />,
+    );
+    expect(noTemplate.querySelector("a")?.getAttribute("href")).toBe("https://wa.me/5511912345678");
   });
 });
