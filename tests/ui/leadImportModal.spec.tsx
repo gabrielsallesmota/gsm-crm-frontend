@@ -636,3 +636,221 @@ describe("F-10 / 1B processamento, progresso e resultado", () => {
     expect(within(dialog).getByText(/telefone já existir cadastrado/)).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+describe("R4 janela segura de retomada (idempotência vale 24 h; retomamos só até 20 h)", () => {
+  const H = 60 * 60 * 1000;
+  type Saved = { startedAt: number; importId: string };
+  const records = () =>
+    Array.from({ length: window.localStorage.length }, (_, i) => window.localStorage.key(i) ?? "")
+      .filter((k) => k.startsWith("gsm.leadImport."))
+      .map((k) => ({ key: k, value: JSON.parse(window.localStorage.getItem(k)!) as Saved }));
+  /** Envelhece o(s) registro(s) guardado(s): como se a importação tivesse começado há `ms`. */
+  const ageImport = (ms: number) => {
+    for (const r of records()) {
+      window.localStorage.setItem(r.key, JSON.stringify({ ...r.value, startedAt: Date.now() - ms }));
+    }
+  };
+
+  /** Importação que cai no 2º lote (403), deixando o registro de retomada guardado. */
+  async function interrupted(strategy = "skip", csv = csvOf(600)) {
+    api.bulkImport.mockReset();
+    api.bulkImport
+      .mockImplementationOnce(async (rows) => created(rows))
+      .mockRejectedValueOnce(new ApiError(403, "Sem permissão"));
+    const view = open();
+    await upload(csv);
+    await screen.findByText(/linha\(s\) encontrada\(s\)/);
+    if (strategy !== "skip") {
+      fireEvent.change(screen.getByLabelText("Se o telefone já existir"), { target: { value: strategy } });
+    }
+    fireEvent.click(submit());
+    await screen.findByText("Falhou");
+    view.unmount();
+    api.bulkImport.mockReset();
+    api.bulkImport.mockImplementation(async (rows) => created(rows));
+  }
+
+  async function reopen(csv = csvOf(600), strategy = "skip") {
+    const view = open();
+    await upload(csv);
+    await screen.findByText(/linha\(s\) encontrada\(s\)/);
+    if (strategy !== "skip") {
+      fireEvent.change(screen.getByLabelText("Se o telefone já existir"), { target: { value: strategy } });
+    }
+    return view;
+  }
+
+  it.each([
+    ["1 hora", 1 * H],
+    ["19 horas", 19 * H],
+    ["19 h 59 min (colado na janela)", 20 * H - 60_000],
+  ])("após %s a importação é RETOMADA com a mesma identidade", async (_label, age) => {
+    await interrupted();
+    const before = records()[0]!.value;
+    ageImport(age);
+    await reopen();
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(screen.getByText(/retomou uma importação interrompida/)).toBeTruthy();
+    expect(api.bulkImport.mock.calls[0]![5]).toBe(`imp-${before.importId}-0000`);
+  });
+
+  it.each([
+    ["20 horas", 20 * H],
+    ["24 horas", 24 * H],
+    ["3 dias", 72 * H],
+  ])("após %s a retomada é BLOQUEADA: nada é reenviado e a pessoa é avisada", async (_label, age) => {
+    await interrupted();
+    ageImport(age);
+    await reopen();
+    fireEvent.click(submit());
+    const alert = await within(screen.getByRole("dialog")).findByRole("alert");
+    expect(alert.textContent).toMatch(/proteção contra duplicação desta importação venceu/);
+    expect(alert.textContent).toMatch(/Nada foi reenviado/);
+    expect(alert.textContent).toMatch(/podem já ter sido importados/);
+    expect(api.bulkImport).not.toHaveBeenCalled();
+    expect(screen.queryByText(/retomou uma importação/)).toBeNull();
+  });
+
+  it("depois de vencida, 'Preparar nova importação' recomeça com NOVA identidade, só quando a pessoa confirma", async () => {
+    await interrupted();
+    const old = records()[0]!.value;
+    ageImport(30 * H);
+    await reopen();
+    fireEvent.click(submit());
+    fireEvent.click(await screen.findByRole("button", { name: "Preparar nova importação" }));
+    expect(screen.queryByText(/proteção contra duplicação desta importação venceu/)).toBeNull();
+    expect(api.bulkImport).not.toHaveBeenCalled(); // preparar NÃO envia
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(api.bulkImport.mock.calls[0]![5]).not.toContain(old.importId);
+  });
+
+  it("estratégia 'duplicar' vencida: a nova importação NÃO oferece duplicar como recuperação (vira 'ignorar')", async () => {
+    await interrupted("duplicate");
+    ageImport(26 * H);
+    await reopen(csvOf(600), "duplicate");
+    fireEvent.click(submit());
+    fireEvent.click(await screen.findByRole("button", { name: "Preparar nova importação" }));
+    expect((screen.getByLabelText("Se o telefone já existir") as HTMLSelectElement).value).toBe("skip");
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(api.bulkImport.mock.calls.every((c) => c[4] === "skip")).toBe(true);
+  });
+
+  it("retomar NÃO renova a janela: o início continua sendo o da primeira tentativa", async () => {
+    await interrupted();
+    ageImport(10 * H);
+    const start = records()[0]!.value.startedAt;
+    api.bulkImport.mockReset();
+    api.bulkImport.mockRejectedValue(new ApiError(403, "de novo")); // a retomada também falha
+    await reopen();
+    fireEvent.click(submit());
+    await screen.findByText("Falhou");
+    expect(records()[0]!.value.startedAt).toBe(start);
+  });
+
+  it("'Retomar importação' na mesma tela também respeita a janela (o relógio avançou)", async () => {
+    api.bulkImport.mockReset();
+    api.bulkImport
+      .mockImplementationOnce(async (rows) => created(rows))
+      .mockRejectedValueOnce(new ApiError(403, "x"));
+    open();
+    await upload(csvOf(600));
+    await screen.findByText(/600 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(submit());
+    await screen.findByText("Falhou");
+    const real = Date.now;
+    vi.spyOn(Date, "now").mockImplementation(() => real() + 21 * H);
+    api.bulkImport.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Retomar importação" }));
+    expect(await screen.findByText(/proteção contra duplicação desta importação venceu/)).toBeTruthy();
+    expect(api.bulkImport).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ["outro arquivo", () => csvOf(601), "skip"],
+    ["outra estratégia", () => csvOf(600), "update"],
+  ])("mudança de %s NÃO reaproveita a identidade (é outra importação, sem aviso de vencida)", async (_l, csv, strategy) => {
+    await interrupted();
+    ageImport(30 * H);
+    await reopen(csv(), strategy);
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(screen.queryByText(/proteção contra duplicação desta importação venceu/)).toBeNull();
+  });
+
+  it("mudança de mapeamento gera outra assinatura (nova importação)", async () => {
+    await interrupted();
+    ageImport(30 * H);
+    open();
+    await upload(csvOf(600));
+    await screen.findByText(/600 linha\(s\) encontrada\(s\)/);
+    fireEvent.change(screen.getByLabelText("Campo do lead para a coluna Telefone"), { target: { value: "__ignore__" } });
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(screen.queryByText(/venceu/)).toBeNull();
+  });
+
+  it("outro usuário ou outro tenant não enxerga nem reaproveita o registro", async () => {
+    await interrupted();
+    ageImport(1 * H);
+    const key = records()[0]!.value.importId;
+    const view = open({ user: GESTOR });
+    await upload(csvOf(600));
+    await screen.findByText(/600 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(api.bulkImport.mock.calls[0]![5]).not.toContain(key);
+    expect(screen.queryByText(/retomou/)).toBeNull();
+    view.unmount();
+    const other = open({ tenantId: "t-outro" });
+    await upload(csvOf(600));
+    await screen.findByText(/600 linha\(s\) encontrada\(s\)/);
+    api.bulkImport.mockClear();
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(api.bulkImport.mock.calls[0]![5]).not.toContain(key);
+    other.unmount();
+  });
+
+  it("duas abas com a MESMA planilha usam a mesma identidade (o servidor serializa/reproduz)", async () => {
+    await interrupted();
+    ageImport(2 * H);
+    const key = records()[0]!.value.importId;
+    await reopen();
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(api.bulkImport.mock.calls[0]![5]).toBe(`imp-${key}-0000`);
+  });
+
+  it("registros de mais de 30 dias são limpos; os de 1 a 30 dias continuam avisando", async () => {
+    await interrupted();
+    ageImport(40 * 24 * H);
+    expect(records()).toHaveLength(1);
+    await reopen(csvOf(5)); // outra planilha: ao iniciar, poda os registros vencidos
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(records()).toHaveLength(0);
+  });
+});
+
+describe("A6 sair da tela no meio da importação", () => {
+  it("a importação para depois do lote em voo (não segue invisível) e o lote seguinte não é enviado", async () => {
+    const first = deferred<ImportSummary>();
+    api.bulkImport.mockReset();
+    api.bulkImport.mockReturnValueOnce(first.promise);
+    api.bulkImport.mockImplementation(async (rows) => created(rows));
+    const view = open();
+    await upload(csvOf(1200));
+    await screen.findByText(/1200 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(submit());
+    await screen.findByRole("progressbar");
+    view.unmount(); // navegou para outra rota
+    first.resolve(created(Array.from({ length: 500 }, (_, i) => ({ name: `Lead ${i}` }))));
+    await new Promise((r) => setTimeout(r, 200)); // dá tempo de um envio indevido acontecer
+    expect(api.bulkImport).toHaveBeenCalledTimes(1);
+  });
+});

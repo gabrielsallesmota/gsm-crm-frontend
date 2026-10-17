@@ -15,6 +15,9 @@ import type {
 import type { Page } from "../../types/common";
 import { apiRequest, apiRequestText } from "./ApiClient";
 
+/** Um lote que não responde em 2 min é abortado (vira falha de rede, reenviada com a MESMA chave). */
+const BULK_IMPORT_TIMEOUT_MS = 120_000;
+
 interface StageDto {
   id: string;
   pipeline_id: string;
@@ -261,6 +264,7 @@ export class LeadsApiRepository implements LeadsRepository {
       }[];
     }>("/api/v1/leads/bulk-import", {
       method: "POST",
+      signal: AbortSignal.timeout(BULK_IMPORT_TIMEOUT_MS),
       ...(idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : {}),
       body: JSON.stringify({
         pipeline_id: pipelineId,

@@ -15,7 +15,11 @@ import {
   csvSafeCell,
   finalState,
   importKey,
+  IDEMPOTENCY_TTL_MS,
+  RESUME_SAFE_MS,
   isRetryable,
+  isWithinSafeWindow,
+  resumeStatus,
   prepareRows,
   reportToCsv,
   runImport,
@@ -64,6 +68,19 @@ describe("prepareRows — validação antes do envio", () => {
     assert.match(out.invalid[0]!.detail, /Nome é obrigatório/);
     assert.match(out.invalid[1]!.detail, /UF/);
     assert.match(out.invalid[2]!.detail, /200/);
+  });
+
+  it("valor maior que a coluna do banco vira linha inválida (não derruba o lote no servidor)", () => {
+    const out = prepareRows(
+      ["Nome", "Empresa", "Observações"],
+      ["name", "company", "notes"],
+      [["A", "c".repeat(201), ""], ["B", "ok", "n".repeat(4000)], ["C", "", "n".repeat(4001)]],
+      ORIGINS,
+    );
+    assert.deepEqual(out.valid.map((r) => r.input.name), ["B"]);
+    assert.deepEqual(out.invalid.map((r) => r.rowNumber), [2, 4]);
+    assert.match(out.invalid[0]!.detail, /Empresa tem 201 caracteres; o máximo é 200/);
+    assert.match(out.invalid[1]!.detail, /Observações tem 4001 caracteres; o máximo é 4000/);
   });
 
   it("origem desconhecida: o lead segue sem origem e vira AVISO (não é descartado em silêncio)", () => {
@@ -402,5 +419,37 @@ describe("CSV do relatório", () => {
     assert.ok(csv.includes(`"'=HYPERLINK(""http://x"")"`));
     assert.ok(csv.includes('"a, b"'));
     assert.ok(!csv.includes("Ok")); // sucesso não entra no relatório de atenção
+  });
+});
+
+describe("janela segura de retomada (R4)", () => {
+  const H = 60 * 60 * 1000;
+  const NOW = 1_800_000_000_000;
+  const rec = (agoMs: number) => ({ sig: "s", importId: "id", startedAt: NOW - agoMs });
+
+  it("a janela de retomada é MENOR que a validade da chave no servidor (folga de 4 h)", () => {
+    assert.equal(IDEMPOTENCY_TTL_MS, 24 * H);
+    assert.equal(RESUME_SAFE_MS, 20 * H);
+    assert.ok(RESUME_SAFE_MS < IDEMPOTENCY_TTL_MS);
+  });
+
+  it("1 h, 19 h e 19 h 59 min: fresca; 20 h, 24 h, 3 dias: vencida", () => {
+    for (const age of [0, 1 * H, 19 * H, 20 * H - 1000]) {
+      assert.equal(resumeStatus(rec(age), "s", NOW).kind, "fresh", String(age));
+    }
+    for (const age of [20 * H, 24 * H, 72 * H]) {
+      assert.equal(resumeStatus(rec(age), "s", NOW).kind, "expired", String(age));
+    }
+  });
+
+  it("assinatura diferente ou sem registro: nenhuma retomada (é outra importação)", () => {
+    assert.equal(resumeStatus(rec(H), "outra", NOW).kind, "none");
+    assert.equal(resumeStatus(null, "s", NOW).kind, "none");
+  });
+
+  it("relógio inconsistente (início no futuro) ou registro corrompido: tratado como vencido", () => {
+    assert.equal(resumeStatus(rec(-H), "s", NOW).kind, "expired");
+    assert.equal(resumeStatus({ sig: "s", importId: "i", startedAt: Number.NaN }, "s", NOW).kind, "expired");
+    assert.equal(isWithinSafeWindow(NOW + 60_000, NOW), true); // pequena diferença de relógio é tolerada
   });
 });

@@ -57,3 +57,35 @@ describe("readableDetail — corpo de erro do FastAPI", () => {
     assert.equal(readableDetail([], "fb"), "fb");
   });
 });
+
+describe("campos acima do limite (422 do Pydantic) viram frase legível, não erro 500", () => {
+  const detail = (field: string, max: number) => [
+    { type: "string_too_long", loc: ["body", field], msg: `String should have at most ${max} characters` },
+  ];
+  const cases: [string, number, string][] = [
+    ["company", 200, "Empresa: pode ter no máximo 200 caracteres"],
+    ["position", 120, "Cargo: pode ter no máximo 120 caracteres"],
+    ["phone", 30, "Telefone: pode ter no máximo 30 caracteres"],
+    ["whatsapp", 30, "WhatsApp: pode ter no máximo 30 caracteres"],
+    ["email", 255, "E-mail: pode ter no máximo 255 caracteres"],
+    ["city", 120, "Cidade: pode ter no máximo 120 caracteres"],
+    ["notes", 4000, "Observações: pode ter no máximo 4000 caracteres"],
+  ];
+  for (const [field, max, expected] of cases) {
+    it(field, () => {
+      assert.equal(readableDetail(detail(field, max), "fb"), expected);
+    });
+  }
+
+  it("422 de domínio (telefone com dígitos demais) é mostrado como veio", () => {
+    assert.equal(
+      describeError(new ApiError(422, "Telefone com dígitos demais; confira o número."), "fb"),
+      "Telefone com dígitos demais; confira o número.",
+    );
+  });
+
+  it("nenhum 422 é apresentado como 'erro inesperado do servidor'", () => {
+    assert.doesNotMatch(describeError(new ApiError(422, "Empresa: pode ter no máximo 200 caracteres"), "fb"), /inesperado/i);
+  });
+});
+

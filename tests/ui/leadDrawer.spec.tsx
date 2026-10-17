@@ -256,6 +256,17 @@ describe("F-14 edição de dados", () => {
     expect((screen.getByLabelText("Nome") as HTMLInputElement).value).toBe("Novo");
   });
 
+  it("campo acima do limite (422): mensagem legível com o campo e o limite, rascunho preservado", async () => {
+    api.update.mockRejectedValue(new ApiError(422, "Empresa: pode ter no máximo 200 caracteres"));
+    open();
+    edit();
+    fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "Novo" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    expect(await screen.findByText("Empresa: pode ter no máximo 200 caracteres")).toBeTruthy();
+    expect(screen.queryByText(/Erro inesperado/)).toBeNull();
+    expect((screen.getByLabelText("Nome") as HTMLInputElement).value).toBe("Novo");
+  });
+
   it("tags: só aparecem as selecionáveis em edição; alternar entra no payload", async () => {
     api.update.mockResolvedValue(makeLead({ tags: ["tag1"] }));
     open();

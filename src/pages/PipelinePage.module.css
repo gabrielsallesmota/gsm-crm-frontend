@@ -253,6 +253,13 @@
   padding: 5px 8px;
 }
 
+/* Foco por teclado visível (o `select:focus` global zera o contorno e só troca a cor da borda):
+   o seletor 'mover' aparece justamente porque o foco chegou ao cartão — precisa ser inconfundível. */
+.cardMove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 @media (hover: hover) and (pointer: fine) and (min-width: 761px) {
   .cardMove:not(:focus) {
     position: absolute;

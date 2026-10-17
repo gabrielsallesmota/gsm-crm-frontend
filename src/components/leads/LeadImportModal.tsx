@@ -21,15 +21,18 @@ import {
   chunk,
   finalState,
   guessMapping,
+  isWithinSafeWindow,
   newImportId,
   prepareRows,
   reportToCsv,
+  resumeStatus,
   runImport,
   signatureOf,
   type BatchResult,
   type ImportState,
   type Progress,
   type Report,
+  type ResumeRecord,
   type RunOutcome,
 } from "../../utils/leadImport";
 
@@ -45,29 +48,64 @@ const STATE_LABEL: Record<ImportState, string> = {
 
 /** Quantas linhas problemáticas aparecem na tela; o relatório completo é o CSV baixável. */
 const REPORT_ROWS_SHOWN = 200;
-const RESUME_TTL_MS = 20 * 60 * 60 * 1000; // < 24 h, a validade das chaves no servidor
 
 const fmt = (n: number) => n.toLocaleString("pt-BR");
 
-function readResume(storageKey: string, signature: string): string | null {
+/** Um registro por (tenant, usuário, assinatura da planilha+parâmetros): importar outra planilha
+ * não apaga o registro de uma interrompida. */
+function resumeKey(prefix: string, signature: string): string {
+  return `${prefix}.${signature}`;
+}
+
+function readResume(prefix: string, signature: string): ResumeRecord | null {
   try {
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return null;
-    const saved = JSON.parse(raw) as { sig: string; importId: string; at: number };
-    return saved.sig === signature && Date.now() - saved.at < RESUME_TTL_MS ? saved.importId : null;
+    const raw = window.localStorage.getItem(resumeKey(prefix, signature));
+    return raw ? (JSON.parse(raw) as ResumeRecord) : null;
   } catch {
     return null;
   }
 }
 
-function writeResume(storageKey: string, signature: string, importId: string | null) {
+function writeResume(prefix: string, record: ResumeRecord) {
   try {
-    if (importId) window.localStorage.setItem(storageKey, JSON.stringify({ sig: signature, importId, at: Date.now() }));
-    else window.localStorage.removeItem(storageKey);
+    window.localStorage.setItem(resumeKey(prefix, record.sig), JSON.stringify(record));
   } catch {
     // sem armazenamento: só perde a retomada após recarregar a página
   }
 }
+
+function clearResume(prefix: string, signature: string) {
+  try {
+    window.localStorage.removeItem(resumeKey(prefix, signature));
+  } catch {
+    // nada a limpar
+  }
+}
+
+/** Por quanto tempo lembramos que uma planilha já foi enviada (só assinatura + id + data, sem dados
+ * pessoais). Passadas as 24 h do servidor o registro NÃO serve mais para retomar, mas continua
+ * servindo para AVISAR que a planilha já foi enviada (senão reenviá-la com "duplicar" criaria
+ * duplicados sem nenhum alerta). */
+const RECORD_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Remove registros muito antigos. */
+function pruneResume(prefix: string, now: number) {
+  try {
+    for (let i = window.localStorage.length - 1; i >= 0; i--) {
+      const key = window.localStorage.key(i);
+      if (!key?.startsWith(`${prefix}.`)) continue;
+      const saved = JSON.parse(window.localStorage.getItem(key) ?? "null") as ResumeRecord | null;
+      if (!saved || !Number.isFinite(saved.startedAt) || now - saved.startedAt >= RECORD_RETENTION_MS) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // ignora
+  }
+}
+
+const dateTime = (ms: number) =>
+  ms > 0 ? new Date(ms).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "data desconhecida";
 
 function downloadCsv(name: string, content: string) {
   if (typeof URL.createObjectURL !== "function") return;
@@ -123,11 +161,17 @@ export function LeadImportModal({
   const cancelRef = useRef(false);
   const doneBatches = useRef(new Map<number, BatchResult>());
   const importIdRef = useRef<string | null>(null);
+  const startedAtRef = useRef<number>(0);
+  // Proteção contra duplicação vencida: nada é reenviado até a pessoa decidir (R4).
+  const [expired, setExpired] = useState<{ startedAt: number } | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      // Saiu da tela (navegou para outra rota) no meio da importação: ela PARA depois do lote em
+      // voo, em vez de seguir invisível. O registro de retomada fica guardado.
+      cancelRef.current = true;
     };
   }, []);
 
@@ -183,7 +227,7 @@ export function LeadImportModal({
     }
   }
 
-  const resumeStorageKey = `gsm.leadImport.${currentTenantId ?? "-"}.${user?.id ?? "-"}`;
+  const resumePrefix = `gsm.leadImport.${currentTenantId ?? "-"}.${user?.id ?? "-"}`;
   const signature = signatureOf([
     fileName,
     String(fileBytes),
@@ -207,13 +251,35 @@ export function LeadImportModal({
       // Mesma planilha e mesmos parâmetros de uma importação interrompida (inclusive após recarregar
       // a página): reaproveita o identificador. Os lotes já gravados voltam do servidor como
       // repetição (sem gravar de novo), então o relatório sai completo.
-      const previous = readResume(resumeStorageKey, signature);
-      importIdRef.current = previous ?? newImportId();
-      setResumed(previous !== null);
+      const now = Date.now();
+      pruneResume(resumePrefix, now);
+      const status = resumeStatus(readResume(resumePrefix, signature), signature, now);
+      if (status.kind === "expired") {
+        // Já houve uma importação desta planilha cuja proteção (24 h) venceu: o servidor não sabe
+        // mais quais lotes gravou. NÃO reenviar sozinho; a pessoa decide (ver painel de aviso).
+        setExpired({ startedAt: status.startedAt });
+        return;
+      }
+      if (status.kind === "fresh") {
+        importIdRef.current = status.importId;
+        startedAtRef.current = status.startedAt;
+      } else {
+        importIdRef.current = newImportId();
+        startedAtRef.current = now;
+      }
+      setResumed(status.kind === "fresh");
       doneBatches.current = new Map();
+    } else if (!isWithinSafeWindow(startedAtRef.current, Date.now())) {
+      // "Retomar" na mesma janela do navegador, mas já passou da janela segura.
+      setExpired({ startedAt: startedAtRef.current });
+      return;
     }
     const importId = importIdRef.current!;
-    writeResume(resumeStorageKey, signature, importId);
+    // O início é gravado UMA vez (retomar não renova a janela).
+    if (!readResume(resumePrefix, signature)) {
+      writeResume(resumePrefix, { sig: signature, importId, startedAt: startedAtRef.current });
+    }
+    setExpired(null);
     cancelRef.current = false;
     setPhase("running");
     setResult(null);
@@ -233,10 +299,24 @@ export function LeadImportModal({
     const report = buildReport(prepared, batches, outcome);
     const state = finalState(outcome, report);
     // Terminou sem interrupção: a próxima importação desta planilha é uma NOVA (não repete a chave).
-    if (outcome.state === "completed") writeResume(resumeStorageKey, signature, null);
+    if (outcome.state === "completed") clearResume(resumePrefix, signature);
     if (!mounted.current) return;
     setResult({ state, report, outcome });
     setPhase("done");
+  }
+
+  /** Depois que a proteção venceu: recomeça do zero, SEM reaproveitar chaves vencidas e sem "duplicar". */
+  function prepareFreshImport() {
+    clearResume(resumePrefix, signature);
+    importIdRef.current = null;
+    startedAtRef.current = 0;
+    doneBatches.current = new Map();
+    if (dedupeStrategy === "duplicate") setDedupeStrategy("skip");
+    setResumed(false);
+    setExpired(null);
+    setResult(null);
+    setProgress(null);
+    setPhase("setup");
   }
 
   function handleClose() {
@@ -307,7 +387,9 @@ export function LeadImportModal({
           </p>
           {resumed && (
             <p style={{ fontSize: 12.5, margin: "0 0 8px" }}>
-              Esta planilha retomou uma importação interrompida: os lotes já gravados não foram duplicados.
+              Esta planilha retomou uma importação interrompida (iniciada em {dateTime(startedAtRef.current)},
+              dentro da janela de proteção de 24 h): o servidor reconhece os lotes já gravados e não os
+              grava de novo.
             </p>
           )}
           <div className={styles.summaryStats}>
@@ -527,6 +609,22 @@ export function LeadImportModal({
         <p id={`${uid}-blocked`} role="status" style={{ color: "var(--tone-amber)", fontSize: 12.5 }}>
           {blockedReason}
         </p>
+      )}
+
+      {expired && (
+        <div role="alert" className={styles.summary} style={{ borderColor: "var(--tone-amber)" }}>
+          <p style={{ margin: "0 0 8px", fontWeight: 600 }}>A proteção contra duplicação desta importação venceu</p>
+          <p style={{ margin: "0 0 8px", fontSize: 12.5 }}>
+            Esta planilha foi enviada pela primeira vez em {dateTime(expired.startedAt)}. O servidor só guarda
+            o registro dos lotes por 24 h, então não é seguro reenviá-los: alguns ou todos os leads desta
+            planilha podem já ter sido importados. <strong>Nada foi reenviado.</strong>
+          </p>
+          <p style={{ margin: "0 0 8px", fontSize: 12.5 }}>
+            Para continuar, prepare uma nova importação: telefones já cadastrados serão tratados pela
+            estratégia escolhida{dedupeStrategy === "duplicate" ? " (que será trocada para “Ignorar a linha”)" : ""}.
+          </p>
+          <Button onClick={prepareFreshImport}>Preparar nova importação</Button>
+        </div>
       )}
 
       <div className={styles.modalActions}>

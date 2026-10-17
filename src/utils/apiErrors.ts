@@ -54,6 +54,7 @@ const FIELD_LABELS: Record<string, string> = {
   expected_value: "Valor",
   probability: "Probabilidade",
   company: "Empresa",
+  position: "Cargo",
   whatsapp: "WhatsApp",
   city: "Cidade",
   state: "Estado",

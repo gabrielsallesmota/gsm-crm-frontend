@@ -26,6 +26,17 @@ export const IGNORE = "__ignore__";
 /** Mesmas restrições do esquema do servidor (`ImportRowRequest`): nome ≤ 200, UF = 2 letras. */
 const NAME_MAX = 200;
 const STATE_MAX = 2;
+/** Tamanho das colunas do banco (espelha `IMPORT_FIELD_LIMITS` do backend): um valor maior seria
+ * recusado pelo servidor como erro DA LINHA; aqui a linha já é separada antes de enviar. */
+const FIELD_LIMITS: Record<string, [label: string, max: number]> = {
+  company: ["Empresa", 200],
+  position: ["Cargo", 120],
+  phone: ["Telefone", 30],
+  whatsapp: ["WhatsApp", 30],
+  email: ["E-mail", 255],
+  city: ["Cidade", 120],
+  notes: ["Observações", 4000],
+};
 
 export interface FieldDef {
   key: string;
@@ -121,6 +132,12 @@ export function prepareRows(
       });
       return;
     }
+    const tooLong = Object.entries(FIELD_LIMITS).find(([field, [, max]]) => (input[field]?.length ?? 0) > max);
+    if (tooLong) {
+      const [field, [label, max]] = tooLong;
+      invalid.push({ rowNumber, name, detail: `${label} tem ${input[field]!.length} caracteres; o máximo é ${max}.` });
+      return;
+    }
     if (rowUnknownOrigin) warnings.unknownOrigin += 1;
     const phones = [input.phone, input.whatsapp].filter((p): p is string => Boolean(p));
     if (phones.length > 0 && phones.every((p) => digits(p) < 10)) warnings.shortPhone += 1;
@@ -199,6 +216,45 @@ export interface Progress {
   currentBatch: number | null;
   /** Reenvio do mesmo lote (1 = primeira tentativa). */
   attempt: number;
+}
+
+// ---------------------------------------------------------------------------------------------
+// janela segura de retomada (R4)
+// ---------------------------------------------------------------------------------------------
+
+/** Validade da chave de idempotência no servidor (`IDEMPOTENCY_TTL_HOURS`), contada a partir do
+ * primeiro envio de cada lote. Depois disso o servidor ESQUECE o lote: reenviá-lo regravaria. */
+export const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
+/** Só retomamos dentro de 20 h do INÍCIO da importação (folga de 4 h para relógio, sono do
+ * notebook e a própria duração do reenvio). O início nunca é renovado ao retomar. */
+export const RESUME_SAFE_MS = 20 * 60 * 60 * 1000;
+/** Tolerância para relógio do aparelho adiantado/atrasado (início "no futuro" além disso = suspeito). */
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
+
+export interface ResumeRecord {
+  sig: string;
+  importId: string;
+  /** Início da importação (primeiro envio). Gravado UMA vez; retomar não o renova. */
+  startedAt: number;
+}
+
+export type ResumeStatus =
+  | { kind: "none" }
+  | { kind: "fresh"; importId: string; startedAt: number }
+  | { kind: "expired"; startedAt: number };
+
+export function isWithinSafeWindow(startedAt: number, now: number): boolean {
+  const age = now - startedAt;
+  return age >= -CLOCK_SKEW_MS && age < RESUME_SAFE_MS;
+}
+
+/** O que fazer com um registro de importação anterior para ESTA planilha e estes parâmetros. */
+export function resumeStatus(record: ResumeRecord | null, signature: string, now: number): ResumeStatus {
+  if (!record || record.sig !== signature) return { kind: "none" };
+  if (!Number.isFinite(record.startedAt)) return { kind: "expired", startedAt: 0 };
+  return isWithinSafeWindow(record.startedAt, now)
+    ? { kind: "fresh", importId: record.importId, startedAt: record.startedAt }
+    : { kind: "expired", startedAt: record.startedAt };
 }
 
 /** Identificador da importação: base das chaves de idempotência de todos os lotes. */
