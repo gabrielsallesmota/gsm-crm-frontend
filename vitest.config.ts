@@ -9,6 +9,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["tests/ui/**/*.spec.{ts,tsx}"],
+    setupFiles: ["tests/ui/support/setup.ts"],
+    testTimeout: 20000,
     restoreMocks: true,
     unstubGlobals: true,
   },
