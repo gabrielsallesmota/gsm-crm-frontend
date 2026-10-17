@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { Lead, LeadMessageTemplate, UpdateLeadInput } from "../../types/lead";
 import type { PipelineStage } from "../../types/pipeline";
 import type { Task } from "../../types/task";
@@ -54,6 +54,9 @@ export function LeadDrawer({
   onDeleted?: (leadId: string) => void;
 }) {
   const { user } = useAuth();
+  // DRW-01: rótulo visível e campo ligados por `aria-labelledby` (sem mudar o visual).
+  const uid = useId();
+  const labelId = (field: string) => `${uid}-${field}`;
   const canAssign = can(user, "leads.assign");
   const { toast, toastError } = useToast();
   const { update, move, delete: deleteLead } = useLeadActions();
@@ -307,10 +310,13 @@ export function LeadDrawer({
             )}
           </label>
           <div className={styles.field}>
-            <div className={styles.fieldLabel}>Valor</div>
+            <div className={styles.fieldLabel} id={labelId("value")}>
+              Valor
+            </div>
             {editing ? (
               <CurrencyInput
                 className={styles.editInputSmall}
+                aria-labelledby={labelId("value")}
                 value={form.value}
                 onChange={(v) => setForm((f) => ({ ...f, value: v }))}
               />
@@ -319,11 +325,14 @@ export function LeadDrawer({
             )}
           </div>
           <div className={styles.field}>
-            <div className={styles.fieldLabel}>Probabilidade</div>
+            <div className={styles.fieldLabel} id={labelId("probability")}>
+              Probabilidade
+            </div>
             {editing ? (
               <input
                 className={styles.editInputSmall}
                 type="number"
+                aria-labelledby={labelId("probability")}
                 min={0}
                 max={100}
                 value={form.probability}
@@ -334,10 +343,13 @@ export function LeadDrawer({
             )}
           </div>
           <div className={styles.field}>
-            <div className={styles.fieldLabel}>Telefone</div>
+            <div className={styles.fieldLabel} id={labelId("phone")}>
+              Telefone
+            </div>
             {editing ? (
               <input
                 className={styles.editInputSmall}
+                aria-labelledby={labelId("phone")}
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: formatPhone(e.target.value) }))}
               />
@@ -346,10 +358,13 @@ export function LeadDrawer({
             )}
           </div>
           <div className={styles.field}>
-            <div className={styles.fieldLabel}>E-mail</div>
+            <div className={styles.fieldLabel} id={labelId("email")}>
+              E-mail
+            </div>
             {editing ? (
               <input
                 className={styles.editInputSmall}
+                aria-labelledby={labelId("email")}
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               />
@@ -358,10 +373,13 @@ export function LeadDrawer({
             )}
           </div>
           <div className={styles.field}>
-            <div className={styles.fieldLabel}>Origem</div>
+            <div className={styles.fieldLabel} id={labelId("origin")}>
+              Origem
+            </div>
             {editing ? (
               <select
                 className={styles.editInputSmall}
+                aria-labelledby={labelId("origin")}
                 value={form.origin}
                 onChange={(e) => setForm((f) => ({ ...f, origin: e.target.value }))}
               >
@@ -424,9 +442,12 @@ export function LeadDrawer({
 
         {editing ? (
           <div className={styles.section}>
-            <div className={styles.sectionTitle}>Notas</div>
+            <div className={styles.sectionTitle} id={labelId("notes")}>
+              Notas
+            </div>
             <textarea
               className={styles.editTextarea}
+              aria-labelledby={labelId("notes")}
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               rows={4}

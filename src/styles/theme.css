@@ -15,6 +15,9 @@
   --border-strong: rgba(255, 255, 255, 0.16);
 
   --accent: #2ee66e;
+  /* Verde usado como COR DE TEXTO (links, rótulos, ícones): no escuro é o próprio acento; no claro é
+     mais escuro para passar 4,5:1 (WCAG AA). Fundos e bordas continuam com --accent. */
+  --accent-text: #2ee66e;
   --accent-bg: rgba(46, 230, 110, 0.14);
   --accent-border: rgba(46, 230, 110, 0.22);
   --accent-soft: #bfeecd;
@@ -30,7 +33,7 @@
   --text-dim: #cdd6df;
   --muted: #9aa6b2;
   --muted-2: #7f8b96;
-  --faint: #5f6b76;
+  --faint: #78848f;
 
   /* Títulos de página/modal/card — branco puro no escuro, quase-preto no claro. */
   --heading: #ffffff;
@@ -100,6 +103,7 @@
      branco não passa de ~1.6:1 de contraste. Como os botões de destaque usam
      texto escuro (`--on-accent`), esse verde também serve de fundo. */
   --accent: #12a550;
+  --accent-text: #0b7a38;
   --accent-bg: rgba(18, 165, 80, 0.12);
   --accent-border: rgba(18, 165, 80, 0.3);
   --accent-soft: #0b6b34;
@@ -116,7 +120,7 @@
   --muted: #56626e;
   /* Etapa 4: era #6b7682 (4,2:1 sobre --bg, abaixo do AA 4,5:1). */
   --muted-2: #636e7a;
-  --faint: #8d98a3;
+  --faint: #66717c;
 
   --heading: #0b1218;
 

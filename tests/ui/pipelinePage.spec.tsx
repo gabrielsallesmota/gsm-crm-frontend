@@ -345,7 +345,8 @@ describe("F-02/F-03 mover lead", () => {
     await waitFor(() => expect(api.move).toHaveBeenCalledTimes(1));
     // o card em movimento fica bloqueado: select desabilitado e aria-busy
     expect(moveSelect("Maria Souza").disabled).toBe(true);
-    expect(card("Maria Souza").getAttribute("aria-busy")).toBe("true");
+    // PIP-01: o estado "ocupado" fica no contêiner do cartão (o botão de abrir é só o resumo)
+    expect(card("Maria Souza").parentElement?.getAttribute("aria-busy")).toBe("true");
     await act(async () => pending.resolve(makeLead({ stageId: "s-contato" })));
   });
 
@@ -557,7 +558,7 @@ describe("F-12 cartão do lead", () => {
   it("ações internas do cartão (mover, e-mail, WhatsApp) NÃO abrem o painel por engano", async () => {
     api.move.mockResolvedValue(makeLead({ stageId: "s-contato" }));
     render();
-    const c = await screen.findByRole("button", { name: "Abrir Maria Souza" });
+    const c = (await screen.findByRole("button", { name: "Abrir Maria Souza" })).parentElement as HTMLElement;
     fireEvent.click(within(c).getByLabelText("Mover Maria Souza para outra etapa"));
     fireEvent.click(within(c).getByRole("link", { name: "Escrever e-mail para Maria Souza" }));
     fireEvent.click(within(c).getByRole("link", { name: /WhatsApp/ }));
@@ -567,7 +568,7 @@ describe("F-12 cartão do lead", () => {
   it("links de contato: e-mail abre mailto; WhatsApp abre wa.me (com template: com mensagem; sem: em branco)", async () => {
     api.listMessageTemplates.mockResolvedValue([makeTemplate({ message: "Oi {nome}" })]);
     render();
-    const c = await screen.findByRole("button", { name: "Abrir Maria Souza" });
+    const c = (await screen.findByRole("button", { name: "Abrir Maria Souza" })).parentElement as HTMLElement;
     await waitFor(() => expect(within(c).getByRole("link", { name: /WhatsApp/ })).toBeTruthy());
     expect(within(c).getByRole("link", { name: /WhatsApp/ }).getAttribute("href")).toBe(
       "https://wa.me/5511987654321?text=Oi%20Maria%20Souza",

@@ -143,7 +143,7 @@
    do app (ver `constants/prospectEnums.ts`), pra destacar "é agora" sem
    confundir com "atrasado" (vermelho, acima). */
 .targetDateToday {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .cardMeta {
@@ -294,7 +294,7 @@
 
 .dateShortcutBtn:hover {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .modalActions {

@@ -78,7 +78,7 @@
 
 .actionLink:hover {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .actionLink:focus-visible {
@@ -107,7 +107,7 @@
 
 .success {
   font-size: 13px;
-  color: var(--accent);
+  color: var(--accent-text);
   margin-bottom: 14px;
 }
 
@@ -162,7 +162,7 @@
 }
 
 .providerArrow {
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 

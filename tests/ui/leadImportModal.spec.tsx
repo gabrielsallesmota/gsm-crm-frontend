@@ -140,12 +140,28 @@ describe("F-10 mapeamento", () => {
     expect(rowsSent()).toEqual([{ name: "Ana", phone: "11999990000" }]);
   });
 
-  it("sem nenhuma coluna mapeada para Nome o botão fica desabilitado SEM explicação (caracterização)", async () => {
+  it("N-03: sem coluna mapeada para Nome o botão fica desabilitado E a tela explica o motivo", async () => {
     open();
     await upload("Telefone\n11999990000");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
     expect(submit().disabled).toBe(true);
-    expect(screen.queryByText(/nome é obrigatório|obrigatório/i)).toBeNull();
+    const reason = screen.getByText(/Nome é obrigatório: associe uma coluna/);
+    expect(reason.getAttribute("role")).toBe("status");
+    expect(submit().getAttribute("aria-describedby")).toBe(reason.id);
+    // mapear o Nome tira o aviso e habilita o botão
+    const mapSelect = screen.getByLabelText("Campo do lead para a coluna Telefone");
+    fireEvent.change(mapSelect, { target: { value: "name" } });
+    expect(screen.queryByText(/Nome é obrigatório/)).toBeNull();
+    expect(submit().disabled).toBe(false);
+  });
+
+  it("N-03: com Nome mapeado mas TODAS as linhas sem nome, a explicação é outra e o envio continua bloqueado", async () => {
+    open();
+    await upload("Nome,Telefone\n,1\n  ,2");
+    await screen.findByText(/2 linha\(s\) encontrada\(s\)/);
+    expect(submit().disabled).toBe(true);
+    expect(screen.getByText("Nenhuma linha pode ser importada: todas estão sem nome.")).toBeTruthy();
+    expect(api.bulkImport).not.toHaveBeenCalled();
   });
 
   it("duas colunas para o MESMO campo: a última vence, sem aviso (caracterização)", async () => {
@@ -354,17 +370,85 @@ describe("F-10 processamento e resultado", () => {
     expect(api.bulkImport).not.toHaveBeenCalled();
   });
 
-  it("clicar no fundo FECHA e descarta o arquivo/mapeamento (caracterização — ver IMP-01)", async () => {
+  it("IMP-01: é um diálogo modal com nome; Esc e clique no fundo fecham enquanto nada foi escolhido", async () => {
+    const { onClose } = open();
+    const dialog = screen.getByRole("dialog", { name: "Importar leads via CSV" });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    fireEvent.mouseDown(dialog.parentElement as HTMLElement);
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it("IMP-01: depois de escolher o arquivo, Esc e clique no fundo NÃO descartam o trabalho; só Cancelar", async () => {
+    const { onClose } = open();
+    const input = document.querySelector("input[type=file]") as HTMLInputElement;
+    await upload("Nome\nAna");
+    fireEvent.input(input); // o navegador dispara `input` além de `change` ao escolher o arquivo
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.mouseDown(screen.getByRole("dialog").parentElement as HTMLElement);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("IMP-01: durante o envio nada fecha o diálogo (Esc, fundo, × e Cancelar)", async () => {
+    const pending = deferred<ImportSummary>();
+    api.bulkImport.mockReturnValue(pending.promise);
     const { onClose } = open();
     await upload("Nome\nAna");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
-    fireEvent.click(document.querySelector("[class*='overlay']") as HTMLElement);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    fireEvent.click(submit());
+    await screen.findByRole("button", { name: "Importando…" });
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.mouseDown(screen.getByRole("dialog").parentElement as HTMLElement);
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(onClose).not.toHaveBeenCalled();
+    pending.resolve(SUMMARY);
+    await screen.findByText("Criados:");
+  });
+
+  it("IMP-01: o foco volta para quem abriu a importação ao fechar", async () => {
+    const opener = document.createElement("button");
+    document.body.append(opener);
+    opener.focus();
+    const view = open();
+    expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(true);
+    view.unmount();
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
+  });
+
+  it("IMP-06/N-02: arquivo, parâmetros e de/para têm nome acessível", async () => {
+    open();
+    expect(screen.getByLabelText("Arquivo CSV com os leads")).toBeTruthy();
+    await upload("Nome,Telefone\nAna,1");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    for (const name of ["Estágio de entrada (leads novos)", "Responsável pelos leads novos", "Se o telefone já existir"]) {
+      expect(screen.getByLabelText(name)).toBeTruthy();
+    }
+    expect((screen.getByLabelText("Campo do lead para a coluna Nome") as HTMLSelectElement).value).toBe("name");
+    expect((screen.getByLabelText("Campo do lead para a coluna Telefone") as HTMLSelectElement).value).toBe("phone");
+  });
+
+  it("A-10: erro da importação é anunciado UMA vez (role=alert) e o texto continua visível", async () => {
+    api.bulkImport.mockRejectedValueOnce(new ApiError(422, "Lote recusado"));
+    open();
+    await upload("Nome\nAna");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(submit());
+    const dialog = screen.getByRole("dialog", { name: "Importar leads via CSV" });
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toBe("Lote recusado");
+    expect(within(dialog).getAllByRole("alert")).toHaveLength(1);
   });
 
   it("texto do modal descreve de/para e estratégia de telefone existente", () => {
     open();
-    const title = screen.getByText("Importar leads via CSV");
-    expect(within(title.parentElement as HTMLElement).getByText(/telefone já existir cadastrado/)).toBeTruthy();
+    const dialog = screen.getByRole("dialog", { name: "Importar leads via CSV" });
+    expect(within(dialog).getByText(/telefone já existir cadastrado/)).toBeTruthy();
   });
 });

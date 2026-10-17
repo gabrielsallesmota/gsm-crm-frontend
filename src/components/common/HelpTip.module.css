@@ -24,7 +24,7 @@
 
 .trigger:hover,
 .trigger[aria-expanded="true"] {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent);
 }
 

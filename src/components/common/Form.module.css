@@ -111,7 +111,7 @@
 .linkBtn {
   background: none;
   border: none;
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 12.5px;
   cursor: pointer;
   padding: 0;

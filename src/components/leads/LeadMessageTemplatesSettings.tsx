@@ -4,6 +4,7 @@ import { useLeadMessageTemplates } from "../../hooks/useLeadMessageTemplates";
 import { useLeadMessageTemplateActions } from "../../hooks/useLeadMessageTemplateActions";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
+import { ConfirmDialog } from "../common/ConfirmDialog";
 import { EmptyState } from "../common/EmptyState";
 import { useToast } from "../../hooks/useToast";
 import { ApiError } from "../../types/common";
@@ -42,14 +43,18 @@ export function LeadMessageTemplatesSettings() {
   const { toast, toastError } = useToast();
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  // CFG-02: excluir pede confirmação e diz QUAL template será removido.
+  const [confirmDelete, setConfirmDelete] = useState<LeadMessageTemplate | null>(null);
 
-  async function handleDelete(id: string) {
+  async function handleDelete(template: LeadMessageTemplate): Promise<boolean> {
     try {
-      await deleteTemplate(id);
+      await deleteTemplate(template.id);
       toast("Template excluído");
       reload();
+      return true;
     } catch (err) {
       toastError(err, "Não foi possível excluir o template");
+      return false;
     }
   }
 
@@ -115,7 +120,7 @@ export function LeadMessageTemplatesSettings() {
                   <button
                     className={styles.linkBtn}
                     type="button"
-                    onClick={() => void handleDelete(template.id)}
+                    onClick={() => setConfirmDelete(template)}
                   >
                     Excluir
                   </button>
@@ -129,6 +134,17 @@ export function LeadMessageTemplatesSettings() {
           <div className={styles.hint}>Nenhum template cadastrado ainda.</div>
         )}
       </div>
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Excluir template?"
+          message={`O template de ${stageLabelFor(confirmDelete.stageId, pipelineList)} (${
+            confirmDelete.origin ? originOf(confirmDelete.origin).label : "qualquer origem"
+          }) será excluído: "${confirmDelete.message.length > 80 ? `${confirmDelete.message.slice(0, 80)}…` : confirmDelete.message}". Os leads dessa etapa passam a usar o template padrão da etapa, se houver; sem ele, o WhatsApp abre a conversa em branco.`}
+          onConfirm={() => handleDelete(confirmDelete)}
+          onClose={() => setConfirmDelete(null)}
+        />
+      )}
     </div>
   );
 }
@@ -186,6 +202,7 @@ function TemplateForm({
       <div className={styles.formRow}>
         <select
           className={styles.select}
+          aria-label="Etapa do template"
           value={stageId}
           onChange={(e) => setStageId(e.target.value)}
           disabled={Boolean(existing)}
@@ -198,7 +215,12 @@ function TemplateForm({
             )),
           )}
         </select>
-        <select className={styles.select} value={origin} onChange={(e) => setOrigin(e.target.value)}>
+        <select
+          className={styles.select}
+          aria-label="Origem do template"
+          value={origin}
+          onChange={(e) => setOrigin(e.target.value)}
+        >
           <option value="">Qualquer origem (coringa)</option>
           {ORIGIN_KEYS.map((key) => (
             <option key={key} value={key}>
@@ -209,6 +231,7 @@ function TemplateForm({
       </div>
       <textarea
         className={styles.textarea}
+        aria-label="Mensagem do template"
         rows={3}
         placeholder="Olá {nome}, tudo bem? Vi seu contato pela {empresa}…"
         value={message}

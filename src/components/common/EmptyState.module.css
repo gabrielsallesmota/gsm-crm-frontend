@@ -23,7 +23,7 @@
   justify-content: center;
   font-size: 19px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--tone-green-bg, rgba(46, 230, 110, 0.12));
 }
 

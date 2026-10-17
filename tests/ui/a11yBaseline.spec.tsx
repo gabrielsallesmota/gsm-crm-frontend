@@ -3,10 +3,11 @@
 //   FALHA CONHECIDA    defeito já identificado na Auditoria 01 — escrito com `it.fails`: o teste
 //                      afirma o comportamento DESEJADO e é verde enquanto o defeito existir; quando a
 //                      Fase 1 corrigir, ele passa a FALHAR e deve ser convertido em teste comum;
+//   CORRIGIDO 1A       defeito corrigido na Fase 1A: o `it.fails` foi convertido em teste comum;
 //   FALHA NOVA         defeito não listado na auditoria, descoberto aqui;
 //   MANUAL             não automatizável em jsdom (`it.todo`).
 // Nada de produção foi alterado para fazer estes testes passarem.
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -131,11 +132,16 @@ describe("PASSA — comportamento atual correto", () => {
 });
 
 // =============================================================================================
-describe("FALHA CONHECIDA — defeitos da Auditoria 01 (it.fails: verde = defeito ainda presente)", () => {
-  it.fails("[FALHA CONHECIDA PIP-01] cartão com role=button NÃO deveria conter controles interativos aninhados", async () => {
+describe("Auditoria 01 — corrigidos na Fase 1A (testes comuns) e pendentes (it.fails: verde = defeito ainda presente)", () => {
+  it("[CORRIGIDO 1A PIP-01] o cartão com role=button não contém controles interativos aninhados", async () => {
     renderApp(<PipelinePage />);
     const card = await screen.findByRole("button", { name: "Abrir Maria Souza" });
     expect(card.querySelectorAll(INTERACTIVE).length).toBe(0);
+    // as ações continuam existindo — como IRMÃS do botão, dentro do mesmo cartão
+    const wrapper = card.parentElement as HTMLElement;
+    expect(wrapper.querySelector("select")).toBeTruthy();
+    expect(wrapper.querySelectorAll("a[href]").length).toBeGreaterThanOrEqual(1);
+    expect(card.contains(wrapper.querySelector("select"))).toBe(false);
   });
 
   it.fails("[FALHA CONHECIDA PIP-04] reordenar colunas deveria ter alternativa por teclado no próprio quadro", async () => {
@@ -144,33 +150,33 @@ describe("FALHA CONHECIDA — defeitos da Auditoria 01 (it.fails: verde = defeit
     expect(screen.getAllByRole("button", { name: /Mover coluna|Mover etapa/ }).length).toBeGreaterThan(0);
   });
 
-  it.fails("[FALHA CONHECIDA DRW-01] todos os campos do painel em edição deveriam ter nome acessível", async () => {
+  it("[CORRIGIDO 1A DRW-01] todos os campos do painel em edição deveriam ter nome acessível", async () => {
     renderApp(<LeadDrawer lead={makeLead()} stages={STAGES} onClose={() => undefined} />);
     fireEvent.click(screen.getByRole("button", { name: /Editar/ }));
     expect(unnamedFields(screen.getByRole("dialog"))).toEqual([]);
   });
 
-  it.fails("[FALHA CONHECIDA IMP-01] a importação deveria ser um diálogo acessível (role=dialog, aria-modal)", () => {
+  it("[CORRIGIDO 1A IMP-01] a importação deveria ser um diálogo acessível (role=dialog, aria-modal)", () => {
     renderApp(<LeadImportModal pipelineId="p1" stages={STAGES} defaultStageId="s-novo" onClose={() => undefined} onImported={() => undefined} />);
     expect(screen.getByRole("dialog").getAttribute("aria-modal")).toBe("true");
   });
 
-  it.fails("[FALHA CONHECIDA IMP-01] Esc deveria fechar a importação (hoje só o clique no fundo ou Cancelar)", async () => {
+  it("[CORRIGIDO 1A IMP-01] Esc deveria fechar a importação (hoje só o clique no fundo ou Cancelar)", async () => {
     const onClose = vi.fn();
     renderApp(<LeadImportModal pipelineId="p1" stages={STAGES} defaultStageId="s-novo" onClose={onClose} onImported={() => undefined} />);
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
-  it.fails("[FALHA CONHECIDA IMP-06] selects da importação (etapa, duplicados, de/para) deveriam ter nome acessível", async () => {
+  it("[CORRIGIDO 1A IMP-06] selects da importação (etapa, duplicados, de/para) deveriam ter nome acessível", async () => {
     renderApp(<LeadImportModal pipelineId="p1" stages={STAGES} defaultStageId="s-novo" onClose={() => undefined} onImported={() => undefined} />);
     const input = document.querySelector("input[type=file]") as HTMLInputElement;
     fireEvent.change(input, { target: { files: [new File(["Nome,Telefone\nAna,1"], "x.csv")] } });
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
-    expect(unnamedFields(screen.getByText("Importar leads via CSV").parentElement!)).toEqual([]);
+    expect(unnamedFields(screen.getByRole("dialog", { name: "Importar leads via CSV" }))).toEqual([]);
   });
 
-  it.fails("[FALHA CONHECIDA A-10] erro da importação deveria ser anunciado (role=alert)", async () => {
+  it("[CORRIGIDO 1A A-10] erro da importação deveria ser anunciado (role=alert)", async () => {
     vi.mocked(leadsService.bulkImport).mockRejectedValue(new Error("falhou"));
     renderApp(<LeadImportModal pipelineId="p1" stages={STAGES} defaultStageId="s-novo" onClose={() => undefined} onImported={() => undefined} />);
     const input = document.querySelector("input[type=file]") as HTMLInputElement;
@@ -178,18 +184,19 @@ describe("FALHA CONHECIDA — defeitos da Auditoria 01 (it.fails: verde = defeit
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
     fireEvent.click(screen.getByRole("button", { name: /^Importar/ }));
     await screen.findByText("falhou");
-    const modal = screen.getByText("Importar leads via CSV").parentElement as HTMLElement;
+    const modal = screen.getByRole("dialog", { name: "Importar leads via CSV" });
     expect(within(modal).getByRole("alert").textContent).toContain("falhou");
+    expect(within(modal).getAllByRole("alert")).toHaveLength(1); // sem anúncio duplicado
   });
 
-  it.fails("[FALHA CONHECIDA CFG-06] campos de Configurações (nome do pipeline, da tag, da etapa) deveriam ter nome acessível", async () => {
+  it("[CORRIGIDO 1A CFG-06] campos de Configurações (nome do pipeline, da tag, da etapa) deveriam ter nome acessível", async () => {
     renderApp(<SettingsPage />);
     await screen.findByText("Comercial");
     const named = unnamedFields(screen.getByRole("heading", { name: "Pipelines" }).closest("section")!);
     expect(named).toEqual([]);
   });
 
-  it.fails("[FALHA CONHECIDA CFG-07] formulário de template deveria ter rótulos nos selects e na mensagem", async () => {
+  it("[CORRIGIDO 1A CFG-07] formulário de template deveria ter rótulos nos selects e na mensagem", async () => {
     renderApp(<SettingsPage />);
     await screen.findByText("Comercial");
     const section = screen.getByRole("heading", { name: "Pipeline — mensagens de WhatsApp" }).closest("section")!;
@@ -199,24 +206,25 @@ describe("FALHA CONHECIDA — defeitos da Auditoria 01 (it.fails: verde = defeit
 });
 
 // =============================================================================================
-describe("FALHA NOVA — achados desta fase, não listados na Auditoria 01", () => {
-  it.fails("[FALHA NOVA N-01] campos de data do filtro de período deveriam ter nome acessível", () => {
+describe("Achados da Fase 0 (N-01..N-03) — corrigidos na Fase 1A", () => {
+  it("[CORRIGIDO 1A N-01] campos de data do filtro de período deveriam ter nome acessível", () => {
     renderApp(<PeriodFilter value={{}} onChange={() => undefined} />);
     expect(unnamedFields(document.body)).toEqual([]);
   });
 
-  it.fails("[FALHA NOVA N-02] o seletor de arquivo da importação deveria ter nome acessível", () => {
+  it("[CORRIGIDO 1A N-02] o seletor de arquivo da importação deveria ter nome acessível", () => {
     renderApp(<LeadImportModal pipelineId="p1" stages={STAGES} defaultStageId="s-novo" onClose={() => undefined} onImported={() => undefined} />);
     const file = document.querySelector("input[type=file]") as HTMLElement;
     expect(hasAccessibleName(file)).toBe(true);
   });
 
-  it.fails("[FALHA NOVA N-03] 'Importar' desabilitado por falta da coluna Nome deveria explicar o motivo", async () => {
+  it("[CORRIGIDO 1A N-03] 'Importar' desabilitado por falta da coluna Nome deveria explicar o motivo", async () => {
     renderApp(<LeadImportModal pipelineId="p1" stages={STAGES} defaultStageId="s-novo" onClose={() => undefined} onImported={() => undefined} />);
     const input = document.querySelector("input[type=file]") as HTMLInputElement;
     fireEvent.change(input, { target: { files: [new File(["Telefone\n11999990000"], "x.csv")] } });
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
     expect(screen.getByText(/nome.*obrigat|obrigat.*nome/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Importar/ }).getAttribute("aria-describedby")).toBeTruthy();
   });
 });
 
@@ -256,13 +264,43 @@ describe("contraste de cores — calculado dos tokens reais de src/styles/theme.
     }
   });
 
-  it.fails("[FALHA CONHECIDA A-05] --faint (usado em 'Sem leads' e no drawer) deveria passar 4,5:1 nos dois temas", () => {
-    expect(ratio(dark["faint"]!, dark["card-bg-alt"]!)).toBeGreaterThanOrEqual(4.5); // ≈ 3,46
-    expect(ratio(light["faint"]!, light["card-bg"]!)).toBeGreaterThanOrEqual(4.5); // ≈ 2,94
+  const BGS = ["bg", "card-bg", "card-bg-alt"];
+
+  it("[CORRIGIDO 1A A-05] --faint passa 4,5:1 sobre fundo, card e card alternativo nos dois temas", () => {
+    for (const bg of BGS) {
+      expect(ratio(dark["faint"]!, dark[bg]!), `escuro faint/${bg}`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(light["faint"]!, light[bg]!), `claro faint/${bg}`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
-  it.fails("[FALHA CONHECIDA SYS-02] acento verde do tema claro usado como TEXTO pequeno deveria passar 4,5:1", () => {
-    expect(ratio(light["accent"]!, light["card-bg"]!)).toBeGreaterThanOrEqual(4.5); // ≈ 3,22
+  it("[CORRIGIDO 1A SYS-02] --accent-text (verde como TEXTO) passa 4,5:1 nos dois temas", () => {
+    for (const bg of BGS) {
+      expect(ratio(dark["accent-text"]!, dark[bg]!), `escuro accent-text/${bg}`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(light["accent-text"]!, light[bg]!), `claro accent-text/${bg}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("[PASSA] o verde de FUNDO/BORDA (--accent) segue o mesmo da identidade; só o TEXTO usa --accent-text", () => {
+    expect(light["accent"]).toBe("#12a550");
+    expect(dark["accent"]).toBe("#2ee66e");
+    expect(dark["accent-text"]).toBe(dark["accent"]); // escuro: sem mudança visual
+  });
+
+  it("[PASSA] nenhum CSS usa --accent diretamente como cor de TEXTO (usa --accent-text)", () => {
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = resolve(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith(".css") && !entry.name.includes("theme")) {
+          readFileSync(full, "utf8").split("\n").forEach((line, i) => {
+            if (/^\s*color:\s*var\(--accent\)\s*;/.test(line)) offenders.push(`${entry.name}:${i + 1}`);
+          });
+        }
+      }
+    };
+    walk(resolve(process.cwd(), "src"));
+    expect(offenders).toEqual([]);
   });
 });
 

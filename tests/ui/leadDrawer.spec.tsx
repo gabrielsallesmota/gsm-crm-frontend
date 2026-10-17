@@ -206,6 +206,28 @@ describe("F-14 edição de dados", () => {
     expect(onSaved).toHaveBeenCalled();
   });
 
+  it("DRW-01: todos os campos editáveis são encontrados pelo rótulo e o salvamento leva os valores digitados", async () => {
+    api.update.mockResolvedValue(makeLead());
+    open();
+    edit();
+    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "11911112222" } });
+    fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "novo@example.com" } });
+    fireEvent.change(screen.getByLabelText("Valor"), { target: { value: "250000" } });
+    fireEvent.change(screen.getByLabelText("Probabilidade"), { target: { value: "70" } });
+    fireEvent.change(screen.getByLabelText("Origem"), { target: { value: "google" } });
+    fireEvent.change(screen.getByLabelText("Notas"), { target: { value: "Nota nova" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    await waitFor(() => expect(api.update).toHaveBeenCalledTimes(1));
+    expect(api.update.mock.calls[0]![1]).toMatchObject({
+      email: "novo@example.com",
+      value: 2500,
+      probability: 70,
+      origin: "google",
+      notes: "Nota nova",
+    });
+    expect(String(api.update.mock.calls[0]![1].phone)).toContain("11");
+  });
+
   it("nome vazio desabilita o Salvar", async () => {
     open();
     edit();

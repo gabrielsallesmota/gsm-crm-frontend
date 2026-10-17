@@ -260,7 +260,7 @@ describe("F-25 etapas", () => {
     await waitFor(() => expect(pipes.reorderStages).toHaveBeenCalledWith("p1", ["s-contato", "s-novo", "s-ganho", "s-perdido"]));
   });
 
-  it("excluir etapa: confirmação informa que só etapa SEM leads pode ser excluída (e NÃO cita templates — CFG-03)", async () => {
+  it("CFG-03: excluir etapa: a confirmação informa que só etapa SEM leads pode ser excluída E que os templates da etapa também serão excluídos", async () => {
     pipes.deleteStage.mockResolvedValue(undefined);
     open();
     await screen.findByText("Comercial");
@@ -268,7 +268,7 @@ describe("F-25 etapas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Excluir" }));
     const confirm = await screen.findByRole("dialog", { name: "Excluir etapa?" });
     expect(within(confirm).getByText(/Só é possível excluir uma etapa sem leads/)).toBeTruthy();
-    expect(within(confirm).queryByText(/template/i)).toBeNull();
+    expect(within(confirm).getByText(/templates de mensagem de WhatsApp cadastrados para esta etapa também serão excluídos/)).toBeTruthy();
     fireEvent.click(within(confirm).getByRole("button", { name: "Excluir" }));
     await waitFor(() => expect(pipes.deleteStage).toHaveBeenCalledWith("s-contato"));
     expect(await screen.findByText("Etapa excluída")).toBeTruthy();
@@ -320,13 +320,51 @@ describe("F-26 tags e F-27 origens", () => {
     expect(await screen.findByText("Já existe uma tag com este nome")).toBeTruthy();
   });
 
-  it("remover tag: executa DIRETO, sem confirmação (CFG-02 — falha conhecida, documentada)", async () => {
+  it("CFG-02: remover tag pede confirmação que cita a tag; cancelar NÃO remove", async () => {
+    open();
+    fireEvent.click(await screen.findByRole("button", { name: "Remover tag VIP" }));
+    const confirm = await screen.findByRole("dialog", { name: "Remover tag?" });
+    expect(within(confirm).getByText(/A tag "VIP" será removida/)).toBeTruthy();
+    expect(tags.delete).not.toHaveBeenCalled(); // abrir o diálogo não remove nada
+    fireEvent.click(within(confirm).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Remover tag?" })).toBeNull());
+    expect(tags.delete).not.toHaveBeenCalled();
+    expect(screen.getByText("VIP")).toBeTruthy();
+  });
+
+  it("CFG-02: confirmar remove a tag com a MESMA chamada de antes e avisa só depois do sucesso", async () => {
     tags.delete.mockResolvedValue(undefined);
     open();
     fireEvent.click(await screen.findByRole("button", { name: "Remover tag VIP" }));
+    const confirm = await screen.findByRole("dialog", { name: "Remover tag?" });
+    expect(screen.queryByText("Tag removida")).toBeNull();
+    fireEvent.click(within(confirm).getByRole("button", { name: "Remover" }));
     await waitFor(() => expect(tags.delete).toHaveBeenCalledWith("tg1"));
-    expect(screen.queryByRole("dialog")).toBeNull();
     expect(await screen.findByText("Tag removida")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Remover tag?" })).toBeNull());
+  });
+
+  it("CFG-02: falha ao remover a tag mantém o diálogo aberto, avisa o erro e NÃO diz que removeu", async () => {
+    tags.delete.mockRejectedValue(new ApiError(500, "x"));
+    open();
+    fireEvent.click(await screen.findByRole("button", { name: "Remover tag VIP" }));
+    const confirm = await screen.findByRole("dialog", { name: "Remover tag?" });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Remover" }));
+    expect(await screen.findByText(/Erro inesperado no servidor/)).toBeTruthy();
+    expect(screen.queryByText("Tag removida")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Remover tag?" })).toBeTruthy();
+  });
+
+  it("CFG-02: Esc fecha o diálogo de remoção sem remover e devolve o foco ao botão da tag", async () => {
+    open();
+    const trigger = await screen.findByRole("button", { name: "Remover tag VIP" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    await screen.findByRole("dialog", { name: "Remover tag?" });
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(tags.delete).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 
   it("erro ao carregar as tags: aviso próprio, o resto da página continua", async () => {
@@ -435,13 +473,60 @@ describe("F-28 mensagens de WhatsApp (templates)", () => {
     await waitFor(() => expect(leads.updateMessageTemplate).toHaveBeenCalledWith("a", { origin: null, message: "Nova" }));
   });
 
-  it("excluir template: executa DIRETO, sem confirmação (CFG-02 — falha conhecida, documentada)", async () => {
+  it("CFG-02: excluir template pede confirmação que identifica etapa, origem e mensagem; cancelar NÃO exclui", async () => {
+    leads.listMessageTemplates.mockResolvedValue([
+      makeTemplate({ id: "a", origin: "instagram", message: "Mensagem do Instagram" }),
+    ]);
+    open();
+    fireEvent.click(await screen.findByRole("button", { name: "Excluir" }));
+    const confirm = await screen.findByRole("dialog", { name: "Excluir template?" });
+    expect(within(confirm).getByText(/Comercial — Novo \(Instagram\)/)).toBeTruthy();
+    expect(within(confirm).getByText(/Mensagem do Instagram/)).toBeTruthy();
+    expect(leads.deleteMessageTemplate).not.toHaveBeenCalled();
+    fireEvent.click(within(confirm).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(leads.deleteMessageTemplate).not.toHaveBeenCalled();
+  });
+
+  it("CFG-02: confirmar exclui o template com a MESMA chamada de antes; mensagem de sucesso só depois", async () => {
     leads.listMessageTemplates.mockResolvedValue([makeTemplate({ id: "a" })]);
     leads.deleteMessageTemplate.mockResolvedValue(undefined);
     open();
     fireEvent.click(await screen.findByRole("button", { name: "Excluir" }));
+    const confirm = await screen.findByRole("dialog", { name: "Excluir template?" });
+    expect(within(confirm).getByText(/qualquer origem/)).toBeTruthy(); // coringa
+    expect(screen.queryByText("Template excluído")).toBeNull();
+    fireEvent.click(within(confirm).getByRole("button", { name: "Excluir" }));
     await waitFor(() => expect(leads.deleteMessageTemplate).toHaveBeenCalledWith("a"));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(await screen.findByText("Template excluído")).toBeTruthy();
+  });
+
+  it("CFG-02: falha ao excluir o template mantém o diálogo e não diz que excluiu", async () => {
+    leads.listMessageTemplates.mockResolvedValue([makeTemplate({ id: "a" })]);
+    leads.deleteMessageTemplate.mockRejectedValue(new ApiError(500, "x"));
+    open();
+    fireEvent.click(await screen.findByRole("button", { name: "Excluir" }));
+    const confirm = await screen.findByRole("dialog", { name: "Excluir template?" });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Excluir" }));
+    expect(await screen.findByText(/Erro inesperado no servidor/)).toBeTruthy();
+    expect(screen.queryByText("Template excluído")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Excluir template?" })).toBeTruthy();
+  });
+
+  it("CFG-06/CFG-07: campos de pipeline, etapa, tag e template têm nome acessível", async () => {
+    open();
+    await screen.findByText("Comercial");
+    for (const name of ["Nome do novo pipeline", "Nome da nova tag", "Etapa do template", "Origem do template", "Mensagem do template"]) {
+      expect(screen.getByLabelText(name)).toBeTruthy();
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Editar pipeline Comercial" }));
+    expect(screen.getByLabelText("Nome do pipeline")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(within(pipelineCard("Comercial")).getByRole("button", { name: /Novo/ }));
+    expect(screen.getByLabelText("Nome da etapa")).toBeTruthy();
+    fireEvent.click(within(pipelineCard("Comercial")).getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(within(pipelineCard("Comercial")).getByRole("button", { name: "+ Etapa" }));
+    expect(screen.getByLabelText("Nome da nova etapa")).toBeTruthy();
   });
 
   it("sem pipeline não há formulário de template; orienta a criar um", async () => {

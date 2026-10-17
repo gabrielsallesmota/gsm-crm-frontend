@@ -35,7 +35,7 @@ select:focus {
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 a:hover {

@@ -70,6 +70,7 @@ export function PeriodFilter({
         <input
           type="date"
           className={styles.dateInput}
+          aria-label="Período: data inicial"
           value={value.dateFrom ?? ""}
           onChange={(e) => onChange(withField(value, "dateFrom", e.target.value))}
         />
@@ -77,6 +78,7 @@ export function PeriodFilter({
         <input
           type="date"
           className={styles.dateInput}
+          aria-label="Período: data final"
           value={value.dateTo ?? ""}
           onChange={(e) => onChange(withField(value, "dateTo", e.target.value))}
         />

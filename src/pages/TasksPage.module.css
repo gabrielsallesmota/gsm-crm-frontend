@@ -46,7 +46,7 @@
 .checkbox {
   background: transparent;
   border: none;
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 17px;
 }
 

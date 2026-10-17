@@ -272,6 +272,16 @@ describe("PeriodFilter (F-08)", () => {
     expect(onChange.mock.lastCall![0]).toEqual({});
   });
 
+  it("N-01: os campos de data têm nome acessível e continuam filtrando pela data digitada", () => {
+    const onChange = vi.fn();
+    render(<Controlled onChange={onChange} />);
+    const from = screen.getByLabelText("Período: data inicial");
+    const to = screen.getByLabelText("Período: data final");
+    fireEvent.change(from, { target: { value: "2026-10-01" } });
+    fireEvent.change(to, { target: { value: "2026-10-15" } });
+    expect(onChange.mock.lastCall![0]).toEqual({ dateFrom: "2026-10-01", dateTo: "2026-10-15" });
+  });
+
   it("os presets são calculados UMA vez ao carregar o módulo (caracterização — PIP-07)", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-15T12:00:00"));

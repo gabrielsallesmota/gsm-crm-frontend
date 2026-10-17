@@ -18,7 +18,7 @@
 }
 
 .demoBanner b {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .body {
@@ -124,7 +124,7 @@
 }
 
 .logoAccent {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .logoSub {
@@ -162,7 +162,7 @@
 
 .navItemActive {
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Recolhe/expande a sidebar fixa (desktop/tablet) — some no mobile via

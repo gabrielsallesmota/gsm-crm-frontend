@@ -474,45 +474,50 @@ function KanbanCard({
   onMove: (stage: PipelineStage) => void;
 }) {
   const origin = originOf(lead.origin);
+  // PIP-01: o cartão é um contêiner NEUTRO (arrastável); só a área de resumo é o botão "Abrir lead".
+  // Mover, WhatsApp e e-mail são irmãos desse botão — nenhum controle fica dentro de outro.
   return (
     <div
       className={pending ? `${styles.card} ${styles.cardPending}` : styles.card}
       draggable={!pending}
       onDragStart={onDragStart}
-      onClick={onClick}
-      // Teclado: Tab chega no card, Enter/Espaço abre o lead (lá dá para
-      // trocar a etapa sem arrastar).
-      role="button"
-      tabIndex={0}
-      aria-label={`Abrir ${lead.name}`}
-      onKeyDown={(e) => {
-        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          onClick();
-        }
-      }}
       aria-busy={pending}
     >
-      <div className={styles.cardName}>{lead.name}</div>
-      {lead.company && <div className={styles.cardCompany}>{lead.company}</div>}
-      {lead.lastComment && (
-        // `title` = tooltip nativo com o texto inteiro no hover; o texto
-        // visível já vem truncado por CSS (`.cardComment`, ellipsis).
-        <div className={styles.cardComment} title={lead.lastComment.text}>
-          💬 {lead.lastComment.text}
+      <div
+        className={styles.cardMain}
+        // Teclado: Tab chega na área de resumo, Enter/Espaço abre o lead (lá dá para
+        // trocar a etapa sem arrastar). O conteúdo é só texto (nada interativo dentro).
+        role="button"
+        tabIndex={0}
+        aria-label={`Abrir ${lead.name}`}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+      >
+        <div className={styles.cardName}>{lead.name}</div>
+        {lead.company && <div className={styles.cardCompany}>{lead.company}</div>}
+        {lead.lastComment && (
+          // `title` = tooltip nativo com o texto inteiro no hover; o texto
+          // visível já vem truncado por CSS (`.cardComment`, ellipsis).
+          <div className={styles.cardComment} title={lead.lastComment.text}>
+            💬 {lead.lastComment.text}
+          </div>
+        )}
+        <div className={styles.cardFooter}>
+          <span className={styles.cardValue}>R$ {brl(lead.value)}</span>
+          <Badge label={origin.label} color={origin.color} bg={origin.bg} />
         </div>
-      )}
-      <div className={styles.cardFooter}>
-        <span className={styles.cardValue}>R$ {brl(lead.value)}</span>
-        <Badge label={origin.label} color={origin.color} bg={origin.bg} />
+        <div className={styles.cardOwner}>{ownerName ?? (lead.ownerId ? "—" : "Sem responsável")}</div>
       </div>
-      <div className={styles.cardOwner}>{ownerName ?? (lead.ownerId ? "—" : "Sem responsável")}</div>
       {/* Alternativa ao arrastar (celular/teclado): mover pela lista. */}
       <select
         className={styles.cardMove}
         value={lead.stageId}
         disabled={pending}
-        onClick={(e) => e.stopPropagation()}
         onChange={(e) => {
           const target = stages.find((s) => s.id === e.target.value);
           if (target) onMove(target);

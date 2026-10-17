@@ -303,7 +303,7 @@
 .taskCheck {
   background: transparent;
   border: none;
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 16px;
   padding: 0;
   cursor: pointer;

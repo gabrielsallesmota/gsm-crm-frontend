@@ -24,6 +24,7 @@ import type { Pipeline, PipelineStage } from "../types/pipeline";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { reorderIds } from "../utils/pipelineBoard";
 import type { ProspectStage } from "../types/prospect";
+import type { Tag } from "../types/tag";
 import styles from "./SettingsPage.module.css";
 
 // Mesmo funil padrão semeado automaticamente pelo backend em todo pipeline
@@ -75,6 +76,7 @@ export function SettingsPage() {
   const [newStageFor, setNewStageFor] = useState<string | null>(null);
   const [newStageForm, setNewStageForm] = useState({ label: "", color: "#4aa3ff" });
   const [confirmDeleteStage, setConfirmDeleteStage] = useState<PipelineStage | null>(null);
+  const [confirmDeleteTag, setConfirmDeleteTag] = useState<Tag | null>(null);
   const [confirmDeletePipeline, setConfirmDeletePipeline] = useState<Pipeline | null>(null);
   const [stageForm, setStageForm] = useState({ label: "", color: "#4aa3ff", isWon: false, isLost: false });
   const [editingPipeline, setEditingPipeline] = useState<string | null>(null);
@@ -282,13 +284,15 @@ export function SettingsPage() {
     }
   }
 
-  async function handleDeleteTag(id: string) {
+  async function handleDeleteTag(tag: Tag): Promise<boolean> {
     try {
-      await deleteTag(id);
+      await deleteTag(tag.id);
       toast("Tag removida");
       reloadTags();
+      return true;
     } catch (err) {
       toastError(err, "Não foi possível remover a tag");
+      return false;
     }
   }
 
@@ -315,6 +319,7 @@ export function SettingsPage() {
             <input
               className={styles.input}
               placeholder="Nome do novo pipeline…"
+              aria-label="Nome do novo pipeline"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
             />
@@ -354,6 +359,7 @@ export function SettingsPage() {
                   />
                   <input
                     className={styles.input}
+                    aria-label="Nome do pipeline"
                     value={pipelineForm.name}
                     onChange={(e) => setPipelineForm((f) => ({ ...f, name: e.target.value }))}
                   />
@@ -411,6 +417,7 @@ export function SettingsPage() {
                     <div key={stage.id} className={styles.stageEditForm}>
                       <input
                         className={styles.input}
+                        aria-label="Nome da etapa"
                         value={stageForm.label}
                         onChange={(e) => setStageForm((f) => ({ ...f, label: e.target.value }))}
                       />
@@ -497,6 +504,7 @@ export function SettingsPage() {
                     <input
                       className={styles.input}
                       placeholder="Nome da etapa…"
+                      aria-label="Nome da nova etapa"
                       value={newStageForm.label}
                       onChange={(e) => setNewStageForm((f) => ({ ...f, label: e.target.value }))}
                       autoFocus
@@ -545,9 +553,18 @@ export function SettingsPage() {
       {confirmDeleteStage && (
         <ConfirmDialog
           title="Excluir etapa?"
-          message={`A etapa "${confirmDeleteStage.label}" será excluída. Só é possível excluir uma etapa sem leads — mova os leads antes.`}
+          message={`A etapa "${confirmDeleteStage.label}" será excluída. Só é possível excluir uma etapa sem leads — mova os leads antes. Os templates de mensagem de WhatsApp cadastrados para esta etapa também serão excluídos.`}
           onConfirm={() => handleDeleteStage(confirmDeleteStage)}
           onClose={() => setConfirmDeleteStage(null)}
+        />
+      )}
+      {confirmDeleteTag && (
+        <ConfirmDialog
+          title="Remover tag?"
+          message={`A tag "${confirmDeleteTag.label}" será removida e deixará de aparecer nos leads que a usam. Os leads não são excluídos.`}
+          confirmLabel="Remover"
+          onConfirm={() => handleDeleteTag(confirmDeleteTag)}
+          onClose={() => setConfirmDeleteTag(null)}
         />
       )}
       {confirmDeletePipeline && (
@@ -566,6 +583,7 @@ export function SettingsPage() {
             <input
               className={styles.input}
               placeholder="Nome da nova tag…"
+              aria-label="Nome da nova tag"
               value={newTagLabel}
               onChange={(e) => setNewTagLabel(e.target.value)}
             />
@@ -598,7 +616,7 @@ export function SettingsPage() {
               <button
                 type="button"
                 className={styles.tagDeleteBtn}
-                onClick={() => void handleDeleteTag(tag.id)}
+                onClick={() => setConfirmDeleteTag(tag)}
                 aria-label={`Remover tag ${tag.label}`}
               >
                 ✕
