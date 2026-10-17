@@ -291,6 +291,7 @@ export function ManageStagesModal({
           <input
             className={styles.input}
             placeholder="Nome do novo estágio…"
+            aria-label="Nome do novo estágio"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void handleCreate()}

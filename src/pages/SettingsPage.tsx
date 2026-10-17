@@ -650,6 +650,7 @@ export function SettingsPage() {
               <input
                 className={styles.input}
                 placeholder="Nome do novo estágio…"
+                aria-label="Nome do novo estágio de prospecção"
                 value={newProspectStage.name}
                 onChange={(e) => setNewProspectStage((f) => ({ ...f, name: e.target.value }))}
               />
@@ -708,6 +709,7 @@ export function SettingsPage() {
                   <div key={stage.id} className={styles.stageEditForm}>
                     <input
                       className={styles.input}
+                      aria-label="Nome do estágio de prospecção"
                       value={prospectStageForm.name}
                       onChange={(e) =>
                         setProspectStageForm((f) => ({ ...f, name: e.target.value }))

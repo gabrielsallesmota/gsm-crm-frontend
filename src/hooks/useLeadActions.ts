@@ -20,6 +20,8 @@ export interface LeadActions {
     defaultStageId: string,
     defaultOwnerId: string,
     dedupeStrategy: DedupeStrategy,
+    /** Fase 1B: chave de idempotência do lote (reenviar o mesmo lote não grava de novo). */
+    idempotencyKey?: string,
   ): Promise<ImportSummary>;
   exportCsv(): Promise<string>;
 }
@@ -34,8 +36,15 @@ export function useLeadActions(): LeadActions {
     update: (id, input) => leadsService.update(id, input),
     move: (id, stageId) => leadsService.move(id, stageId),
     delete: (id) => leadsService.delete(id),
-    bulkImport: (rows, pipelineId, defaultStageId, defaultOwnerId, dedupeStrategy) =>
-      leadsService.bulkImport(rows, pipelineId, defaultStageId, defaultOwnerId, dedupeStrategy),
+    bulkImport: (rows, pipelineId, defaultStageId, defaultOwnerId, dedupeStrategy, idempotencyKey) =>
+      leadsService.bulkImport(
+        rows,
+        pipelineId,
+        defaultStageId,
+        defaultOwnerId,
+        dedupeStrategy,
+        idempotencyKey,
+      ),
     exportCsv: () => leadsService.exportCsv(),
   };
 }

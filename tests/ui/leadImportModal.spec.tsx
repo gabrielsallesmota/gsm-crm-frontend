@@ -1,5 +1,5 @@
-// FASE 0 — caracterização da importação de leads (F-10). Descreve o fluxo ATUAL, inclusive seus
-// limites (envio em lote único, descartes silenciosos). Não implementa lotes (D-10 é futuro).
+// FASE 0 (caracterização) + FASE 1B (importação em lotes, D-10): validação antes do envio, lotes
+// de 500 com Idempotency-Key, progresso real, retomada, cancelamento e relatório por linha.
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,7 @@ import { LeadImportModal } from "../../src/components/leads/LeadImportModal";
 import { leadsService } from "../../src/services/LeadsService";
 import { usersService } from "../../src/services/UsersService";
 import { ApiError } from "../../src/types/common";
+import { BATCH_SIZE } from "../../src/utils/leadImport";
 import type { ImportRowInput, ImportSummary } from "../../src/types/lead";
 import { ADMIN, GESTOR, STAGES, VENDEDOR, deferred, renderApp } from "./support/harness";
 
@@ -40,6 +41,7 @@ function open(options: Parameters<typeof renderApp>[1] = {}) {
       defaultStageId="s-novo"
       onClose={onClose}
       onImported={onImported}
+      retrySleep={instantSleep}
     />,
     options,
   );
@@ -55,6 +57,16 @@ async function upload(csv: string | Uint8Array, name = "leads.csv") {
 
 const submit = () => screen.getByRole("button", { name: /^Importar/ }) as HTMLButtonElement;
 const rowsSent = (): ImportRowInput[] => api.bulkImport.mock.calls[0]![0];
+const instantSleep = () => Promise.resolve();
+/** Resposta do servidor para um lote: tudo criado. */
+const created = (rows: ImportRowInput[]): ImportSummary => ({
+  total: rows.length,
+  created: rows.length,
+  updated: 0,
+  skipped: 0,
+  errors: 0,
+  rows: rows.map((r, i) => ({ rowIndex: i, outcome: "created" as const, name: r.name, detail: null })),
+});
 const csvOf = (n: number) =>
   ["Nome,Telefone", ...Array.from({ length: n }, (_, i) => `Lead ${i},11${String(900000000 + i)}`)].join("\n");
 
@@ -175,23 +187,36 @@ describe("F-10 mapeamento", () => {
     expect(rowsSent()).toEqual([{ name: "Aninha" }]);
   });
 
-  it("linhas sem nome saem do lote em silêncio; o botão conta só as válidas (caracterização)", async () => {
+  it("1B: linhas sem nome NÃO são enviadas, mas aparecem na pré-importação (e depois no relatório)", async () => {
     open();
     await upload("Nome,Telefone\nAna,1\n,2\nBia,3\n   ,4");
     await screen.findByText(/4 linha\(s\) encontrada\(s\)/);
     expect(submit().textContent).toBe("Importar 2 lead(s)");
+    const preview = screen.getByRole("region", { name: "Pré-importação" });
+    expect(preview.textContent).toMatch(/Linhas:\s*4.*Válidas:\s*2.*Inválidas:\s*2/s);
+    expect(preview.textContent).toMatch(/linha 3: Nome é obrigatório/);
     fireEvent.click(submit());
     await waitFor(() => expect(api.bulkImport).toHaveBeenCalled());
     expect(rowsSent().map((r) => r.name)).toEqual(["Ana", "Bia"]);
   });
 
-  it("origem reconhecida é normalizada; origem desconhecida é DESCARTADA em silêncio e o lead segue", async () => {
+  it("origem reconhecida é normalizada; origem desconhecida segue SEM origem e a pré-importação avisa", async () => {
     open();
     await upload("Nome,Origem\nAna,WhatsApp\nBia,Indicação do vizinho");
     await screen.findByText(/2 linha\(s\) encontrada\(s\)/);
     fireEvent.click(submit());
     await waitFor(() => expect(api.bulkImport).toHaveBeenCalled());
     expect(rowsSent()).toEqual([{ name: "Ana", origin: "whatsapp" }, { name: "Bia" }]);
+  });
+
+  it("1B: origem desconhecida e telefone curto geram AVISO antes de importar", async () => {
+    open();
+    await upload("Nome,Origem,Telefone\nAna,Indicação do vizinho,123");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    const preview = screen.getByRole("region", { name: "Pré-importação" });
+    expect(preview.textContent).toMatch(/1 linha\(s\) com origem desconhecida/);
+    expect(preview.textContent).toMatch(/1 linha\(s\) com telefone curto/);
+    expect(preview.textContent).toMatch(/apenas que passou/);
   });
 
   it("telefone e e-mail inválidos NÃO são validados no navegador (vão como estão; o servidor decide)", async () => {
@@ -223,7 +248,14 @@ describe("F-10 parâmetros da importação e permissões", () => {
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
     fireEvent.click(submit());
     await waitFor(() => expect(api.bulkImport).toHaveBeenCalled());
-    expect(api.bulkImport).toHaveBeenCalledWith([{ name: "Ana" }], "p1", "s-novo", "u-admin", "skip");
+    expect(api.bulkImport).toHaveBeenCalledWith(
+      [{ name: "Ana" }],
+      "p1",
+      "s-novo",
+      "u-admin",
+      "skip",
+      expect.stringMatching(/^imp-[a-z0-9]+-0000$/),
+    );
   });
 
   it.each([
@@ -279,86 +311,238 @@ describe("F-10 parâmetros da importação e permissões", () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-describe("F-10 limites de volume (caracterização do que a TELA faz; o limite de 2.000 é do servidor)", () => {
-  it.each([1, 500, 2000, 2001, 10000])(
-    "%i linha(s): a tela envia TODAS em UMA chamada, sem lotes e sem aviso de limite",
-    async (n) => {
+describe("1B limites e lotes (D-10)", () => {
+  it.each([
+    [1, 1],
+    [500, 1],
+    [501, 2],
+    [2000, 4],
+    [2001, 5],
+    [10000, 20],
+  ])(
+    "%i linha(s): enviadas em %i lote(s) de até 500, em ordem, sem perder nenhuma",
+    async (n, calls) => {
+      api.bulkImport.mockImplementation(async (rows) => created(rows));
       open();
       await upload(csvOf(n));
       await screen.findByText(new RegExp(`${n} linha\\(s\\) encontrada\\(s\\)`));
       expect(submit().textContent).toBe(`Importar ${n} lead(s)`);
-      expect(submit().disabled).toBe(false);
+      expect(screen.getByRole("region", { name: "Pré-importação" }).textContent).toMatch(
+        new RegExp(`Lotes:\\s*${calls}`),
+      );
       fireEvent.click(submit());
-      await waitFor(() => expect(api.bulkImport).toHaveBeenCalledTimes(1));
-      expect(rowsSent()).toHaveLength(n);
-      expect(screen.queryByText(/limite|máximo|2\.?000/i)).toBeNull();
+      await screen.findByText("Concluído", undefined, { timeout: 20000 });
+      expect(api.bulkImport).toHaveBeenCalledTimes(calls);
+      const sent = api.bulkImport.mock.calls.map((c) => c[0]);
+      expect(sent.every((rows) => rows.length <= BATCH_SIZE)).toBe(true);
+      expect(sent.flat()).toHaveLength(n);
+      expect(sent.flat().map((r) => r.name)).toEqual(Array.from({ length: n }, (_, i) => `Lead ${i}`));
+      const keys = api.bulkImport.mock.calls.map((c) => c[5]);
+      expect(new Set(keys).size).toBe(calls); // uma chave por lote
     },
-    30000,
+    60000,
   );
+
+  it("10.001 linhas: bloqueado ANTES de enviar qualquer coisa, com mensagem clara", async () => {
+    open();
+    await upload(csvOf(10001));
+    expect(await screen.findByText(/limite é 10\.000/)).toBeTruthy();
+    expect(screen.getByText(/Nada foi importado/)).toBeTruthy();
+    expect(submit().disabled).toBe(true);
+    expect(api.bulkImport).not.toHaveBeenCalled();
+  });
+
+  it("arquivo acima de 5 MB é recusado antes de processar", async () => {
+    open();
+    const input = document.querySelector("input[type=file]") as HTMLInputElement;
+    const big = new File(["Nome\nAna"], "grande.csv", { type: "text/csv" });
+    Object.defineProperty(big, "size", { value: 6 * 1024 * 1024 });
+    fireEvent.change(input, { target: { files: [big] } });
+    expect(await screen.findByText(/limite é 5 MB/)).toBeTruthy();
+    expect(api.bulkImport).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------------------------
-describe("F-10 processamento e resultado", () => {
-  it("durante a importação: botão mostra 'Importando…' e Cancelar fica desabilitado", async () => {
-    const pending = deferred<ImportSummary>();
-    api.bulkImport.mockReturnValue(pending.promise);
+describe("F-10 / 1B processamento, progresso e resultado", () => {
+  it("durante a importação: barra de progresso real, contadores e 'Cancelar importação'", async () => {
+    const first = deferred<ImportSummary>();
+    api.bulkImport.mockReturnValueOnce(first.promise);
+    api.bulkImport.mockImplementation(async (rows) => created(rows));
     open();
-    await upload("Nome\nAna");
-    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    await upload(csvOf(600));
+    await screen.findByText(/600 linha\(s\) encontrada\(s\)/);
     fireEvent.click(submit());
-    expect(await screen.findByRole("button", { name: "Importando…" })).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Cancelar" }) as HTMLButtonElement).disabled).toBe(true);
-    pending.resolve(SUMMARY);
-    expect(await screen.findByText("Criados:")).toBeTruthy();
+    const bar = (await screen.findByRole("progressbar", { name: "Progresso da importação" })) as HTMLProgressElement;
+    expect(bar.max).toBe(600);
+    expect(bar.value).toBe(0);
+    expect(screen.getByText(/Enviando lote 1 de 2/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Cancelar importação" }) as HTMLButtonElement).disabled).toBe(false);
+    first.resolve(created(Array.from({ length: 500 }, (_, i) => ({ name: `Lead ${i}` }))));
+    await screen.findByText("Concluído");
+    expect(screen.getByText(/Criados:/).textContent).toMatch(/600/);
   });
 
-  it("resumo com totais; erros listados por linha (nº e nome); 'Ver no pipeline' recarrega e fecha", async () => {
+  it("resumo com totais por categoria; motivos por linha com o NÚMERO ORIGINAL; 'Ver no pipeline' recarrega e fecha", async () => {
     api.bulkImport.mockResolvedValue({
-      total: 5,
-      created: 2,
+      total: 4,
+      created: 1,
       updated: 1,
-      skipped: 1,
-      errors: 1,
+      skipped: 2,
+      errors: 0,
       rows: [
         { rowIndex: 0, outcome: "created", name: "Ana", detail: null },
-        { rowIndex: 3, outcome: "skipped", name: "Bia", detail: "Telefone já cadastrado para 'Bia'" },
-        { rowIndex: 4, outcome: "error", name: "", detail: "Nome obrigatório" },
+        { rowIndex: 1, outcome: "updated", name: "Caio", detail: null },
+        { rowIndex: 2, outcome: "skipped", name: "Bia", detail: "Telefone já cadastrado para 'Bia'", reason: "duplicate" },
+        { rowIndex: 3, outcome: "skipped", name: "Dani", detail: "Telefone pertence a outro responsável", reason: "permission" },
       ],
     });
     const { onImported, onClose } = open();
-    await upload("Nome\nAna");
-    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    await upload("Nome,Telefone\nAna,1\nCaio,2\nBia,3\nDani,4\n,5");
+    await screen.findByText(/5 linha\(s\) encontrada\(s\)/);
     fireEvent.click(submit());
-    expect(await screen.findByText("Linhas processadas:")).toBeTruthy();
+    expect(await screen.findByText("Concluído com erros")).toBeTruthy();
     const stats = document.querySelector("[class*='summaryStats']") as HTMLElement;
-    expect(stats.textContent).toMatch(/processadas:\s*5.*Criados:\s*2.*Atualizados:\s*1.*Ignorados:\s*1.*erro:\s*1/s);
-    expect(screen.getByText(/Linha 5 \(sem nome\): Nome obrigatório/)).toBeTruthy();
-    // caracterização (IMP-07): o MOTIVO de cada linha ignorada não é exibido
-    expect(screen.queryByText(/Telefone já cadastrado/)).toBeNull();
+    expect(stats.textContent).toMatch(/arquivo:\s*5.*Criados:\s*1.*Atualizados:\s*1.*ignorados:\s*1.*permissão:\s*1.*validação:\s*1/s);
+    const list = screen.getByLabelText("Linhas que precisam de atenção");
+    expect(list.textContent).toMatch(/Linha 4 \(Bia\) — Duplicado ignorado: Telefone já cadastrado/);
+    expect(list.textContent).toMatch(/Linha 5 \(Dani\) — Sem permissão/);
+    expect(list.textContent).toMatch(/Linha 6 \(sem nome\) — Falha de validação: Nome é obrigatório/);
+    expect(screen.getByRole("button", { name: "Baixar relatório (CSV)" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Ver no pipeline" }));
     expect(onImported).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("falha da API: mensagem do erro em texto, lote preservado para nova tentativa", async () => {
+  it("falha NÃO recuperável (422): para no lote, mostra a mensagem e oferece retomar sem reenviar o arquivo", async () => {
     api.bulkImport.mockRejectedValueOnce(new ApiError(422, "Falha de validação do lote"));
     open();
     await upload("Nome\nAna");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
     fireEvent.click(submit());
-    expect(await screen.findByText("Falha de validação do lote")).toBeTruthy();
-    expect(submit().disabled).toBe(false); // continua possível tentar de novo sem reenviar o arquivo
-    fireEvent.click(submit());
-    await waitFor(() => expect(api.bulkImport).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("Falhou")).toBeTruthy();
+    expect(within(screen.getByRole("dialog")).getByRole("alert").textContent).toMatch(/Falha de validação do lote.*lote 1 de 1/);
+    expect(api.bulkImport).toHaveBeenCalledTimes(1); // 422 não é repetido às cegas
+    api.bulkImport.mockImplementation(async (rows) => created(rows));
+    fireEvent.click(screen.getByRole("button", { name: "Retomar importação" }));
+    await screen.findByText("Concluído");
+    expect(api.bulkImport).toHaveBeenCalledTimes(2);
   });
 
-  it("422 de lote grande vira mensagem genérica quando o servidor não explica (sem dica de limite)", async () => {
-    api.bulkImport.mockRejectedValueOnce(new ApiError(500, ""));
+  it("falha do servidor (500) e de rede: repete o MESMO lote com a MESMA chave e conclui sem duplicar", async () => {
+    api.bulkImport
+      .mockRejectedValueOnce(new ApiError(500, ""))
+      .mockRejectedValueOnce(new ApiError(0, "sem rede"))
+      .mockImplementation(async (rows) => created(rows));
+    open();
+    await upload("Nome\nAna");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(api.bulkImport).toHaveBeenCalledTimes(3);
+    const keys = api.bulkImport.mock.calls.map((c) => c[5]);
+    expect(new Set(keys).size).toBe(1);
+  });
+
+  it("500 persistente: após as tentativas a importação falha com mensagem em texto e o lote vira 'não confirmado'", async () => {
+    api.bulkImport.mockRejectedValue(new ApiError(500, ""));
     open();
     await upload("Nome\nAna");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
     fireEvent.click(submit());
     expect(await screen.findByText(/Erro inesperado no servidor/)).toBeTruthy();
+    expect(api.bulkImport).toHaveBeenCalledTimes(3);
+    expect(screen.getByLabelText("Linhas que precisam de atenção").textContent).toMatch(/Erro de processamento/);
+  });
+
+  it("falha parcial: lotes anteriores ficam gravados; retomar reenvia SÓ o que faltou", async () => {
+    api.bulkImport
+      .mockImplementationOnce(async (rows) => created(rows))
+      .mockRejectedValueOnce(new ApiError(403, "Sessão sem permissão"));
+    open();
+    await upload(csvOf(1000));
+    await screen.findByText(/1000 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(submit());
+    expect(await screen.findByText("Falhou")).toBeTruthy();
+    expect(screen.getByText(/Criados:/).textContent).toMatch(/500/);
+    expect(within(screen.getByRole("dialog")).getByRole("alert").textContent).toMatch(/lote 2 de 2/);
+    api.bulkImport.mockImplementation(async (rows) => created(rows));
+    fireEvent.click(screen.getByRole("button", { name: "Retomar importação" }));
+    await screen.findByText("Concluído");
+    expect(api.bulkImport).toHaveBeenCalledTimes(3); // 1 ok + 1 falho + 1 retomado (o lote 1 NÃO volta)
+    const keys = api.bulkImport.mock.calls.map((c) => c[5]);
+    expect(keys[1]).toBe(keys[2]); // o lote que falhou é reenviado com a mesma chave
+    expect(keys[0]).not.toBe(keys[1]);
+    expect(screen.getByText(/Criados:/).textContent).toMatch(/1\.000/);
+  });
+
+  it("cancelar interrompe DEPOIS do lote em andamento e informa o que ficou sem processar", async () => {
+    const first = deferred<ImportSummary>();
+    api.bulkImport.mockReturnValueOnce(first.promise);
+    open();
+    await upload(csvOf(1200));
+    await screen.findByText(/1200 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(submit());
+    await screen.findByRole("progressbar");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar importação" }));
+    first.resolve(created(Array.from({ length: 500 }, (_, i) => ({ name: `Lead ${i}` }))));
+    expect(await screen.findByText("Cancelada")).toBeTruthy();
+    expect(api.bulkImport).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Criados:/).textContent).toMatch(/500/);
+    expect(screen.getByLabelText("Linhas que precisam de atenção").textContent).toMatch(/Não processado/);
+    expect(screen.getByRole("button", { name: "Retomar importação" })).toBeTruthy();
+  });
+
+  it("estratégia 'duplicar' + falha de rede: o reenvio usa a mesma chave (o servidor devolve o lote já gravado)", async () => {
+    api.bulkImport
+      .mockRejectedValueOnce(new ApiError(0, "timeout"))
+      .mockImplementation(async (rows) => created(rows));
+    open();
+    await upload("Nome,Telefone\nAna,11999990000");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    fireEvent.change(screen.getByLabelText("Se o telefone já existir"), { target: { value: "duplicate" } });
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    const [a, b] = api.bulkImport.mock.calls;
+    expect(a![5]).toBe(b![5]);
+    expect(a![4]).toBe("duplicate");
+  });
+
+  it("fechar a aba durante o envio pede confirmação (beforeunload) e só enquanto roda", async () => {
+    const pending = deferred<ImportSummary>();
+    api.bulkImport.mockReturnValue(pending.promise);
+    open();
+    await upload("Nome\nAna");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    const idle = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(idle);
+    expect(idle.defaultPrevented).toBe(false);
+    fireEvent.click(submit());
+    await screen.findByRole("progressbar");
+    const running = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(running);
+    expect(running.defaultPrevented).toBe(true);
+    pending.resolve(SUMMARY);
+    await screen.findByText("Concluído");
+  });
+
+  it("recarregar a página e reenviar a MESMA planilha com os MESMOS parâmetros reaproveita a identidade da importação", async () => {
+    api.bulkImport.mockRejectedValue(new ApiError(403, "Sem permissão"));
+    const first = open();
+    await upload("Nome\nAna");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(submit());
+    await screen.findByText("Falhou");
+    const keyBefore = api.bulkImport.mock.calls[0]![5];
+    first.unmount(); // “recarregou a página”
+    api.bulkImport.mockImplementation(async (rows) => created(rows));
+    open();
+    await upload("Nome\nAna");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(api.bulkImport.mock.calls.at(-1)![5]).toBe(keyBefore);
+    expect(screen.getByText(/retomou uma importação interrompida/)).toBeTruthy();
   });
 
   it("Cancelar fecha a importação sem enviar nada", async () => {
@@ -394,21 +578,21 @@ describe("F-10 processamento e resultado", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("IMP-01: durante o envio nada fecha o diálogo (Esc, fundo, × e Cancelar)", async () => {
+  it("IMP-01: durante o envio nada fecha o diálogo (Esc, fundo e ×)", async () => {
     const pending = deferred<ImportSummary>();
     api.bulkImport.mockReturnValue(pending.promise);
     const { onClose } = open();
     await upload("Nome\nAna");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
     fireEvent.click(submit());
-    await screen.findByRole("button", { name: "Importando…" });
+    await screen.findByRole("progressbar");
     fireEvent.keyDown(document, { key: "Escape" });
     fireEvent.mouseDown(screen.getByRole("dialog").parentElement as HTMLElement);
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     await new Promise((r) => setTimeout(r, 20));
     expect(onClose).not.toHaveBeenCalled();
     pending.resolve(SUMMARY);
-    await screen.findByText("Criados:");
+    await screen.findByText("Concluído");
   });
 
   it("IMP-01: o foco volta para quem abriu a importação ao fechar", async () => {
@@ -442,7 +626,7 @@ describe("F-10 processamento e resultado", () => {
     fireEvent.click(submit());
     const dialog = screen.getByRole("dialog", { name: "Importar leads via CSV" });
     const alert = await within(dialog).findByRole("alert");
-    expect(alert.textContent).toBe("Lote recusado");
+    expect(alert.textContent).toMatch(/^Lote recusado/);
     expect(within(dialog).getAllByRole("alert")).toHaveLength(1);
   });
 

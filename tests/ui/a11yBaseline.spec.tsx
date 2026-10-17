@@ -36,6 +36,7 @@ import { prospectsService } from "../../src/services/ProspectsService";
 import { tagsService } from "../../src/services/TagsService";
 import { tasksService } from "../../src/services/TasksService";
 import { usersService } from "../../src/services/UsersService";
+import { ApiError } from "../../src/types/common";
 import { STAGES, makeLead, makePipeline, page, renderApp } from "./support/harness";
 
 afterEach(cleanup);
@@ -144,10 +145,10 @@ describe("Auditoria 01 — corrigidos na Fase 1A (testes comuns) e pendentes (it
     expect(card.contains(wrapper.querySelector("select"))).toBe(false);
   });
 
-  it.fails("[FALHA CONHECIDA PIP-04] reordenar colunas deveria ter alternativa por teclado no próprio quadro", async () => {
+  it("[CORRIGIDO 1B PIP-04] reordenar colunas tem alternativa por teclado no próprio quadro", async () => {
     renderApp(<PipelinePage />);
     await screen.findByText("Maria Souza");
-    expect(screen.getAllByRole("button", { name: /Mover coluna|Mover etapa/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /Mover etapa .* para a (esquerda|direita)/ }).length).toBe(STAGES.length * 2);
   });
 
   it("[CORRIGIDO 1A DRW-01] todos os campos do painel em edição deveriam ter nome acessível", async () => {
@@ -177,13 +178,13 @@ describe("Auditoria 01 — corrigidos na Fase 1A (testes comuns) e pendentes (it
   });
 
   it("[CORRIGIDO 1A A-10] erro da importação deveria ser anunciado (role=alert)", async () => {
-    vi.mocked(leadsService.bulkImport).mockRejectedValue(new Error("falhou"));
+    vi.mocked(leadsService.bulkImport).mockRejectedValue(new ApiError(422, "falhou"));
     renderApp(<LeadImportModal pipelineId="p1" stages={STAGES} defaultStageId="s-novo" onClose={() => undefined} onImported={() => undefined} />);
     const input = document.querySelector("input[type=file]") as HTMLInputElement;
     fireEvent.change(input, { target: { files: [new File(["Nome\nAna"], "x.csv")] } });
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
     fireEvent.click(screen.getByRole("button", { name: /^Importar/ }));
-    await screen.findByText("falhou");
+    await screen.findAllByText(/falhou/);
     const modal = screen.getByRole("dialog", { name: "Importar leads via CSV" });
     expect(within(modal).getByRole("alert").textContent).toContain("falhou");
     expect(within(modal).getAllByRole("alert")).toHaveLength(1); // sem anúncio duplicado

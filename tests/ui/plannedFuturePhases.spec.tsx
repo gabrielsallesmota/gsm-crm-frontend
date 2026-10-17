@@ -3,15 +3,8 @@
 // docs/ux-redesign/fase-0-testes/07_TESTES_FUTUROS.md.
 import { describe, it } from "vitest";
 
-describe("PLANEJADO — D-10 importação em lotes (até 10.000 linhas, lotes de 500, com progresso)", () => {
-  it.todo("10.000 linhas são divididas em 20 requisições de até 500, em ordem");
-  it.todo("a barra de progresso reflete lotes concluídos/total e o botão Cancelar interrompe após o lote atual");
-  it.todo("falha em um lote: os anteriores permanecem e o relatório final lista as linhas do lote que falhou");
-  it.todo("reprocessar o mesmo arquivo com 'ignorar duplicados' não cria leads repetidos");
-  it.todo("duplicado ENTRE lotes respeita a estratégia escolhida");
-  it.todo("o relatório final mostra criados/atualizados/ignorados (com motivo)/erros por linha e permite baixar");
-  it.todo("fechar o assistente durante o processamento pede confirmação e não perde o progresso");
-});
+// D-10 (importação em lotes) foi implementado na Fase 1B: cenários em leadImportModal.spec.tsx,
+// tests/leadImport.test.ts e test_import_batches_and_sorting_1b.py.
 
 describe("PLANEJADO — D-03 lead perdido", () => {
   it.todo("mover para etapa 'Perdido' pede confirmação (card e painel) e cancelar mantém a etapa original");

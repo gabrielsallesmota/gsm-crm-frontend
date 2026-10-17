@@ -172,6 +172,7 @@ function TemplateForm({
       <div className={styles.formRow}>
         <select
           className={styles.select}
+          aria-label="Estágio da mensagem"
           value={stageId}
           onChange={(e) => setStageId(e.target.value)}
           disabled={Boolean(existing)}
@@ -185,6 +186,7 @@ function TemplateForm({
         <input
           className={styles.input}
           placeholder="Área (opcional — em branco = coringa do estágio)"
+          aria-label="Área (opcional — em branco = coringa do estágio)"
           value={niche}
           onChange={(e) => setNiche(e.target.value)}
         />
@@ -192,6 +194,7 @@ function TemplateForm({
       <textarea
         className={styles.textarea}
         rows={3}
+        aria-label="Mensagem de WhatsApp"
         placeholder="Olá {empresa}, tudo bem? Notei que vocês atuam com {servico_principal}…"
         value={message}
         onChange={(e) => setMessage(e.target.value)}

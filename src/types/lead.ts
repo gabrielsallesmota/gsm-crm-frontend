@@ -141,6 +141,8 @@ export interface ImportRowResult {
   outcome: "created" | "updated" | "skipped" | "error";
   name: string;
   detail: string | null;
+  /** Motivo estável (Fase 1B): ausente em created/updated. */
+  reason?: "validation" | "duplicate" | "permission" | null;
 }
 
 export interface ImportSummary {

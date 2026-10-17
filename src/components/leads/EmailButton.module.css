@@ -21,4 +21,14 @@
 .btnSmall {
   padding: 4px 9px;
   font-size: 11px;
+  /* PIP-12: alvo de toque mínimo (WCAG 2.2 — 24px); maior em telas de toque. */
+  min-height: 28px;
+  min-width: 28px;
+}
+
+@media (pointer: coarse) {
+  .btnSmall {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }

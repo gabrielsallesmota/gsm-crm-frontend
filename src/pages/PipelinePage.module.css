@@ -121,6 +121,41 @@
   color: var(--text);
 }
 
+/* PIP-04: reordenar etapas sem arrastar. Alvo de toque mínimo de 28px (44px em tela de toque). */
+.stageMoves {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.stageMove {
+  min-width: 28px;
+  min-height: 28px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stageMove:hover:not(:disabled) {
+  background: var(--hover-bg-2);
+  color: var(--text);
+}
+
+.stageMove:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+@media (pointer: coarse) {
+  .stageMove {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 .columnCount {
   font-size: 11.5px;
   color: var(--muted);
@@ -141,6 +176,7 @@
   border-radius: 12px;
   padding: 12px;
   cursor: grab;
+  position: relative; /* contém o seletor 'mover' visualmente oculto (PIP-05) */
 }
 
 .cardMain {
@@ -202,8 +238,10 @@
   margin-top: 6px;
 }
 
-/* Mover por lista: sempre disponível em telas de toque/estreitas, onde
-   arrastar não funciona; no desktop com mouse fica escondido. */
+/* Mover por lista: sempre disponível em telas de toque/estreitas, onde arrastar não funciona. No
+   desktop com mouse fica VISUALMENTE oculto (sem `display: none`, que o tiraria da árvore de
+   acessibilidade e do Tab — PIP-05): continua alcançável por teclado/leitor de tela e aparece
+   quando o foco chega ao cartão. */
 .cardMove {
   margin-top: 8px;
   width: 100%;
@@ -216,8 +254,29 @@
 }
 
 @media (hover: hover) and (pointer: fine) and (min-width: 761px) {
-  .cardMove {
-    display: none;
+  .cardMove:not(:focus) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .card:has(:focus-visible) .cardMove {
+    position: static;
+    width: 100%;
+    height: auto;
+    margin: 8px 0 0;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
   }
 }
 

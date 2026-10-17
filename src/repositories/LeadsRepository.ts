@@ -29,6 +29,8 @@ export interface LeadsRepository {
     defaultStageId: string,
     defaultOwnerId: string,
     dedupeStrategy: DedupeStrategy,
+    /** Fase 1B: chave de idempotência do lote (reenviar o mesmo lote não grava de novo). */
+    idempotencyKey?: string,
   ): Promise<ImportSummary>;
   exportCsv(): Promise<string>;
 

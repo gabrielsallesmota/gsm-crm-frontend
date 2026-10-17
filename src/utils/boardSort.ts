@@ -1,9 +1,9 @@
-/** Ordenação client-side dos cards dentro de cada coluna do Kanban (Pipeline
- * de leads e Prospecção) — pedido explícito do usuário ("A-Z, Z-A, Data e
- * etc"). Deliberadamente client-side, não uma troca de `sortBy`/`sortDir` no
- * fetch: os boards já carregam a página inteira (200 itens) e reagrupam por
- * estágio no front, então reordenar aqui é instantâneo e não pede um
- * round-trip novo pra API a cada troca de critério. */
+/** Opções de ordenação dos cards dentro de cada coluna do Kanban.
+ *
+ * - Pipeline de LEADS (Fase 1B, PIP-02): a ordenação é GLOBAL e feita pelo SERVIDOR — a coluna só
+ *   carrega 25 cards por vez, então ordenar só os já carregados mostrava uma ordem falsa. Use
+ *   `serverSortFor` para traduzir a opção em `sortBy`/`sortDir` da listagem.
+ * - Prospecção (`sortBoardItems`): segue client-side, sobre os itens que o quadro já carregou. */
 export type BoardSortOption = "none" | "az" | "za" | "date_desc" | "date_asc";
 
 export const BOARD_SORT_OPTIONS: { value: BoardSortOption; label: string }[] = [
@@ -13,6 +13,23 @@ export const BOARD_SORT_OPTIONS: { value: BoardSortOption; label: string }[] = [
   { value: "date_desc", label: "Mais recentes primeiro" },
   { value: "date_asc", label: "Mais antigos primeiro" },
 ];
+
+/** Opção da tela → ordenação enviada ao servidor. "padrão" não envia nada (padrão do servidor:
+ * mais recentes primeiro, desempate por id). */
+export function serverSortFor(option: BoardSortOption): { sortBy?: string; sortDir?: "asc" | "desc" } {
+  switch (option) {
+    case "az":
+      return { sortBy: "name", sortDir: "asc" };
+    case "za":
+      return { sortBy: "name", sortDir: "desc" };
+    case "date_desc":
+      return { sortBy: "created_at", sortDir: "desc" };
+    case "date_asc":
+      return { sortBy: "created_at", sortDir: "asc" };
+    default:
+      return {};
+  }
+}
 
 export function sortBoardItems<T>(
   items: T[],

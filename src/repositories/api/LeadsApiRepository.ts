@@ -244,6 +244,7 @@ export class LeadsApiRepository implements LeadsRepository {
     defaultStageId: string,
     defaultOwnerId: string,
     dedupeStrategy: DedupeStrategy,
+    idempotencyKey?: string,
   ): Promise<ImportSummary> {
     const dto = await apiRequest<{
       total: number;
@@ -256,9 +257,11 @@ export class LeadsApiRepository implements LeadsRepository {
         outcome: ImportSummary["rows"][number]["outcome"];
         name: string;
         detail: string | null;
+        reason?: ImportSummary["rows"][number]["reason"];
       }[];
     }>("/api/v1/leads/bulk-import", {
       method: "POST",
+      ...(idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : {}),
       body: JSON.stringify({
         pipeline_id: pipelineId,
         default_stage_id: defaultStageId,
@@ -278,6 +281,7 @@ export class LeadsApiRepository implements LeadsRepository {
         outcome: r.outcome,
         name: r.name,
         detail: r.detail,
+        reason: r.reason ?? null,
       })),
     };
   }

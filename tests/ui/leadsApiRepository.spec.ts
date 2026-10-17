@@ -134,3 +134,41 @@ describe("LeadsApiRepository — mapeamento do DTO", () => {
     await expect(new LeadsApiRepository().get("x")).rejects.toMatchObject({ status: 404 });
   });
 });
+
+describe("LeadsApiRepository — importação em lotes (Fase 1B)", () => {
+  const SUMMARY_DTO = {
+    total: 2,
+    created: 1,
+    updated: 0,
+    skipped: 1,
+    errors: 0,
+    rows: [
+      { row_index: 0, outcome: "created", name: "Ana", detail: null },
+      { row_index: 1, outcome: "skipped", name: "Bia", detail: "Telefone já cadastrado", reason: "duplicate" },
+    ],
+  };
+
+  it("envia o header Idempotency-Key do lote e mapeia o `reason` por linha", async () => {
+    const fetchMock = mockFetch(SUMMARY_DTO);
+    const out = await new LeadsApiRepository().bulkImport(
+      [{ name: "Ana" }, { name: "Bia" }],
+      "pipe-1",
+      "stage-1",
+      "user-1",
+      "skip",
+      "imp-abc-0003",
+    );
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(new Headers(init.headers).get("Idempotency-Key")).toBe("imp-abc-0003");
+    expect(calledUrl(fetchMock).pathname).toBe("/api/v1/leads/bulk-import");
+    expect(out.rows.map((r) => r.reason)).toEqual([null, "duplicate"]);
+    expect(out.rows[1]!.rowIndex).toBe(1);
+  });
+
+  it("sem chave (uso antigo) não manda o header", async () => {
+    const fetchMock = mockFetch(SUMMARY_DTO);
+    await new LeadsApiRepository().bulkImport([{ name: "Ana" }], "pipe-1", "stage-1", "user-1", "skip");
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(new Headers(init.headers).has("Idempotency-Key")).toBe(false);
+  });
+});

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePipelines } from "../hooks/usePipelines";
 import { usePipelineActions } from "../hooks/usePipelineActions";
@@ -30,7 +30,7 @@ const ProspectionBoard = lazy(() =>
   import("../components/prospects/ProspectionBoard").then((m) => ({ default: m.ProspectionBoard })),
 );
 import { originOf } from "../constants/origins";
-import { BOARD_SORT_OPTIONS, sortBoardItems, type BoardSortOption } from "../utils/boardSort";
+import { BOARD_SORT_OPTIONS, serverSortFor, type BoardSortOption } from "../utils/boardSort";
 import { brl } from "../utils/currency";
 import { findLead, hasMore, reorderIds } from "../utils/pipelineBoard";
 import { EMPTY_PERIOD, type Period } from "../utils/periods";
@@ -131,8 +131,11 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   // "" = todos; "__none__" = sem responsável; senão o id do dono.
   const [ownerFilter, setOwnerFilter] = useState("");
+  // Ordenação GLOBAL: vai para o servidor junto com os demais filtros (PIP-02).
+  const [sortOption, setSortOption] = useState<BoardSortOption>("none");
   const filter: BoardFilter = {
     ...period,
+    ...serverSortFor(sortOption),
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(ownerFilter === "__none__" ? { unassigned: true } : ownerFilter ? { ownerId: ownerFilter } : {}),
   };
@@ -155,7 +158,6 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
       setSearchParams(searchParams, { replace: true });
     }
   }
-  const [sortOption, setSortOption] = useState<BoardSortOption>("none");
 
   const ownerNames = new Map((team ?? []).map((m) => [m.id, m.name]));
 
@@ -168,6 +170,44 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
       toast("Aguarde: este lead ainda está sendo movido.", "warning");
     } else if (result.reason === "error") {
       toastError(result.error, "Não foi possível mover o lead — ele voltou para a etapa anterior.");
+    }
+  }
+
+  // PIP-04: alternativa por teclado ao arrastar colunas (botões no cabeçalho de cada etapa).
+  const pendingFocus = useRef<{ stageId: string; dir: "left" | "right" } | null>(null);
+  const stageOrderKey = stages.map((s) => s.id).join(",");
+  useEffect(() => {
+    // A recarga da lista de etapas reordena os nós do DOM e pode soltar o foco: devolve ao mesmo
+    // botão (ou ao oposto, se a etapa chegou à ponta e o botão foi desabilitado).
+    const target = pendingFocus.current;
+    if (!target) return;
+    pendingFocus.current = null;
+    const pick = (dir: string) =>
+      document.querySelector<HTMLButtonElement>(`[data-stage-move="${target.stageId}:${dir}"]`);
+    const same = pick(target.dir);
+    (same && !same.disabled ? same : pick(target.dir === "left" ? "right" : "left"))?.focus();
+  }, [stageOrderKey]);
+
+  async function moveStageBy(stage: PipelineStage, dir: "left" | "right") {
+    if (!pipeline) return;
+    const index = stages.findIndex((s) => s.id === stage.id);
+    const neighbor = stages[dir === "left" ? index - 1 : index + 1];
+    if (!neighbor) return;
+    const ids = reorderIds(
+      stages.map((s) => s.id),
+      stage.id,
+      neighbor.id,
+    );
+    if (!ids) return;
+    pendingFocus.current = { stageId: stage.id, dir };
+    try {
+      await reorderStages(pipeline.id, ids);
+      // Mensagem completa (a posição nova é a informação que quem não enxerga o quadro precisa).
+      toast(`Etapa ${stage.label} movida para a posição ${ids.indexOf(stage.id) + 1} de ${ids.length}`);
+      reloadPipelines();
+    } catch (err) {
+      pendingFocus.current = null;
+      toastError(err, "Não foi possível reordenar as etapas");
     }
   }
 
@@ -364,12 +404,7 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
       <div className={styles.board}>
         {stages.map((stage) => {
           const column = board.board[stage.id];
-          const stageLeads = sortBoardItems(
-            column?.items ?? [],
-            sortOption,
-            (l) => l.name,
-            (l) => l.createdAt,
-          );
+          const stageLeads = column?.items ?? [];
           return (
             <div
               key={stage.id}
@@ -388,6 +423,30 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
                   {stage.label}
                   {stage.isWon ? " 🏆" : stage.isLost ? " ✕" : ""}
                 </span>
+                {canReorderStages && (
+                  <span className={styles.stageMoves}>
+                    <button
+                      type="button"
+                      className={styles.stageMove}
+                      data-stage-move={`${stage.id}:left`}
+                      aria-label={`Mover etapa ${stage.label} para a esquerda`}
+                      disabled={stages[0]?.id === stage.id}
+                      onClick={() => void moveStageBy(stage, "left")}
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.stageMove}
+                      data-stage-move={`${stage.id}:right`}
+                      aria-label={`Mover etapa ${stage.label} para a direita`}
+                      disabled={stages[stages.length - 1]?.id === stage.id}
+                      onClick={() => void moveStageBy(stage, "right")}
+                    >
+                      ›
+                    </button>
+                  </span>
+                )}
                 <span className={styles.columnCount} title="Total real nesta etapa">
                   {column && column.page > 0 ? column.total : "…"}
                 </span>

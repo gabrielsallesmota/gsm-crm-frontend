@@ -141,6 +141,7 @@ export class LeadsMockRepository implements LeadsRepository {
     _defaultStageId: string,
     _defaultOwnerId: string,
     _dedupeStrategy: DedupeStrategy,
+    _idempotencyKey?: string,
   ): Promise<ImportSummary> {
     throw new NotImplementedError("Import de CSV", IMPORT_TEMPLATE_REASON);
   }

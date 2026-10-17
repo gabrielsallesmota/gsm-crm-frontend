@@ -488,20 +488,165 @@ describe("F-06..F-09 filtros", () => {
     await waitFor(() => expect(screen.queryByText("Seu funil ainda está vazio")).toBeNull());
   });
 
-  it("ordenação é APLICADA NO CLIENTE e só sobre o que já foi carregado (PIP-02)", async () => {
-    serveBoard({
-      "s-novo": [makeLead({ id: "a", name: "Carlos" }), makeLead({ id: "b", name: "Alberto" }), makeLead({ id: "c", name: "Bia" })],
+  // ---- Fase 1B (PIP-02): ordenação GLOBAL, feita pelo servidor ---------------------------------
+  /** Servidor falso que ORDENA de verdade (nome/data, desempate por id) e pagina — como o backend. */
+  function serveSorted(all: Lead[]) {
+    api.list.mockImplementation(async (filter: LeadListFilter) => {
+      const mine = all.filter((l) => l.stageId === filter.stageId);
+      const dir = filter.sortDir === "asc" ? 1 : -1;
+      const by = filter.sortBy ?? "created_at";
+      const key = (l: Lead) => (by === "name" ? l.name : l.createdAt);
+      const sorted = [...mine].sort((a, b) => {
+        const c = key(a).localeCompare(key(b), "pt-BR");
+        return c !== 0 ? c * dir : a.id.localeCompare(b.id);
+      });
+      const size = filter.pageSize ?? 25;
+      const pageNumber = filter.page ?? 1;
+      return page(sorted.slice((pageNumber - 1) * size, pageNumber * size), mine.length, pageNumber);
+    });
+  }
+  const many = (n: number, make: (i: number) => Partial<Lead>) =>
+    Array.from({ length: n }, (_, i) => makeLead({ id: `l${String(i).padStart(3, "0")}`, ...make(i) }));
+  const cardNames = () =>
+    screen.getAllByRole("button", { name: /^Abrir / }).map((b) => (b.getAttribute("aria-label") ?? "").slice(6));
+  const lastFilter = () => api.list.mock.calls.at(-1)![0] as LeadListFilter;
+
+  it("PIP-02: a ordenação vai ao SERVIDOR (sortBy/sortDir) e recarrega todas as colunas da página 1", async () => {
+    render();
+    await screen.findByText("Maria Souza");
+    const expected: [string, string | undefined, string | undefined][] = [
+      ["az", "name", "asc"],
+      ["za", "name", "desc"],
+      ["date_desc", "created_at", "desc"],
+      ["date_asc", "created_at", "asc"],
+      ["none", undefined, undefined],
+    ];
+    for (const [option, sortBy, sortDir] of expected) {
+      api.list.mockClear();
+      fireEvent.change(screen.getByLabelText("Ordenação"), { target: { value: option } });
+      await waitFor(() => expect(api.list).toHaveBeenCalledTimes(STAGES.length));
+      for (const call of api.list.mock.calls) {
+        const f = call[0] as LeadListFilter;
+        expect(f.sortBy, option).toBe(sortBy);
+        expect(f.sortDir, option).toBe(sortDir);
+        expect(f.page).toBe(1);
+      }
+    }
+  });
+
+  it("PIP-02: 60 leads — A-Z é a ordem do conjunto TODO (não só dos 25 carregados) e 'Carregar mais' continua dela", async () => {
+    // O lead que vem primeiro em A-Z é o ÚLTIMO criado: a ordenação só no cliente nunca o mostraria.
+    const all = many(60, (i) => ({
+      name: `Lead ${String(60 - i).padStart(2, "0")}`,
+      createdAt: `2026-10-${String(10 + (i % 10)).padStart(2, "0")}T12:00:00Z`,
+      stageId: "s-novo",
+    }));
+    serveSorted(all);
+    render();
+    await screen.findAllByText(/Lead \d\d/);
+    fireEvent.change(screen.getByLabelText("Ordenação"), { target: { value: "az" } });
+    await waitFor(() => expect(cardNames()[0]).toBe("Lead 01"));
+    expect(cardNames()).toEqual(Array.from({ length: 25 }, (_, i) => `Lead ${String(i + 1).padStart(2, "0")}`));
+    fireEvent.click(screen.getByRole("button", { name: "Carregar mais (35)" }));
+    await waitFor(() => expect(cardNames()).toHaveLength(50));
+    expect(cardNames()).toEqual(Array.from({ length: 50 }, (_, i) => `Lead ${String(i + 1).padStart(2, "0")}`));
+    fireEvent.click(screen.getByRole("button", { name: "Carregar mais (10)" }));
+    await waitFor(() => expect(cardNames()).toHaveLength(60));
+    expect(new Set(cardNames()).size).toBe(60); // nenhum repetido, nenhum perdido
+  });
+
+  it("PIP-02: Z-A, mais antigos e mais recentes seguem o conjunto completo (>100 itens)", async () => {
+    const all = many(120, (i) => ({
+      name: `N${String(i).padStart(3, "0")}`,
+      createdAt: new Date(Date.UTC(2026, 0, 1 + i)).toISOString(),
+      stageId: "s-novo",
+    }));
+    serveSorted(all);
+    render();
+    await screen.findByText("N119");
+    fireEvent.change(screen.getByLabelText("Ordenação"), { target: { value: "za" } });
+    await waitFor(() => expect(cardNames()[0]).toBe("N119"));
+    expect(cardNames().at(-1)).toBe("N095");
+    fireEvent.change(screen.getByLabelText("Ordenação"), { target: { value: "date_asc" } });
+    await waitFor(() => expect(cardNames()[0]).toBe("N000"));
+    fireEvent.change(screen.getByLabelText("Ordenação"), { target: { value: "date_desc" } });
+    await waitFor(() => expect(cardNames()[0]).toBe("N119"));
+  });
+
+  it("PIP-02: nomes REPETIDOS e datas iguais não duplicam nem pulam cards entre as páginas", async () => {
+    const all = many(60, (i) => ({
+      name: i % 2 === 0 ? "Igual" : "Outro",
+      createdAt: "2026-10-10T12:00:00Z",
+      stageId: "s-novo",
+    }));
+    serveSorted(all);
+    render();
+    await screen.findAllByText("Igual");
+    fireEvent.change(screen.getByLabelText("Ordenação"), { target: { value: "az" } });
+    await waitFor(() => expect(lastFilter().sortBy).toBe("name"));
+    await screen.findByRole("button", { name: "Carregar mais (35)" });
+    fireEvent.click(screen.getByRole("button", { name: "Carregar mais (35)" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Carregar mais (10)" }));
+    await waitFor(() => expect(cardNames()).toHaveLength(60));
+    const ids = screen.getAllByRole("button", { name: /^Abrir / }).length;
+    expect(ids).toBe(60);
+  });
+
+  it("PIP-02: trocar a ordenação durante o carregamento descarta a resposta ANTIGA", async () => {
+    const slow = deferred<ReturnType<typeof page<Lead>>>();
+    api.list.mockImplementation(async (filter: LeadListFilter) => {
+      if (filter.stageId !== "s-novo") return page([]);
+      if (filter.sortBy === "name" && filter.sortDir === "asc") return page([makeLead({ id: "nova", name: "Resposta nova" })]);
+      return slow.promise; // a consulta inicial (sem ordenação) fica pendente
     });
     render();
-    await screen.findByText("Carlos");
-    api.list.mockClear();
+    await waitFor(() => expect(api.list).toHaveBeenCalled());
     fireEvent.change(screen.getByLabelText("Ordenação"), { target: { value: "az" } });
-    const names = () =>
-      screen.getAllByRole("button", { name: /^Abrir / }).map((b) => b.getAttribute("aria-label"));
-    await waitFor(() => expect(names()).toEqual(["Abrir Alberto", "Abrir Bia", "Abrir Carlos"]));
-    expect(api.list).not.toHaveBeenCalled(); // não consulta o servidor para ordenar
+    await screen.findByText("Resposta nova");
+    await act(async () => {
+      slow.resolve(page([makeLead({ id: "velha", name: "Resposta velha" })]));
+      await Promise.resolve();
+    });
+    expect(screen.queryByText("Resposta velha")).toBeNull();
+    expect(screen.getByText("Resposta nova")).toBeTruthy();
+  });
+
+  it("PIP-02: ordenação convive com busca e responsável (todos vão juntos ao servidor)", async () => {
+    serveBoard({ "s-novo": [makeLead()] });
+    render();
+    await screen.findByText("Maria Souza");
     fireEvent.change(screen.getByLabelText("Ordenação"), { target: { value: "za" } });
-    await waitFor(() => expect(names()).toEqual(["Abrir Carlos", "Abrir Bia", "Abrir Alberto"]));
+    fireEvent.change(screen.getByLabelText("Buscar lead"), { target: { value: "maria" } });
+    await waitFor(() => expect(lastFilter()).toMatchObject({ search: "maria", sortBy: "name", sortDir: "desc" }));
+  });
+
+  it("PIP-02: falha da API ao reordenar mostra o erro na coluna (sem cards falsos) e permite tentar de novo", async () => {
+    render();
+    await screen.findByText("Maria Souza");
+    api.list.mockRejectedValue(new ApiError(500, ""));
+    fireEvent.change(screen.getByLabelText("Ordenação"), { target: { value: "az" } });
+    expect((await screen.findAllByText(/Erro inesperado no servidor|Não foi possível carregar/)).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Maria Souza")).toBeNull();
+    serveBoard({ "s-novo": [makeLead()] });
+    fireEvent.change(screen.getByLabelText("Ordenação"), { target: { value: "za" } });
+    await screen.findByText("Maria Souza");
+  });
+
+  it("PIP-02: mover um lead com a ordenação ativa mantém a ordenação nos filtros seguintes", async () => {
+    serveBoard({ "s-novo": [makeLead()] });
+    api.move.mockResolvedValue(makeLead({ stageId: "s-contato" }));
+    render();
+    await screen.findByText("Maria Souza");
+    fireEvent.change(screen.getByLabelText("Ordenação"), { target: { value: "az" } });
+    await waitFor(() => expect(lastFilter().sortBy).toBe("name"));
+    api.list.mockClear();
+    fireEvent.change(screen.getByLabelText("Mover Maria Souza para outra etapa"), { target: { value: "s-contato" } });
+    await waitFor(() => expect(api.move).toHaveBeenCalledWith("l1", "s-contato"));
+    // o movimento NÃO dispara nova consulta nem perde a ordenação escolhida
+    expect(api.list).not.toHaveBeenCalled();
+    expect((screen.getByLabelText("Ordenação") as HTMLSelectElement).value).toBe("az");
+    fireEvent.change(screen.getByLabelText("Buscar lead"), { target: { value: "x" } });
+    await waitFor(() => expect(lastFilter()).toMatchObject({ search: "x", sortBy: "name", sortDir: "asc" }));
   });
 });
 

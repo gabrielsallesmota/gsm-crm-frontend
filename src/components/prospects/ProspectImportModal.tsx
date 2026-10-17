@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Button } from "../common/Button";
+import { Modal } from "../common/Modal";
 import { useProspectActions } from "../../hooks/useProspectActions";
 import { parseCsv, readFileAsText } from "../../utils/csv";
 import {
@@ -145,6 +146,7 @@ export function ProspectImportModal({
   onClose: () => void;
   onImported: () => void;
 }) {
+  const uid = useId();
   const { bulkImport } = useProspectActions();
   const [fileName, setFileName] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
@@ -199,22 +201,13 @@ export function ProspectImportModal({
   }
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <h2 className={styles.modalTitle}>Importar prospects via CSV</h2>
-        <p className={styles.modalSubtitle}>
-          Suba a planilha, relacione cada coluna com um campo da pipeline (de/para) e escolha o que
-          fazer quando a linha já existir cadastrada — duplicidade é checada por telefone, nome da
-          empresa OU link do Google Maps (basta bater em um desses pra contar como já existente,
-          contra a base inteira, de qualquer época). Mapeie "Data do primeiro contato (P0)" pra
-          cada linha ter sua própria data — sem essa coluna, todas entram SEM contato registrado
-          (ficam sem follow-up até alguém confirmar o primeiro contato de cada uma). As datas dos
-          follow-ups seguintes são calculadas sozinhas a partir daí (configure a cadência em
-          "Estágios"). Mapeie "Mensagem 1".."Mensagem 4" pra cada prospect ter sua própria
-          mensagem de WhatsApp por etapa — configure em "Estágios" qual campo cada uma usa. "Sem
-          WhatsApp" aceita sim/não, true/false ou 1/0.
-        </p>
-
+    // IMP-01: diálogo acessível compartilhado (papel, nome, foco preso/devolvido, Esc, proteção de dados).
+    // Durante o envio o fechamento fica bloqueado.
+    <Modal
+      title="Importar prospects via CSV"
+      subtitle="Suba a planilha, relacione cada coluna com um campo da pipeline (de/para) e escolha o que fazer quando a linha já existir cadastrada — duplicidade é checada por telefone, nome da empresa OU link do Google Maps (basta bater em um desses pra contar como já existente, contra a base inteira, de qualquer época). Mapeie “Data do primeiro contato (P0)” pra cada linha ter sua própria data — sem essa coluna, todas entram SEM contato registrado (ficam sem follow-up até alguém confirmar o primeiro contato de cada uma). As datas dos follow-ups seguintes são calculadas sozinhas a partir daí (configure a cadência em “Estágios”). Mapeie “Mensagem 1”..“Mensagem 4” pra cada prospect ter sua própria mensagem de WhatsApp por etapa — configure em “Estágios” qual campo cada uma usa. “Sem WhatsApp” aceita sim/não, true/false ou 1/0."
+      onClose={importing ? () => undefined : onClose}
+    >
         {summary ? (
           <div className={styles.summary}>
             <div className={styles.summaryStats}>
@@ -255,6 +248,7 @@ export function ProspectImportModal({
                   <input
                     className={styles.fileInput}
                     type="file"
+                    aria-label="Arquivo CSV com os prospects"
                     accept=".csv,text/csv"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -267,8 +261,11 @@ export function ProspectImportModal({
               <>
                 <div className={styles.row}>
                   <div>
-                    <div className={styles.label}>Estágio de entrada (leads novos)</div>
+                    <label className={styles.label} htmlFor={`${uid}-stage`} style={{ display: "block" }}>
+                      Estágio de entrada (leads novos)
+                    </label>
                     <select
+                      id={`${uid}-stage`}
                       className={styles.select}
                       value={stageId}
                       onChange={(e) => setStageId(e.target.value)}
@@ -281,8 +278,11 @@ export function ProspectImportModal({
                     </select>
                   </div>
                   <div>
-                    <div className={styles.label}>Se já existir (telefone, empresa ou Maps)</div>
+                    <label className={styles.label} htmlFor={`${uid}-dedupe`} style={{ display: "block" }}>
+                      Se já existir (telefone, empresa ou Maps)
+                    </label>
                     <select
+                      id={`${uid}-dedupe`}
                       className={styles.select}
                       value={dedupeStrategy}
                       onChange={(e) => setDedupeStrategy(e.target.value as DedupeStrategy)}
@@ -305,6 +305,7 @@ export function ProspectImportModal({
                     </div>
                     <select
                       className={styles.select}
+                      aria-label={`Campo do prospect para a coluna ${header}`}
                       value={mapping[colIndex] ?? IGNORE}
                       onChange={(e) =>
                         setMapping((m) => {
@@ -325,7 +326,11 @@ export function ProspectImportModal({
                 ))}
               </>
             )}
-            {parseError && <p style={{ color: "var(--tone-red)", fontSize: 12.5 }}>{parseError}</p>}
+            {parseError && (
+              <p role="alert" style={{ color: "var(--tone-red)", fontSize: 12.5 }}>
+                {parseError}
+              </p>
+            )}
           </>
         )}
 
@@ -347,7 +352,6 @@ export function ProspectImportModal({
             </Button>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
