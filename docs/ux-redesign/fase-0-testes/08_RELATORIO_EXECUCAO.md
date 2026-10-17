@@ -6,10 +6,10 @@ Data: 2026-10-17. Máquina local (Windows 11, Node ≥ 22, Python 3.13), Postgre
 
 | Repositório | Branch de trabalho | Base | Estado |
 |---|---|---|---|
-| `gsm-crm-frontend` | `test/gsm-crm-ux-safety-net` | `main` @ `213d52d` (limpa; só havia documentos não rastreados da Auditoria 01) | alterações **não commitadas** |
-| `gsm-crm-backend` | `test/gsm-crm-ux-safety-net` | `main` @ `14c2b7d` (limpa) | alterações **não commitadas** |
+| `gsm-crm-frontend` | `test/gsm-crm-ux-safety-net` | `main` @ `213d52d` (limpa; só havia documentos não rastreados da Auditoria 01) | commit `f4198860866721dec4cbc326d23555131bbd0773` (autorizado depois do relatório) |
+| `gsm-crm-backend` | `test/gsm-crm-ux-safety-net` | `main` @ `14c2b7d` (limpa) | commit `1f965ea44f62b749d6df352af5009d3df9f3973b` (autorizado depois do relatório) |
 
-Nenhum commit, push, deploy ou merge. Nenhuma alteração pré-existente foi sobrescrita.
+No momento deste relatório: nenhum commit, push, deploy ou merge. (Atualização: os commits acima foram feitos depois, com autorização, ao validar a Fase 0.) Nenhuma alteração pré-existente foi sobrescrita.
 
 ## Comandos e resultados
 
