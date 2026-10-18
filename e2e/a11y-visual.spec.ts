@@ -46,6 +46,8 @@ const STRICT_RULES = [
   "nested-interactive",
   "duplicate-id-aria",
   "aria-hidden-focus",
+  // Prompt 06: o contraste do botão de WhatsApp foi corrigido; contraste passa a ser regra FIXA.
+  "color-contrast",
 ];
 
 async function audit(page: Page, name: string, scope?: string) {
@@ -87,7 +89,7 @@ for (const theme of THEMES) {
     test.describe(`${vp.name} · tema ${theme}`, () => {
       test.use({ viewport: { width: vp.width, height: vp.height } });
 
-      test("Pipeline: carrega, sem rolagem horizontal da página, axe e captura @cross", async ({ page, browserName }, testInfo) => {
+      test("Pipeline: carrega, sem rolagem horizontal da página, axe e captura @cross", async ({ page }, testInfo) => {
         const tenant = tenantOf(testInfo, 61 + THEMES.indexOf(theme) * 4 + VIEWPORTS.indexOf(vp));
         await seedBoard(tenant, 70);
         await setTheme(page, theme);
@@ -95,9 +97,6 @@ for (const theme of THEMES) {
         await openPipeline(page);
         await expect(column(page, "Novo").getByRole("button", { name: /^Abrir / }).first()).toBeVisible();
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-        // ACHADO (não é da 1B): no WebKit/390 px os campos de data do filtro de período estouram a
-        // largura em ~65 px. `test.fail` mantém o achado visível e vira erro quando for corrigido.
-        test.fail(browserName === "webkit" && vp.width === 390 && overflow > 1, "WebKit mobile: filtro de período extrapola a largura");
         expect(overflow, "a página não pode rolar na horizontal (o quadro rola dentro dele)").toBeLessThanOrEqual(1);
         expect(await page.evaluate(() => document.documentElement.getAttribute("data-theme"))).toBe(theme);
         await audit(page, `pipeline-${vp.name}-${theme}`, "main");
@@ -139,7 +138,7 @@ for (const theme of THEMES) {
 }
 
 test.describe("teclado e foco", () => {
-  test("Tab percorre cartão → seletor → contatos com foco VISÍVEL em cada controle @cross", async ({ page }, testInfo) => {
+  test("Tab percorre cartão → WhatsApp → e-mail → seletor 'mover' com foco VISÍVEL em cada controle @cross", async ({ page, browserName }, testInfo) => {
     const tenant = tenantOf(testInfo, 77);
     const api = await Api.login(tenant);
     const [novo] = (await api.defaultPipeline()).stages;
@@ -160,8 +159,18 @@ test.describe("teclado e foco", () => {
       expect(info.w).toBeGreaterThan(0);
       await page.keyboard.press("Tab");
     }
-    expect(seen[0]).toBe("Abrir Foco Um");
-    expect(seen[1]).toBe("Mover Foco Um para outra etapa"); // o seletor se revela com o foco
+    // O seletor se revela quando o foco chega ao cartão. WebKit/Safari NÃO inclui links na ordem de Tab
+    // por padrão (só com a preferência "Tab destaca cada item"): lá o caminho é resumo → seletor.
+    expect(browserName === "webkit" ? seen.slice(0, 2) : seen).toEqual(
+      browserName === "webkit"
+        ? ["Abrir Foco Um", "Mover Foco Um para outra etapa"]
+        : [
+            "Abrir Foco Um",
+            "Abrir WhatsApp de Foco Um",
+            "Escrever e-mail para Foco Um",
+            "Mover Foco Um para outra etapa",
+          ],
+    );
   });
 
   test("Enter/Espaço no cartão abre o lead e Esc devolve o foco ao cartão", async ({ page }, testInfo) => {
@@ -262,7 +271,7 @@ test.describe("alvos de toque (emulação de celular)", () => {
     await expect(move).toBeVisible(); // visível SEM foco (não há arrastar com o dedo)
     const targets = [
       ...(await page.getByRole("button", { name: /^Mover etapa/ }).all()),
-      ...(await page.locator("a[class*='btnSmall'], button[class*='btnSmall']").all()),
+      ...(await page.locator("[data-lead-id] a[class*='btnIcon']").all()),
     ];
     expect(targets.length).toBeGreaterThan(0);
     for (const target of targets) {
@@ -285,7 +294,7 @@ test.describe("alvos de toque (desktop)", () => {
     await openPipeline(page);
     const targets = [
       ...(await page.getByRole("button", { name: /^Mover etapa/ }).all()),
-      ...(await page.locator("a[class*='btnSmall'], button[class*='btnSmall']").all()),
+      ...(await page.locator("[data-lead-id] a[class*='btnIcon']").all()),
     ];
     expect(targets.length).toBeGreaterThan(0);
     for (const target of targets) {

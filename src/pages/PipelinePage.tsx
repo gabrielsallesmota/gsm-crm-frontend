@@ -1,7 +1,6 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePipelines } from "../hooks/usePipelines";
-import { usePipelineActions } from "../hooks/usePipelineActions";
 import { usePipelineBoard, type BoardFilter } from "../hooks/usePipelineBoard";
 import { useLeadActions } from "../hooks/useLeadActions";
 import { useLeadMessageTemplates } from "../hooks/useLeadMessageTemplates";
@@ -11,36 +10,35 @@ import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { can } from "../auth/permissions";
 import { EmptyState } from "../components/common/EmptyState";
-import { HelpTip } from "../components/common/HelpTip";
 import { SkeletonRows } from "../components/common/Skeleton";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { useMarkOnboardingVisit } from "../hooks/useOnboarding";
 import { ROUTES } from "../constants/routes";
-import { Badge } from "../components/common/Badge";
-import { Button } from "../components/common/Button";
 import { PeriodFilter } from "../components/common/PeriodFilter";
 import { LeadDrawer } from "../components/leads/LeadDrawer";
 import { LeadImportModal } from "../components/leads/LeadImportModal";
-import { WhatsappButton } from "../components/leads/WhatsappButton";
-import { EmailButton } from "../components/leads/EmailButton";
+import { KanbanColumn } from "../components/pipeline/KanbanColumn";
+import { LeadCard } from "../components/pipeline/LeadCard";
+import { PipelineFilters } from "../components/pipeline/PipelineFilters";
+import { PipelineHeader } from "../components/pipeline/PipelineHeader";
+import { StageTabs } from "../components/pipeline/StageTabs";
 // Prospecção é funil INTERNO da GSM (só platform staff) — chunk próprio,
 // nunca baixado por usuário de tenant. Não é controle de acesso: o backend
 // recusa /prospects para quem não é staff.
 const ProspectionBoard = lazy(() =>
   import("../components/prospects/ProspectionBoard").then((m) => ({ default: m.ProspectionBoard })),
 );
-import { originOf } from "../constants/origins";
-import { BOARD_SORT_OPTIONS, serverSortFor, type BoardSortOption } from "../utils/boardSort";
-import { brl } from "../utils/currency";
-import { findLead, hasMore, reorderIds } from "../utils/pipelineBoard";
+import { useIsMobile } from "../hooks/useMediaQuery";
+import { usePipelineDrag } from "../hooks/usePipelineDrag";
+import { useStageReorder } from "../hooks/useStageReorder";
+import { serverSortFor, type BoardSortOption } from "../utils/boardSort";
+import { findLead } from "../utils/pipelineBoard";
+import { boardSummary } from "../utils/pipelineView";
 import { EMPTY_PERIOD, type Period } from "../utils/periods";
 import type { PipelineStage } from "../types/pipeline";
-import type { Lead, LeadMessageTemplate } from "../types/lead";
 import styles from "./PipelinePage.module.css";
 
 type SourceFilter = "todos" | "ativo" | "passivo";
-
-const PASSIVO_BADGE = { label: "Passivo", color: "var(--tone-blue)", bg: "var(--tone-blue-bg)" };
 
 const SOURCE_FILTER_LABEL: Record<SourceFilter, string> = {
   todos: "Todos",
@@ -81,9 +79,11 @@ export function PipelinePage() {
         </div>
       )}
 
-      <PeriodFilter value={period} onChange={setPeriod} />
+      {/* O período do quadro de leads mora nos filtros dele ("Criados em"); só a Prospecção sozinha
+          (staff com "Ativo") precisa do controle no topo da página. */}
+      {!showPassivo && <PeriodFilter value={period} onChange={setPeriod} />}
 
-      {showPassivo && <LeadsPipelineBoard taggedPassivo={isSuperAdmin} period={period} />}
+      {showPassivo && <LeadsPipelineBoard taggedPassivo={isSuperAdmin} period={period} onPeriod={setPeriod} />}
 
       {showPassivo && showAtivo && <div className={styles.sourceDivider} />}
 
@@ -101,16 +101,26 @@ export function PipelinePage() {
  * nomes, cores e ordem o cliente configurou — sem funil fixo. Cada coluna é
  * paginada no backend ("Carregar mais"), o contador é o total real, o
  * movimento é otimista com rollback e existe alternativa ao arrastar
- * (select no card e na ficha do lead).
+ * (seletor no card e na ficha do lead).
+ *
+ * Redesign (Prompt 06): esta função só orquestra estado e regras; a apresentação está em
+ * `components/pipeline/*` (cabeçalho, filtros, coluna, cartão, abas de etapa).
  */
-function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean; period: Period }) {
+function LeadsPipelineBoard({
+  taggedPassivo,
+  period,
+  onPeriod,
+}: {
+  taggedPassivo: boolean;
+  period: Period;
+  onPeriod: (period: Period) => void;
+}) {
   const {
     data: pipelines,
     loading: loadingPipelines,
     error: pipelineError,
     reload: reloadPipelines,
   } = usePipelines();
-  const { reorderStages } = usePipelineActions();
   const { exportCsv } = useLeadActions();
   const { data: templates } = useLeadMessageTemplates();
   const { data: team } = useTeamDirectory();
@@ -120,6 +130,7 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
   // não vê a alça de arrastar coluna. Ver auth/permissions.ts.
   const canReorderStages = can(user, "pipeline.reorder");
   const canFilterByOwner = can(user, "leads.viewAll");
+  const isMobile = useIsMobile();
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const pipeline =
     pipelines?.find((p) => p.id === selectedPipelineId) ??
@@ -141,12 +152,9 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
   };
   const board = usePipelineBoard(pipeline?.id ?? null, stages, filter);
 
-  const [dragId, setDragId] = useState<string | null>(null);
-  // Arrastar uma COLUNA (reordenar etapas) é diferente de arrastar um CARD
-  // (mover lead de etapa) — estado separado, mesmo padrão de
-  // `ProspectionBoard.tsx`.
-  const [dragColumnId, setDragColumnId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  // Mobile: uma etapa por vez (null = a primeira).
+  const [mobileStageId, setMobileStageId] = useState<string | null>(null);
   // `?importar=1` (vindo do Dashboard/onboarding) já abre a importação.
   const [searchParams, setSearchParams] = useSearchParams();
   const [importing, setImporting] = useState(searchParams.get("importar") === "1");
@@ -173,69 +181,9 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
     }
   }
 
-  // PIP-04: alternativa por teclado ao arrastar colunas (botões no cabeçalho de cada etapa).
-  const pendingFocus = useRef<{ stageId: string; dir: "left" | "right" } | null>(null);
-  const stageOrderKey = stages.map((s) => s.id).join(",");
-  useEffect(() => {
-    // A recarga da lista de etapas reordena os nós do DOM e pode soltar o foco: devolve ao mesmo
-    // botão (ou ao oposto, se a etapa chegou à ponta e o botão foi desabilitado).
-    const target = pendingFocus.current;
-    if (!target) return;
-    pendingFocus.current = null;
-    const pick = (dir: string) =>
-      document.querySelector<HTMLButtonElement>(`[data-stage-move="${target.stageId}:${dir}"]`);
-    const same = pick(target.dir);
-    (same && !same.disabled ? same : pick(target.dir === "left" ? "right" : "left"))?.focus();
-  }, [stageOrderKey]);
-
-  async function moveStageBy(stage: PipelineStage, dir: "left" | "right") {
-    if (!pipeline) return;
-    const index = stages.findIndex((s) => s.id === stage.id);
-    const neighbor = stages[dir === "left" ? index - 1 : index + 1];
-    if (!neighbor) return;
-    const ids = reorderIds(
-      stages.map((s) => s.id),
-      stage.id,
-      neighbor.id,
-    );
-    if (!ids) return;
-    pendingFocus.current = { stageId: stage.id, dir };
-    try {
-      await reorderStages(pipeline.id, ids);
-      // Mensagem completa (a posição nova é a informação que quem não enxerga o quadro precisa).
-      toast(`Etapa ${stage.label} movida para a posição ${ids.indexOf(stage.id) + 1} de ${ids.length}`);
-      reloadPipelines();
-    } catch (err) {
-      pendingFocus.current = null;
-      toastError(err, "Não foi possível reordenar as etapas");
-    }
-  }
-
-  async function handleDrop(target: PipelineStage) {
-    if (dragColumnId) {
-      const draggedStageId = dragColumnId;
-      setDragColumnId(null);
-      if (!pipeline) return;
-      const ids = reorderIds(
-        stages.map((s) => s.id),
-        draggedStageId,
-        target.id,
-      );
-      if (!ids) return;
-      try {
-        await reorderStages(pipeline.id, ids);
-        toast("Ordem das etapas atualizada");
-        reloadPipelines();
-      } catch (err) {
-        toastError(err, "Não foi possível reordenar as etapas");
-      }
-      return;
-    }
-    if (!dragId) return;
-    const leadId = dragId;
-    setDragId(null);
-    await moveLead(leadId, target);
-  }
+  // PIP-04: reordenar etapas (botões do cabeçalho e arrastar) com foco devolvido ao botão certo.
+  const { moveStageBy, dropStage } = useStageReorder(pipeline, stages, reloadPipelines);
+  const drag = usePipelineDrag({ moveLead, dropStage, stages });
 
   function handleExport() {
     void (async () => {
@@ -253,6 +201,8 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
       }
     })();
   }
+
+  const openLead = useCallback((id: string) => setSelectedLeadId(id), []);
 
   const canConfigure = can(user, "settings.manage");
   const configureAction = canConfigure
@@ -309,83 +259,36 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
     !debouncedSearch &&
     !ownerFilter &&
     JSON.stringify(period) === JSON.stringify(EMPTY_PERIOD);
+  const summary = boardSummary(stages, board.board);
+  const mobileActiveId = stages.some((s) => s.id === mobileStageId) ? (mobileStageId as string) : stages[0]!.id;
+  const draggedLead = drag.dragId ? findLead(board.board, drag.dragId) : null;
+  // Celular: uma etapa por vez (abas + só a coluna ativa no DOM). Demais larguras: todas as colunas.
+  const visibleStages = isMobile ? stages.filter((s) => s.id === mobileActiveId) : stages;
 
   return (
-    <div>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.pageTitle}>
-            {taggedPassivo && <Badge {...PASSIVO_BADGE} />} Pipeline
-          </h1>
-          <p className={styles.pageSubtitle}>
-            Arraste os cards entre as etapas — ou abra o lead e escolha a etapa
-            <HelpTip label="Como funciona o pipeline">
-              <span>
-                Cada coluna é uma etapa da venda. Quando a negociação avança, mova o lead para a
-                próxima etapa: arrastando o card, pelo seletor de etapa do card (no celular) ou
-                abrindo o lead.
-              </span>
-              <span>
-                Etapas com 🏆 contam como <b>ganho</b> e com ✕ como <b>perda</b> — é isso que
-                alimenta a conversão e a receita do Dashboard.
-              </span>
-            </HelpTip>
-          </p>
-        </div>
-        <div className={styles.toolbar}>
-          {pipelines && pipelines.length > 1 && (
-            <select
-              className={styles.pipelineSelect}
-              value={pipeline.id}
-              onChange={(e) => setSelectedPipelineId(e.target.value)}
-              aria-label="Pipeline"
-            >
-              {pipelines.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          )}
-          <input
-            className={styles.pipelineSelect}
-            placeholder="Buscar lead…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Buscar lead"
-          />
-          {canFilterByOwner && (
-            <select
-              className={styles.pipelineSelect}
-              value={ownerFilter}
-              onChange={(e) => setOwnerFilter(e.target.value)}
-              aria-label="Responsável"
-            >
-              <option value="">Todos os responsáveis</option>
-              <option value="__none__">Sem responsável</option>
-              {team?.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          )}
-          <select
-            className={styles.pipelineSelect}
-            value={sortOption}
-            onChange={(e) => setSortOption(e.target.value as BoardSortOption)}
-            aria-label="Ordenação"
-          >
-            {BOARD_SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <Button onClick={() => setImporting(true)}>Importar planilha</Button>
-          <Button onClick={handleExport}>Exportar CSV</Button>
-        </div>
-      </div>
+    <div className={styles.page}>
+      <PipelineHeader
+        pipeline={pipeline}
+        pipelines={pipelines ?? []}
+        onPipelineChange={setSelectedPipelineId}
+        summary={summary}
+        taggedPassivo={taggedPassivo}
+        onImport={() => setImporting(true)}
+        onExport={handleExport}
+      />
+
+      <PipelineFilters
+        search={search}
+        onSearch={setSearch}
+        owner={ownerFilter}
+        onOwner={setOwnerFilter}
+        owners={team ?? undefined}
+        canFilterByOwner={canFilterByOwner}
+        sort={sortOption}
+        onSort={setSortOption}
+        period={period}
+        onPeriod={onPeriod}
+      />
 
       {boardEmpty && (
         <div className={styles.boardEmpty}>
@@ -401,89 +304,52 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
         </div>
       )}
 
+      {isMobile && (
+        <StageTabs stages={stages} board={board.board} activeId={mobileActiveId} onSelect={setMobileStageId} />
+      )}
+
       <div className={styles.board}>
-        {stages.map((stage) => {
+        {visibleStages.map((stage) => {
           const column = board.board[stage.id];
-          const stageLeads = column?.items ?? [];
+          const index = stages.indexOf(stage);
           return (
-            <div
+            <KanbanColumn
               key={stage.id}
-              className={styles.column}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => void handleDrop(stage)}
+              stage={stage}
+              column={column}
+              isFirst={index === 0}
+              isLast={index === stages.length - 1}
+              canReorder={canReorderStages}
+              mobileActive={stage.id === mobileActiveId}
+              cardOver={!!draggedLead && drag.overStageId === stage.id && draggedLead.stageId !== stage.id}
+              cardDragging={!!drag.dragId}
+              columnOver={!!drag.dragColumnId && drag.overStageId === stage.id && drag.dragColumnId !== stage.id}
+              columnDragged={drag.dragColumnId === stage.id}
+              onMoveStage={(target, dir) => void moveStageBy(target, dir)}
+              onLoadMore={board.loadMore}
+              onRetry={board.reload}
+              onHeaderDragStart={drag.startColumnDrag}
+              onHeaderDragEnd={drag.endDrag}
+              onDragEnter={drag.enterColumn}
+              onDragLeave={drag.leaveColumn}
+              onDrop={(target) => void drag.drop(target)}
             >
-              <div
-                className={styles.columnHeader}
-                draggable={canReorderStages}
-                onDragStart={() => canReorderStages && setDragColumnId(stage.id)}
-                title={canReorderStages ? "Arraste pra reordenar as etapas" : undefined}
-              >
-                <span className={styles.columnDot} style={{ background: stage.color }} />
-                <span className={styles.columnLabel}>
-                  {stage.label}
-                  {stage.isWon ? " 🏆" : stage.isLost ? " ✕" : ""}
-                </span>
-                {canReorderStages && (
-                  <span className={styles.stageMoves}>
-                    <button
-                      type="button"
-                      className={styles.stageMove}
-                      data-stage-move={`${stage.id}:left`}
-                      aria-label={`Mover etapa ${stage.label} para a esquerda`}
-                      disabled={stages[0]?.id === stage.id}
-                      onClick={() => void moveStageBy(stage, "left")}
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.stageMove}
-                      data-stage-move={`${stage.id}:right`}
-                      aria-label={`Mover etapa ${stage.label} para a direita`}
-                      disabled={stages[stages.length - 1]?.id === stage.id}
-                      onClick={() => void moveStageBy(stage, "right")}
-                    >
-                      ›
-                    </button>
-                  </span>
-                )}
-                <span className={styles.columnCount} title="Total real nesta etapa">
-                  {column && column.page > 0 ? column.total : "…"}
-                </span>
-              </div>
-              <div className={styles.cards}>
-                {stageLeads.map((lead) => (
-                  <KanbanCard
-                    key={lead.id}
-                    lead={lead}
-                    stages={stages}
-                    ownerName={lead.ownerId ? (ownerNames.get(lead.ownerId) ?? null) : null}
-                    pending={board.isMoving(lead.id)}
-                    templates={templates ?? []}
-                    onDragStart={() => setDragId(lead.id)}
-                    onClick={() => setSelectedLeadId(lead.id)}
-                    onMove={(target) => void moveLead(lead.id, target)}
-                  />
-                ))}
-                {column?.error && (
-                  <div className={styles.columnError} role="alert">
-                    {column.error}{" "}
-                    <button type="button" className={styles.linkBtn} onClick={board.reload}>
-                      Tentar de novo
-                    </button>
-                  </div>
-                )}
-                {column?.loading && <div className={styles.empty}>Carregando…</div>}
-                {column && !column.loading && !column.error && stageLeads.length === 0 && (
-                  <div className={styles.empty}>Sem leads</div>
-                )}
-                {column && !column.loading && hasMore(column) && (
-                  <button type="button" className={styles.loadMore} onClick={() => board.loadMore(stage.id)}>
-                    Carregar mais ({column.total - column.items.length})
-                  </button>
-                )}
-              </div>
-            </div>
+              {(column?.items ?? []).map((lead) => (
+                <LeadCard
+                  key={lead.id}
+                  lead={lead}
+                  stages={stages}
+                  ownerName={lead.ownerId ? (ownerNames.get(lead.ownerId) ?? null) : null}
+                  pending={board.isMoving(lead.id)}
+                  dragging={drag.dragId === lead.id}
+                  templates={templates ?? []}
+                  onOpen={openLead}
+                  onDragStart={drag.startCardDrag}
+                  onDragEnd={drag.endDrag}
+                  onMove={drag.moveLeadToStage}
+                />
+              ))}
+            </KanbanColumn>
           );
         })}
       </div>
@@ -509,88 +375,6 @@ function LeadsPipelineBoard({ taggedPassivo, period }: { taggedPassivo: boolean;
           onImported={() => board.reload()}
         />
       )}
-    </div>
-  );
-}
-
-function KanbanCard({
-  lead,
-  stages,
-  ownerName,
-  pending,
-  templates,
-  onDragStart,
-  onClick,
-  onMove,
-}: {
-  lead: Lead;
-  stages: PipelineStage[];
-  ownerName: string | null;
-  pending: boolean;
-  templates: LeadMessageTemplate[];
-  onDragStart: () => void;
-  onClick: () => void;
-  onMove: (stage: PipelineStage) => void;
-}) {
-  const origin = originOf(lead.origin);
-  // PIP-01: o cartão é um contêiner NEUTRO (arrastável); só a área de resumo é o botão "Abrir lead".
-  // Mover, WhatsApp e e-mail são irmãos desse botão — nenhum controle fica dentro de outro.
-  return (
-    <div
-      className={pending ? `${styles.card} ${styles.cardPending}` : styles.card}
-      draggable={!pending}
-      onDragStart={onDragStart}
-      aria-busy={pending}
-    >
-      <div
-        className={styles.cardMain}
-        // Teclado: Tab chega na área de resumo, Enter/Espaço abre o lead (lá dá para
-        // trocar a etapa sem arrastar). O conteúdo é só texto (nada interativo dentro).
-        role="button"
-        tabIndex={0}
-        aria-label={`Abrir ${lead.name}`}
-        onClick={onClick}
-        onKeyDown={(e) => {
-          if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
-            e.preventDefault();
-            onClick();
-          }
-        }}
-      >
-        <div className={styles.cardName}>{lead.name}</div>
-        {lead.company && <div className={styles.cardCompany}>{lead.company}</div>}
-        {lead.lastComment && (
-          // `title` = tooltip nativo com o texto inteiro no hover; o texto
-          // visível já vem truncado por CSS (`.cardComment`, ellipsis).
-          <div className={styles.cardComment} title={lead.lastComment.text}>
-            💬 {lead.lastComment.text}
-          </div>
-        )}
-        <div className={styles.cardFooter}>
-          <span className={styles.cardValue}>R$ {brl(lead.value)}</span>
-          <Badge label={origin.label} color={origin.color} bg={origin.bg} />
-        </div>
-        <div className={styles.cardOwner}>{ownerName ?? (lead.ownerId ? "—" : "Sem responsável")}</div>
-      </div>
-      {/* Alternativa ao arrastar (celular/teclado): mover pela lista. */}
-      <select
-        className={styles.cardMove}
-        value={lead.stageId}
-        disabled={pending}
-        onChange={(e) => {
-          const target = stages.find((s) => s.id === e.target.value);
-          if (target) onMove(target);
-        }}
-        aria-label={`Mover ${lead.name} para outra etapa`}
-      >
-        {stages.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.label}
-          </option>
-        ))}
-      </select>
-      <WhatsappButton lead={lead} templates={templates} size="small" />
-      <EmailButton lead={lead} size="small" />
     </div>
   );
 }

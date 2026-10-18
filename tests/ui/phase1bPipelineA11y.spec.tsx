@@ -133,7 +133,7 @@ describe("PIP-04 reordenar etapas por teclado", () => {
 });
 
 describe("PIP-05 mover lead sem arrastar é descobrível", () => {
-  const css = readFileSync(resolve(__dirname, "../../src/pages/PipelinePage.module.css"), "utf8");
+  const css = readFileSync(resolve(__dirname, "../../src/components/pipeline/LeadCard.module.css"), "utf8");
 
   it("o seletor 'mover' existe para cada cartão, com nome acessível e fora de qualquer tabindex negativo", async () => {
     renderApp(<PipelinePage />);
@@ -144,7 +144,7 @@ describe("PIP-05 mover lead sem arrastar é descobrível", () => {
   });
 
   it("o CSS não tira o seletor da árvore de acessibilidade em nenhuma largura/dispositivo (sem display:none)", () => {
-    const blocks = [...css.matchAll(/\.cardMove[^{]*\{([^}]*)\}/g)].map((m) => m[1] ?? "");
+    const blocks = [...css.matchAll(/\.move[^{]*\{([^}]*)\}/g)].map((m) => m[1] ?? "");
     expect(blocks.length).toBeGreaterThan(0);
     for (const block of blocks) {
       expect(block).not.toMatch(/display:\s*none/);
@@ -153,8 +153,8 @@ describe("PIP-05 mover lead sem arrastar é descobrível", () => {
   });
 
   it("no desktop com mouse fica visualmente oculto e aparece quando o foco chega ao cartão", () => {
-    expect(css).toMatch(/\.cardMove:not\(:focus\)\s*\{[^}]*clip/);
-    expect(css).toMatch(/\.card:has\(:focus-visible\) \.cardMove/);
+    expect(css).toMatch(/\.move:not\(:focus\)\s*\{[^}]*clip/);
+    expect(css).toMatch(/\.card:has\(:focus-visible\) \.move/);
   });
 });
 
@@ -174,8 +174,20 @@ describe("PIP-12 alvos de toque dos botões de contato do cartão", () => {
   });
 
   it("os botões de etapa do cabeçalho também respeitam o mínimo", () => {
-    const css = readFileSync(resolve(__dirname, "../../src/pages/PipelinePage.module.css"), "utf8");
-    const base = css.match(/\.stageMove\s*\{([^}]*)\}/)?.[1] ?? "";
-    expect(Number(base.match(/min-height:\s*(\d+)px/)?.[1])).toBeGreaterThanOrEqual(24);
+    const css = readFileSync(resolve(__dirname, "../../src/components/pipeline/KanbanColumn.module.css"), "utf8");
+    const base = css.match(/\.moveBtn\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(Number(base.match(/width:\s*(\d+)px/)?.[1])).toBeGreaterThanOrEqual(24);
+    expect(Number(base.match(/height:\s*(\d+)px/)?.[1])).toBeGreaterThanOrEqual(24);
+  });
+});
+
+describe("Prompt 06 — o realce do destino do arraste NÃO desloca o layout", () => {
+  it("'Soltar aqui' é uma sobreposição (position: absolute + pointer-events: none), não um bloco no fluxo", () => {
+    const css = readFileSync(resolve(__dirname, "../../src/components/pipeline/KanbanColumn.module.css"), "utf8");
+    const block = css.match(/\.dropHint\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(block).toMatch(/position:\s*absolute/);
+    expect(block).toMatch(/pointer-events:\s*none/);
+    // dica da coluna vazia: espaço reservado (visibility), nunca inserida/removida no arraste
+    expect(css).toMatch(/\.emptyHint\s*\{[^}]*visibility:\s*hidden/);
   });
 });

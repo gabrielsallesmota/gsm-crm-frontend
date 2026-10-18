@@ -4,6 +4,7 @@ import {
   findMatchingLeadTemplate,
   renderLeadMessage,
 } from "../../utils/leadMessageTemplates";
+import { IconWhatsapp } from "../common/Icons";
 import styles from "../prospects/WhatsappButton.module.css";
 
 /**
@@ -20,7 +21,8 @@ export function WhatsappButton({
 }: {
   lead: Lead;
   templates: LeadMessageTemplate[];
-  size?: "normal" | "small";
+  /** `icon`: só o ícone (cartões compactos); o nome acessível vai em `aria-label`. */
+  size?: "normal" | "small" | "icon";
 }) {
   if (!lead.phoneNormalized) return null;
   const template = findMatchingLeadTemplate(lead, templates);
@@ -36,11 +38,18 @@ export function WhatsappButton({
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className={size === "small" ? `${styles.btn} ${styles.btnSmall}` : styles.btn}
+      className={
+        size === "icon"
+          ? `${styles.btn} ${styles.btnIcon}`
+          : size === "small"
+            ? `${styles.btn} ${styles.btnSmall}`
+            : styles.btn
+      }
       onClick={(e) => e.stopPropagation()}
       title={message || "Abrir conversa no WhatsApp"}
+      {...(size === "icon" ? { "aria-label": `Abrir WhatsApp de ${lead.name}` } : {})}
     >
-      💬 WhatsApp
+      {size === "icon" ? <IconWhatsapp size={16} /> : "💬 WhatsApp"}
     </a>
   );
 }

@@ -451,19 +451,22 @@ describe("F-06..F-09 filtros", () => {
     render();
     await screen.findByText("Maria Souza");
     api.list.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /^Filtros/ }));
     fireEvent.click(screen.getByRole("button", { name: "Hoje" }));
     await waitFor(() => {
       const f = api.list.mock.calls[0]?.[0];
       expect(f?.dateFrom).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(f?.dateTo).toBe(f?.dateFrom);
     });
-    // a tela não rotula o período como "criados em" — rótulo previsto para a Fase 2 (D-02)
-    expect(screen.queryByText(/Criados em/i)).toBeNull();
+    // Prompt 06 (D-02 mantida): a regra segue sendo a data de CRIAÇÃO, agora DITA na tela
+    expect(screen.getAllByText("Criados em").length).toBeGreaterThan(0);
+    expect(screen.getByRole("group", { name: "Filtros ativos" }).textContent).toMatch(/Criados em:\s*Hoje/);
   });
 
   it("combina período + busca + responsável na MESMA consulta e 'Limpar' remove só o período", async () => {
     render();
     await screen.findByText("Maria Souza");
+    fireEvent.click(screen.getByRole("button", { name: /^Filtros/ }));
     fireEvent.click(screen.getByRole("button", { name: "7 dias" }));
     fireEvent.change(screen.getByLabelText("Responsável"), { target: { value: "u-vend" } });
     fireEvent.change(screen.getByLabelText("Buscar lead"), { target: { value: "maria" } });
@@ -664,27 +667,34 @@ describe("F-12 cartão do lead", () => {
       ],
     });
     render();
-    const c = await screen.findByRole("button", { name: "Abrir Maria Souza" });
+    const main = await screen.findByRole("button", { name: "Abrir Maria Souza" });
+    const c = main.parentElement as HTMLElement; // o cartão: resumo + rodapé (irmãos, sem aninhar)
     expect(within(c).getByText("Clínica Sol")).toBeTruthy();
-    expect(within(c).getByText(/R\$ 2\.500/)).toBeTruthy();
-    expect(within(c).getByText("WhatsApp")).toBeTruthy();
+    expect(within(c).getByText("R$ 2.500")).toBeTruthy();
+    expect(within(c).getByText("WhatsApp")).toBeTruthy(); // origem (badge)
     expect(within(c).getByText("Ana Admin")).toBeTruthy();
     expect(within(c).getByText(/Pediu retorno na sexta/)).toBeTruthy();
+    // contatos: ícones com nome acessível (o texto não depende de hover)
+    expect(within(c).getByRole("link", { name: "Abrir WhatsApp de Maria Souza" })).toBeTruthy();
+    expect(within(c).getByRole("link", { name: "Escrever e-mail para Maria Souza" })).toBeTruthy();
   });
 
   it("dados opcionais ausentes: sem empresa, sem comentário e 'Sem responsável'", async () => {
-    serveBoard({ "s-novo": [makeLead({ company: "", ownerId: null, lastComment: null })] });
+    serveBoard({ "s-novo": [makeLead({ company: "", ownerId: null, lastComment: null, value: 0 })] });
     render();
-    const c = await screen.findByRole("button", { name: "Abrir Maria Souza" });
-    expect(within(c).getByText("Sem responsável")).toBeTruthy();
+    const main = await screen.findByRole("button", { name: "Abrir Maria Souza" });
+    const c = main.parentElement as HTMLElement;
+    expect(within(c).getByText("Sem responsável")).toBeTruthy(); // atenção real: texto + borda, não só cor
     expect(within(c).queryByText("Clínica Sol")).toBeNull();
-    expect(c.querySelector("[class*='cardComment']")).toBeNull();
+    expect(within(c).queryByText(/Pediu retorno/)).toBeNull();
+    expect(within(c).queryByText(/^R\$/)).toBeNull(); // sem valor, sem "R$ 0"
   });
 
   it("dono que já não está na equipe aparece como '—' (nunca 'undefined')", async () => {
     serveBoard({ "s-novo": [makeLead({ ownerId: "u-removido" })] });
     render();
-    const c = await screen.findByRole("button", { name: "Abrir Maria Souza" });
+    const main = await screen.findByRole("button", { name: "Abrir Maria Souza" });
+    const c = main.parentElement as HTMLElement;
     expect(within(c).getByText("—")).toBeTruthy();
     expect(c.textContent).not.toMatch(/undefined|null/);
   });

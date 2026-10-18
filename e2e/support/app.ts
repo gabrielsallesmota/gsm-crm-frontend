@@ -22,11 +22,11 @@ export async function openPipeline(page: Page): Promise<void> {
 export async function waitBoardIdle(page: Page): Promise<void> {
   await expect(page.getByText("Carregando…")).toHaveCount(0);
   // o contador da coluna fica "…" até a 1ª página chegar (também logo após trocar filtro/ordenação)
-  await expect(page.locator("span[class*='columnCount']").filter({ hasText: "…" })).toHaveCount(0);
+  await expect(page.locator("[data-stage-count]").filter({ hasText: "…" })).toHaveCount(0);
 }
 
 export const column = (page: Page, stage: string): Locator =>
-  page.locator("div[class*='_column_']").filter({ has: page.locator("span[class*='columnLabel']", { hasText: stage }) });
+  page.locator(`[data-stage-column][data-stage-name="${stage}"]`);
 
 /** Nomes dos cards, na ordem em que aparecem na coluna. */
 export async function cardNames(page: Page, stage: string): Promise<string[]> {
@@ -37,7 +37,7 @@ export async function cardNames(page: Page, stage: string): Promise<string[]> {
 }
 
 export async function columnTotal(page: Page, stage: string): Promise<number> {
-  const text = await column(page, stage).getByTitle("Total real nesta etapa").textContent();
+  const text = await column(page, stage).locator("[data-stage-count]").textContent();
   return Number(text);
 }
 

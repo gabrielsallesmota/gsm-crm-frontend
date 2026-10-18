@@ -1,0 +1,161 @@
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "title actions"
+    "summary actions";
+  align-items: center;
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.titleRow {
+  grid-area: title;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--heading);
+  font-family: var(--font-heading);
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+}
+
+.pipelineSelect {
+  max-width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.pipelineName {
+  padding: 4px var(--space-3);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.summary {
+  grid-area: summary;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.summary strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.sep {
+  margin: 0 var(--space-2);
+  color: var(--faint);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.actions .primary,
+.actions .secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-input);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.actions .primary {
+  background: var(--accent);
+  border: 1px solid transparent;
+  color: var(--on-accent);
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.actions .primary:hover {
+  background: var(--accent-hover);
+  color: var(--on-accent);
+}
+
+/* `Button` já traz borda e cor; aqui só alinhamos altura/ícone com o botão primário. */
+.actions .secondary {
+  padding: 0 var(--space-3);
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+@media (pointer: coarse) {
+  .actions .primary,
+  .actions .secondary {
+    min-height: 44px;
+  }
+}
+
+.short {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .long {
+    display: none;
+  }
+
+  .short {
+    display: inline;
+  }
+
+  .actions {
+    width: 100%;
+  }
+
+  .actions .primary {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .header {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "summary"
+      "actions";
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+}

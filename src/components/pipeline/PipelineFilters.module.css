@@ -1,0 +1,175 @@
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.search {
+  display: flex;
+  flex: 1 1 220px;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 420px;
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+}
+
+.search:focus-within {
+  border-color: var(--accent);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+.searchInput:focus {
+  outline: none;
+  border: none !important;
+}
+
+.select {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  background: var(--hover-bg);
+}
+
+.toggleOn {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.chevOpen {
+  transform: rotate(180deg);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.panelLabel {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* O `PeriodFilter` traz `margin-bottom` próprio (uso em outras telas): aqui o painel já espaça. */
+.panel > div {
+  margin-bottom: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.clearAll {
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  background: none;
+  border: none;
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (pointer: coarse) {
+  .search,
+  .select,
+  .toggle {
+    min-height: 44px;
+  }
+
+  .clearAll {
+    min-height: 44px;
+  }
+}
+
+/* Celular: busca + botão "Filtros" na 1ª linha; responsável e ordenação lado a lado na 2ª. */
+@media (max-width: 760px) {
+  .search {
+    flex: 1 1 200px;
+    max-width: none;
+    order: 1;
+  }
+
+  .toggle {
+    order: 2;
+  }
+
+  .select {
+    flex: 1 1 140px;
+    order: 3;
+  }
+}

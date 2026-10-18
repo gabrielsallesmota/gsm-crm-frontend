@@ -310,8 +310,11 @@ test.describe("Pipeline — movimentação", () => {
     const { api, stages } = await setup(page, testInfo, 17);
     const card = page.getByRole("button", { name: "Abrir Mover 2" });
     await card.focus();
-    await page.keyboard.press("Tab"); // próximo foco do cartão: o seletor de etapa
     const select = page.getByLabel("Mover Mover 2 para outra etapa");
+    // ordem do cartão: resumo → WhatsApp → (e-mail) → seletor de etapa; o seletor aparece com o foco
+    for (let i = 0; i < 4 && !(await select.evaluate((el) => el === document.activeElement)); i++) {
+      await page.keyboard.press("Tab");
+    }
     await expect(select).toBeFocused();
     await expect(select).toBeVisible();
     const box = await select.boundingBox();
@@ -350,7 +353,7 @@ test.describe("Pipeline — movimentação", () => {
 
 test.describe("Pipeline — reordenar etapas", () => {
   const stageNamesInOrder = async (page: Page) =>
-    page.locator("span[class*='columnLabel']").evaluateAll((els) => els.map((e) => (e.textContent ?? "").replace(/🏆|✕/gu, "").trim()));
+    page.locator("[data-stage-column]").evaluateAll((els) => els.map((e) => e.getAttribute("data-stage-name") ?? ""));
 
   test("por TECLADO: botão da etapa, feedback com a posição, foco preservado e ordem persistida @cross", async ({ page }, testInfo) => {
     const tenant = tenantOf(testInfo, 20);
@@ -378,7 +381,7 @@ test.describe("Pipeline — reordenar etapas", () => {
     await Api.login(tenant);
     await loginUi(page, tenant);
     await openPipeline(page);
-    const header = column(page, "Novo").locator("div[class*='columnHeader']");
+    const header = column(page, "Novo").locator("[data-stage-header]");
     await header.dragTo(column(page, "Ganho"));
     await expect(page.getByText("Ordem das etapas atualizada")).toBeVisible();
     await expect.poll(() => stageNamesInOrder(page)).toEqual(["Em contato", "Ganho", "Novo", "Perdido"]);
@@ -394,7 +397,7 @@ test.describe("Pipeline — reordenar etapas", () => {
     await loginUi(vendedorPage, tenant, "vendedor");
     await openPipeline(vendedorPage);
     await expect(vendedorPage.getByRole("button", { name: /^Mover etapa/ })).toHaveCount(0);
-    expect(await column(vendedorPage, "Novo").locator("div[class*='columnHeader']").getAttribute("draggable")).toBe("false");
+    expect(await column(vendedorPage, "Novo").locator("[data-stage-header]").getAttribute("draggable")).toBe("false");
     await other.close();
   });
 

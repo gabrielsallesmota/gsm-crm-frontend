@@ -1,0 +1,310 @@
+/* Coluna do quadro — Design System (Prompt 06). */
+.column {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 clamp(264px, 23vw, 316px);
+  min-width: 0;
+  background: var(--column-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: var(--space-2);
+  scroll-snap-align: start;
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+/* Destino de um cartão arrastado: realce + texto "Soltar aqui" (não só cor). */
+.cardOver {
+  background: var(--drop-bg);
+  border-color: var(--drop-border);
+  border-style: dashed;
+}
+
+/* Reordenar colunas: marca onde a coluna arrastada vai cair. */
+.columnOver {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.columnDragged {
+  opacity: 0.55;
+}
+
+/* Linha 1: ponto · nome · total · reordenar. Linha 2 (só se houver): soma dos valores, sob o nome —
+   assim o nome nunca é truncado por causa do valor. */
+.header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "dot label count moves"
+    ". sum . .";
+  align-items: center;
+  column-gap: var(--space-2);
+  row-gap: 0;
+  min-height: 40px;
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+}
+
+.dot {
+  grid-area: dot;
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.label {
+  grid-area: label;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--heading);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.sum {
+  grid-area: sum;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.count {
+  grid-area: count;
+  min-width: 24px;
+  padding: 2px var(--space-2);
+  text-align: center;
+  background: var(--hover-bg-2);
+  border-radius: var(--radius-pill);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+/* Reordenar sem arrastar (PIP-04). Revelado por foco/hover; sempre visível em toque. */
+.moves {
+  grid-area: moves;
+  display: inline-flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.header:hover .moves,
+.header:focus-within .moves {
+  opacity: 1;
+}
+
+.moveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.moveBtn:hover:not(:disabled) {
+  background: var(--hover-bg-2);
+  color: var(--text);
+}
+
+.moveBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 96px;
+  overflow-y: auto;
+  /* Rolagem própria da coluna: o cabeçalho e os controles ficam à vista. */
+  max-height: max(360px, calc(100vh - 360px));
+  padding: 2px 2px var(--space-2);
+}
+
+@supports (height: 100dvh) {
+  .body {
+    max-height: max(360px, calc(100dvh - 360px));
+  }
+}
+
+/* Sobreposição (não ocupa espaço): inserir um bloco no fluxo durante o arraste desloca os cartões
+   debaixo do ponteiro e o navegador cancela o "soltar". `pointer-events: none` = não captura eventos. */
+.dropHint {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-sticky);
+  padding: var(--space-3);
+  text-align: center;
+  background: var(--column-bg);
+  border: 1px dashed var(--drop-border);
+  border-radius: var(--radius-md);
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-6) var(--space-3);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.emptyHint {
+  font-size: var(--fs-xs);
+  color: var(--accent-text);
+  visibility: hidden;
+}
+
+.emptyHint[data-active="true"] {
+  visibility: visible;
+}
+
+.skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeletonCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.skeletonLine,
+.skeletonLineShort {
+  display: block;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--hover-bg-3);
+  animation: kanbanPulse 1.4s ease-in-out infinite;
+}
+
+.skeletonLineShort {
+  width: 40%;
+  height: 8px;
+}
+
+@keyframes kanbanPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.loadingMore {
+  padding: var(--space-2);
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.error {
+  padding: var(--space-3);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: var(--fs-xs);
+}
+
+.linkBtn {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.loadMore {
+  width: 100%;
+  min-height: 36px;
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.loadMore:hover {
+  background: var(--hover-bg);
+}
+
+/* Toque: alvos de 44 px; controles de etapa sempre visíveis. */
+@media (pointer: coarse) {
+  .moves {
+    opacity: 1;
+  }
+
+  .moveBtn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .loadMore {
+    min-height: 44px;
+  }
+}
+
+/* Mobile: uma etapa por vez (a navegação fica no seletor de etapas); a página rola, a coluna não. */
+@media (max-width: 760px) {
+  .column {
+    flex-basis: 100%;
+  }
+
+  .column[data-mobile-active="false"] {
+    display: none;
+  }
+
+  .body {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .column,
+  .moves {
+    transition: none;
+  }
+
+  .skeletonLine,
+  .skeletonLineShort {
+    animation: none;
+  }
+}

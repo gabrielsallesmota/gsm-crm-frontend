@@ -47,10 +47,17 @@
 .customRow {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
+  /* WebKit/iOS dá aos `<input type="date">` uma largura intrínseca grande: sem isto os dois campos
+     empurravam a página ~65 px para o lado em 390 px. */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .dateInput {
+  min-width: 0;
+  max-width: 100%;
   background: var(--card-bg-alt);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-input);

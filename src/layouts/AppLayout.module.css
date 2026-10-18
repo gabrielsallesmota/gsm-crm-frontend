@@ -327,12 +327,21 @@
        do drawer ficavam por baixo da faixa "● DEMONSTRAÇÃO" no modo demo. */
     z-index: 1010;
     transform: translateX(-100%);
-    transition: transform 0.25s ease;
-    box-shadow: 20px 0 40px rgba(0, 0, 0, 0.35);
+    /* Fechado: fora da tela, SEM sombra (a sombra vazava como uma faixa cinza na borda esquerda) e
+       fora da ordem de Tab (links invisíveis recebiam foco). `visibility` só muda ao fim da animação. */
+    visibility: hidden;
+    transition:
+      transform 0.25s ease,
+      visibility 0s linear 0.25s;
   }
 
   .sidebarOpen {
     transform: translateX(0);
+    visibility: visible;
+    box-shadow: 20px 0 40px rgba(0, 0, 0, 0.35);
+    transition:
+      transform 0.25s ease,
+      visibility 0s;
   }
 
   .sidebarClose {

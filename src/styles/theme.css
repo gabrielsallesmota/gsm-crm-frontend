@@ -88,6 +88,58 @@
   --radius-card: 15px;
   --radius-input: 11px;
   --radius-pill: 100px;
+
+  /* ---- Design System (Prompt 06) — tokens estruturais ------------------------------------
+     Uma única biblioteca: tudo aqui, em CSS Modules. Valores independentes de tema vivem só neste
+     bloco (o `.theme-dark` herda de `:root`); os que mudam por tema são redefinidos no bloco claro. */
+
+  /* Espaçamento (base 4 px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Tipografia: piso de 12 px (PIP-16); os tamanhos do app seguem esta escala. */
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+  --lh-tight: 1.25;
+  --lh-normal: 1.45;
+
+  /* Raios complementares aos acima */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+
+  /* Camadas (z-index). O que já existe fora do Pipeline não foi renumerado. */
+  --z-base: 1;
+  --z-sticky: 10;
+  --z-dropdown: 30;
+  --z-overlay: 100;
+  --z-toast: 200;
+
+  /* Movimento */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur: 180ms;
+
+  /* Superfícies e elevação */
+  --column-bg: #0d1419;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-lift: 0 10px 24px rgba(0, 0, 0, 0.5);
+
+  /* Estados de interação do quadro */
+  --drop-bg: rgba(46, 230, 110, 0.07);
+  --drop-border: var(--accent);
+  --selected-bg: rgba(46, 230, 110, 0.1);
+
+  /* Texto do botão de WhatsApp (contraste AA sobre o fundo translúcido) */
+  --tone-wa-text: #25d366;
 }
 
 :root[data-theme="light"] {
@@ -159,4 +211,12 @@
   --tone-email: #ffffff;
   --tone-email-bg: #24303b;
   --badge-mix: 40%;
+
+  --column-bg: #e8edf1;
+  --shadow-card: 0 1px 2px rgba(15, 23, 32, 0.08), 0 1px 1px rgba(15, 23, 32, 0.04);
+  --shadow-lift: 0 10px 24px rgba(15, 23, 32, 0.18);
+  --drop-bg: rgba(18, 165, 80, 0.09);
+  --selected-bg: rgba(18, 165, 80, 0.1);
+  /* #128c4a sobre o tint do fundo dava ~3,9:1 (axe: color-contrast). #0a6b36 dá ~6:1. */
+  --tone-wa-text: #0a6b36;
 }

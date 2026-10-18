@@ -121,6 +121,44 @@ export class Api {
     }
   }
 
+  /** Cria um lead pela API (campos completos: valor, empresa, origem…). */
+  async createLead(input: {
+    name: string;
+    stageId: string;
+    ownerId: string;
+    company?: string;
+    phone?: string;
+    email?: string;
+    value?: number;
+    origin?: string;
+  }): Promise<{ id: string }> {
+    const pipeline = await this.defaultPipeline();
+    const created = await this.request<{ id: string }>("POST", "/api/v1/leads", {
+      name: input.name,
+      pipeline_id: pipeline.id,
+      stage_id: input.stageId,
+      owner_id: input.ownerId,
+      origin: input.origin ?? "manual",
+      company: input.company,
+      phone: input.phone,
+      email: input.email,
+      expected_value: input.value,
+    });
+    if (created.status !== 201) throw new Error(`createLead ${created.status}: ${JSON.stringify(created.body)}`);
+    return created.body;
+  }
+
+  async comment(leadId: string, text: string): Promise<void> {
+    // Reenvia em 404: sob carga da máquina, "criar e comentar logo em seguida" pode chegar antes do
+    // commit do lead (achado documentado; não reproduzido em isolamento — 0/60).
+    let r = await this.request("POST", `/api/v1/leads/${leadId}/comments`, { text });
+    for (let attempt = 0; r.status === 404 && attempt < 3; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      r = await this.request("POST", `/api/v1/leads/${leadId}/comments`, { text });
+    }
+    if (r.status !== 201) throw new Error(`comment ${r.status}: ${JSON.stringify(r.body)} (lead ${leadId})`);
+  }
+
   async leadCount(filter: Record<string, string> = {}): Promise<number> {
     const query = new URLSearchParams({ page: "1", page_size: "1", ...filter }).toString();
     const result = await this.request<{ total: number }>("GET", `/api/v1/leads?${query}`);
