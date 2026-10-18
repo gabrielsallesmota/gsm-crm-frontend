@@ -244,7 +244,7 @@ function TenantPanel({
 
       {tenant.isPlatformInternal && (
         <div className={styles.notice}>
-          Tenant interno da GSM: é onde vivem SDR, Prospecção e Clientes GSM. Não pode ser
+          Tenant interno da GSM: é onde vivem SDR e Prospecção da GSM. Não pode ser
           suspenso nem alvo de sessão de suporte.
         </div>
       )}

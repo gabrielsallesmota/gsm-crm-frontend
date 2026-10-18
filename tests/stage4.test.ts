@@ -47,6 +47,7 @@ describe("navegação (cenários A, C e D)", () => {
         "Dashboard",
         "Pipeline",
         "Leads",
+        "Clientes",
         "Tarefas",
         "Agenda",
         "Relatórios",
@@ -74,13 +75,13 @@ describe("navegação (cenários A, C e D)", () => {
     assert.ok(!got.includes("crm:Integrações"));
   });
 
-  it("staff GSM vê o grupo interno separado (Clientes, SDR, Plataforma)", () => {
+  it("staff GSM vê o grupo interno separado (SDR, Plataforma) e Clientes no menu do CRM", () => {
     const sections = navSections(user({ isPlatformStaff: true }));
     assert.equal(sections.length, 2);
     assert.equal(sections[1]!.id, "gsm");
     assert.deepEqual(
       sections[1]!.items.map((i) => i.label),
-      ["Clientes GSM", "SDR", "Plataforma GSM"],
+      ["SDR", "Plataforma GSM"],
     );
   });
 

@@ -16,6 +16,7 @@ export function DrawerHeader({
   editing,
   onEdit,
   onClose,
+  onCreateClient,
 }: {
   lead: Lead;
   stage: PipelineStage | undefined;
@@ -24,6 +25,8 @@ export function DrawerHeader({
   editing: boolean;
   onEdit: () => void;
   onClose: () => void;
+  /** Só em lead GANHO e com Clientes contratado: abre o "Criar cliente?". */
+  onCreateClient?: () => void;
 }) {
   const tel = telHref(lead.phone);
   return (
@@ -59,6 +62,11 @@ export function DrawerHeader({
           </a>
         )}
         <EmailButton lead={lead} />
+        {onCreateClient && (
+          <button type="button" className={styles.actionBtn} onClick={onCreateClient}>
+            🏆 Cliente
+          </button>
+        )}
         {!editing && (
           <button type="button" className={`${styles.actionBtn} ${styles.actionSpacer}`} onClick={onEdit}>
             ✎ Editar

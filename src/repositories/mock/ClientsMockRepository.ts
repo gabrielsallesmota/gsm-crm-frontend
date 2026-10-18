@@ -1,22 +1,26 @@
 import type { ClientsRepository } from "../ClientsRepository";
 import type {
   Client,
+  ClientContract,
   ClientInstallment,
   ClientListFilter,
+  CreateClientFromLeadInput,
+  CreateClientFromLeadResult,
   CreateClientInput,
+  CreateContractInput,
   CustomInstallmentPlanInput,
   GenerateInstallmentsInput,
   UpdateClientInput,
+  UpdateContractInput,
   UpdateInstallmentInput,
 } from "../../types/client";
 import type { Page } from "../../types/common";
 import { NotImplementedError } from "../../utils/errors";
 
 const REASON =
-  "Clientes é a carteira de contratos fechados da própria GSM Automação — não faz parte da demonstração pública do CRM (mesmo racional de `ProspectsMockRepository`).";
+  "Clientes (contratos, parcelas e renovações) exige o servidor — não faz parte da demonstração pública do CRM.";
 
-/** Ver `ProspectsMockRepository` — mesmo padrão: feature real no backend,
- * mas sempre "indisponível" no modo Demo (dado comercial interno da GSM). */
+/** Feature real no backend, mas sempre "indisponível" no modo Demo (sem dado real para mostrar). */
 export class ClientsMockRepository implements ClientsRepository {
   async create(_input: CreateClientInput): Promise<Client> {
     throw new NotImplementedError("Clientes", REASON);
@@ -38,13 +42,46 @@ export class ClientsMockRepository implements ClientsRepository {
     throw new NotImplementedError("Clientes", REASON);
   }
 
-  async listInstallments(_clientId: string): Promise<ClientInstallment[]> {
+  async createFromLead(_input: CreateClientFromLeadInput): Promise<CreateClientFromLeadResult> {
+    throw new NotImplementedError("Clientes", REASON);
+  }
+
+  async findByLead(_leadId: string): Promise<Client | null> {
+    return null;
+  }
+
+  async listContracts(_clientId: string): Promise<ClientContract[]> {
+    throw new NotImplementedError("Clientes", REASON);
+  }
+
+  async createContract(_clientId: string, _input: CreateContractInput): Promise<ClientContract> {
+    throw new NotImplementedError("Clientes", REASON);
+  }
+
+  async updateContract(
+    _clientId: string,
+    _contractId: string,
+    _input: UpdateContractInput,
+  ): Promise<ClientContract> {
+    throw new NotImplementedError("Clientes", REASON);
+  }
+
+  async endContract(_clientId: string, _contractId: string): Promise<ClientContract> {
+    throw new NotImplementedError("Clientes", REASON);
+  }
+
+  async deleteContract(_clientId: string, _contractId: string): Promise<void> {
+    throw new NotImplementedError("Clientes", REASON);
+  }
+
+  async listInstallments(_clientId: string, _contractId?: string): Promise<ClientInstallment[]> {
     throw new NotImplementedError("Clientes", REASON);
   }
 
   async generateInstallments(
     _clientId: string,
     _input: GenerateInstallmentsInput,
+    _contractId?: string,
   ): Promise<ClientInstallment[]> {
     throw new NotImplementedError("Clientes", REASON);
   }
@@ -52,6 +89,7 @@ export class ClientsMockRepository implements ClientsRepository {
   async createCustomInstallmentPlan(
     _clientId: string,
     _input: CustomInstallmentPlanInput,
+    _contractId?: string,
   ): Promise<ClientInstallment[]> {
     throw new NotImplementedError("Clientes", REASON);
   }
@@ -76,15 +114,15 @@ export class ClientsMockRepository implements ClientsRepository {
     throw new NotImplementedError("Clientes", REASON);
   }
 
-  async uploadContract(_clientId: string, _file: File): Promise<Client> {
+  async uploadContractFile(_clientId: string, _file: File): Promise<Client> {
     throw new NotImplementedError("Clientes", REASON);
   }
 
-  async downloadContract(_clientId: string): Promise<Blob> {
+  async downloadContractFile(_clientId: string): Promise<Blob> {
     throw new NotImplementedError("Clientes", REASON);
   }
 
-  async deleteContract(_clientId: string): Promise<Client> {
+  async deleteContractFile(_clientId: string): Promise<Client> {
     throw new NotImplementedError("Clientes", REASON);
   }
 }

@@ -24,6 +24,8 @@ interface TaskDto {
   source?: Task["source"];
   read_only?: boolean;
   external_url?: string | null;
+  client_id?: string | null;
+  contract_id?: string | null;
 }
 
 function toTask(dto: TaskDto): Task {
@@ -43,6 +45,8 @@ function toTask(dto: TaskDto): Task {
     source: dto.source ?? "crm",
     readOnly: dto.read_only === true,
     externalUrl: dto.external_url ?? null,
+    clientId: dto.client_id ?? null,
+    contractId: dto.contract_id ?? null,
   };
 }
 

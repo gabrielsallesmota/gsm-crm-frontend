@@ -8,6 +8,7 @@ import { ConfirmDialog } from "../common/ConfirmDialog";
 import { ConfirmLostDialog } from "./ConfirmLostDialog";
 import { needsLostConfirmation } from "../../utils/pipelineBoard";
 import { TaskFormModal } from "../tasks/TaskFormModal";
+import { CreateClientFromLeadDialog } from "../clients/CreateClientFromLeadDialog";
 import {
   formFromLead,
   isFormDirty,
@@ -27,6 +28,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../hooks/useToast";
 import { useDialog } from "../../hooks/useDialog";
 import { can } from "../../auth/permissions";
+import { hasFeature } from "../../auth/features";
 import { ActivitySection, TIMELINE_MAX_LIMIT } from "./drawer/ActivitySection";
 import { DrawerHeader } from "./drawer/DrawerHeader";
 import { LeadContact } from "./drawer/LeadContact";
@@ -96,6 +98,9 @@ export function LeadDrawer({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState<Discard | null>(null);
   const [confirmLostStage, setConfirmLostStage] = useState<string | null>(null);
+  // "Criar cliente?" — ao ganhar o lead (pergunta, não impõe) ou pelo botão do cabeçalho.
+  const [clientDialog, setClientDialog] = useState(false);
+  const offersClient = hasFeature(user, "clients");
   const [gone, setGone] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -134,6 +139,7 @@ export function LeadDrawer({
             : `Movido para ${target?.label ?? "a nova etapa"}`,
       );
       afterChange(updated);
+      if (target?.isWon && offersClient) setClientDialog(true);
       return true;
     } catch (err) {
       fail(err, "Não foi possível mover o lead.");
@@ -295,6 +301,7 @@ export function LeadDrawer({
           editing={editing}
           onEdit={startEditing}
           onClose={requestClose}
+          {...(stage?.isWon && offersClient ? { onCreateClient: () => setClientDialog(true) } : {})}
         />
 
         <div className={styles.body}>
@@ -422,6 +429,11 @@ export function LeadDrawer({
             onConfirm={confirmDiscardNow}
             onClose={() => setConfirmDiscard(null)}
           />
+        </div>
+      )}
+      {clientDialog && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <CreateClientFromLeadDialog lead={lead} onClose={() => setClientDialog(false)} />
         </div>
       )}
       {confirmLostStage && (

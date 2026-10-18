@@ -30,7 +30,7 @@ export function PlatformOverviewPage() {
         <>
           {!data.platformInternalConfigured && (
             <div className={`${styles.notice} ${styles.danger}`} role="alert">
-              O tenant interno da GSM não está configurado: SDR, Prospecção e Clientes GSM
+              O tenant interno da GSM não está configurado: SDR e Prospecção
               respondem 503 até alguém rodar <code>gsm set-platform-internal-tenant &lt;slug&gt;</code>.
             </div>
           )}

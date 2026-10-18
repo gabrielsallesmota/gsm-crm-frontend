@@ -1,7 +1,12 @@
 // Extensão `.ts` de propósito: roda também no Node (`npm test`), sem Vite.
 import type { AutomationKey, AutomationRule, ParamLimits } from "../types/automations.ts";
 
-const KEYS: readonly AutomationKey[] = ["follow_up", "overdue_task", "stalled_opportunity"];
+const KEYS: readonly AutomationKey[] = [
+  "follow_up",
+  "overdue_task",
+  "stalled_opportunity",
+  "renewal",
+];
 
 function obj(raw: unknown): Record<string, unknown> {
   return raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
@@ -100,6 +105,25 @@ export const RULE_COPY: Record<AutomationKey, RuleCopy> = {
         label: "Dias na mesma etapa",
         unit: "dias",
         hint: "Depois de quantos dias parado o dono é avisado.",
+      },
+    },
+  },
+  renewal: {
+    title: "Renovação de contrato",
+    summary: "Cria a tarefa \"Renovação — cliente\" quando a data de renovação de um contrato se aproxima.",
+    detail:
+      "Vale para todos os contratos ativos que têm data de renovação. Cada contrato pode ter o próprio prazo; sem ele, vale este padrão. Uma tarefa por renovação — nunca repete — para o responsável pelo cliente.",
+    notifies: false,
+    params: {
+      alert_mode: {
+        label: "Quando avisar",
+        unit: "",
+        hint: "No 1º dia do mês da renovação, ou uma antecedência fixa.",
+      },
+      alert_value: {
+        label: "Antecedência",
+        unit: "",
+        hint: "Quantos dias ou meses antes. Não usado no modo \"1º dia do mês\".",
       },
     },
   },

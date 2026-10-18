@@ -34,9 +34,12 @@ import { useStageReorder } from "../hooks/useStageReorder";
 import { serverSortFor, type BoardSortOption } from "../utils/boardSort";
 import { findLead, needsLostConfirmation } from "../utils/pipelineBoard";
 import { ConfirmLostDialog } from "../components/leads/ConfirmLostDialog";
+import { CreateClientFromLeadDialog } from "../components/clients/CreateClientFromLeadDialog";
+import { hasFeature } from "../auth/features";
 import { boardSummary } from "../utils/pipelineView";
 import { EMPTY_PERIOD, type Period } from "../utils/periods";
 import type { PipelineStage } from "../types/pipeline";
+import type { Lead } from "../types/lead";
 import styles from "./PipelinePage.module.css";
 
 type SourceFilter = "todos" | "ativo" | "passivo";
@@ -173,6 +176,8 @@ function LeadsPipelineBoard({
   // D-03: UM só ponto de entrada para mover lead no quadro (arrastar e seletor "mover" passam
   // por aqui). Mover para "perdido" espera a confirmação ANTES de qualquer mudança (nem a otimista).
   const [pendingLost, setPendingLost] = useState<{ leadId: string; stage: PipelineStage } | null>(null);
+  // "Criar cliente?" depois de ganhar um lead (pergunta, não impõe).
+  const [clientFor, setClientFor] = useState<Lead | null>(null);
 
   async function moveLead(leadId: string, stage: PipelineStage) {
     const current = findLead(board.board, leadId);
@@ -187,7 +192,11 @@ function LeadsPipelineBoard({
   async function performMove(leadId: string, stage: PipelineStage) {
     const result = await board.move(leadId, stage.id);
     if (result.ok) {
-      if (stage.isWon) toast("Negócio marcado como ganho 🏆");
+      if (stage.isWon) {
+        toast("Negócio marcado como ganho 🏆");
+        const won = findLead(board.board, leadId);
+        if (won && hasFeature(user, "clients")) setClientFor(won);
+      }
       else if (stage.isLost) toast("Negócio marcado como perdido", "info");
     } else if (result.reason === "busy") {
       toast("Aguarde: este lead ainda está sendo movido.", "warning");
@@ -380,6 +389,8 @@ function LeadsPipelineBoard({
           onDeleted={() => board.reload()}
         />
       )}
+
+      {clientFor && <CreateClientFromLeadDialog lead={clientFor} onClose={() => setClientFor(null)} />}
 
       {pendingLost && (
         <ConfirmLostDialog

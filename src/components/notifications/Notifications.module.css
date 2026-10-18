@@ -30,7 +30,7 @@
 
 .lock {
   font-size: 11.5px;
-  color: var(--tone-amber);
+  color: var(--tone-amber-text);
 }
 
 .notice {
@@ -45,25 +45,25 @@
 .info {
   background: var(--tone-blue-bg);
   border-color: transparent;
-  color: var(--tone-blue);
+  color: var(--tone-blue-text);
 }
 
 .caution {
   background: var(--tone-amber-bg);
   border-color: transparent;
-  color: var(--tone-amber);
+  color: var(--tone-amber-text);
 }
 
 .danger {
   background: var(--tone-red-bg);
   border-color: transparent;
-  color: var(--tone-red);
+  color: var(--tone-red-text);
 }
 
 .success {
   background: var(--tone-green-bg);
   border-color: transparent;
-  color: var(--tone-green);
+  color: var(--tone-green-text);
 }
 
 .subnav {

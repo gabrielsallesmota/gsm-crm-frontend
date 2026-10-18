@@ -236,7 +236,7 @@ export function OrganizationNewPage() {
           <div>
             <p className={styles.muted} style={{ marginTop: 0 }}>
               Pré-selecionado pelo plano "{plan?.name}". O backend bloqueia (403) o que não for
-              contratado. SDR, Prospecção e Clientes GSM são internos e não aparecem aqui.
+              contratado. SDR e Prospecção são internos da GSM e não aparecem aqui.
             </p>
             <div className={styles.featureGrid}>
               {catalog.features.map((f) => (

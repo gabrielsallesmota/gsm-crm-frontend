@@ -1,7 +1,6 @@
-/** Cliente = contrato fechado com a GSM. Nasce automaticamente ao mover um
- * Prospect/Lead pra um estágio "Ganho" (ver
- * `maybe_create_client_from_prospect`/`maybe_create_client_from_lead` no
- * backend) — `source` vira "prospect"/"lead" nesse caso. Também pode ser
+/** Cliente = negócio fechado do tenant. Nasce ao confirmar o diálogo "Criar cliente?" quando
+ * um Lead vai pra uma etapa de ganho (`source: "lead"`); na GSM, Prospect/Lead ganho também
+ * cria sozinho (`source` vira "prospect"/"lead"). Também pode ser
  * cadastrado manualmente (`source: "manual"`, botão "+ Novo cliente" em
  * `ClientsPage`) pra contrato fechado direto, sem passar por Prospecção/
  * Leads. */
@@ -36,16 +35,89 @@ export interface Client {
   contractFileName: string | null;
   contractUploadedAt: string | null;
   notes: string;
+  /** Responsável pelo cliente — recebe as tarefas de renovação. */
+  ownerId: string | null;
   /** Calculados pelo backend a partir das parcelas — nunca editados direto. */
   nextDueDate: string | null;
   hasOverdueInstallment: boolean;
+  /** Contratos ATIVOS e a menor data de renovação entre eles (calculados no backend). */
+  contractsCount: number;
+  nextRenewalDate: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Como o alerta de renovação é calculado a partir da data de renovação. */
+export type RenewalAlertMode = "month_start" | "days_before" | "months_before";
+
+export type ContractStatus = "active" | "renewed" | "ended";
+
+/** Um contrato/ciclo do cliente (Cliente > Contratos > Parcelas). */
+export interface ClientContract {
+  id: string;
+  clientId: string;
+  title: string;
+  valueCents: number | null;
+  paymentType: PaymentType | null;
+  installmentCount: number | null;
+  startDate: string;
+  endDate: string | null;
+  renewalDate: string | null;
+  /** `null` = usa o padrão do tenant (Automações → Renovação de contrato). */
+  renewalAlertMode: RenewalAlertMode | null;
+  renewalAlertValue: number | null;
+  status: ContractStatus;
+  cycleNumber: number;
+  previousContractId: string | null;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateContractInput {
+  startDate: string;
+  title?: string;
+  valueCents?: number;
+  paymentType?: PaymentType;
+  endDate?: string;
+  renewalDate?: string;
+  renewalAlertMode?: RenewalAlertMode;
+  renewalAlertValue?: number;
+  notes?: string;
+}
+
+/** Campos omitidos não mudam. `clear*` limpam; `resetAlert` volta ao padrão do tenant. */
+export interface UpdateContractInput {
+  title?: string;
+  valueCents?: number;
+  startDate?: string;
+  endDate?: string;
+  renewalDate?: string;
+  renewalAlertMode?: RenewalAlertMode;
+  renewalAlertValue?: number;
+  notes?: string;
+  clearRenewalDate?: boolean;
+  clearEndDate?: boolean;
+  resetAlert?: boolean;
+}
+
+/** Conversão confirmada no diálogo "Criar cliente?" ao ganhar um lead. */
+export interface CreateClientFromLeadInput {
+  leadId: string;
+  closedAt?: string;
+  contract?: CreateContractInput;
+}
+
+export interface CreateClientFromLeadResult {
+  client: Client;
+  /** `false` = o lead já tinha virado cliente antes (idempotente). */
+  created: boolean;
 }
 
 export interface ClientInstallment {
   id: string;
   clientId: string;
+  contractId: string | null;
   sequence: number;
   dueDate: string;
   amountCents: number;
@@ -56,6 +128,11 @@ export interface ClientInstallment {
 export interface ClientListFilter {
   search?: string;
   paymentType?: PaymentType;
+  ownerId?: string;
+  /** Renovação entre as duas datas (inclusive), só contratos ativos. */
+  renewalFrom?: string;
+  renewalTo?: string;
+  hasOverdue?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -74,6 +151,7 @@ export interface CreateClientInput {
   niche?: string;
   notes?: string;
   closedAt?: string;
+  ownerId?: string;
 }
 
 export interface UpdateClientInput {
@@ -84,6 +162,7 @@ export interface UpdateClientInput {
   niche?: string;
   notes?: string;
   closedAt?: string;
+  ownerId?: string;
 }
 
 export interface GenerateInstallmentsInput {
@@ -117,6 +196,18 @@ export interface UpdateInstallmentInput {
 export const PAYMENT_TYPE_LABEL: Record<PaymentType, string> = {
   vista: "À vista",
   mensal: "Mensal",
+};
+
+export const RENEWAL_ALERT_MODE_LABEL: Record<RenewalAlertMode, string> = {
+  month_start: "No 1º dia do mês da renovação",
+  days_before: "Dias antes da renovação",
+  months_before: "Meses antes da renovação",
+};
+
+export const CONTRACT_STATUS_LABEL: Record<ContractStatus, string> = {
+  active: "Ativo",
+  renewed: "Renovado",
+  ended: "Encerrado",
 };
 
 export const CLIENT_SOURCE_LABEL: Record<ClientSource, string> = {

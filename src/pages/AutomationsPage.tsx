@@ -20,8 +20,8 @@ import styles from "../components/integrations/Integrations.module.css";
 import local from "../components/automations/Automations.module.css";
 
 /**
- * Configurações → Automações comerciais (CRM-003C). Cinco automações, uma lista: três regras
- * próprias (follow-up, tarefa atrasada, oportunidade parada — `/automations`) e duas que já
+ * Configurações → Automações comerciais (CRM-003C). Seis automações, uma lista: quatro regras
+ * próprias (follow-up, renovação de contrato, tarefa atrasada, oportunidade parada — `/automations`) e duas que já
  * existiam na Central de Notificações (resumo diário e novo lead), mostradas aqui e gravadas
  * pela MESMA API de lá. Admin edita; gestor consulta; o backend recusa o resto (403).
  * Nenhuma regra envia mensagem para cliente final.
@@ -105,6 +105,7 @@ export function AutomationsPage() {
           <ul className={local.list} aria-label="Automações">
             {notificationCard("new_lead")}
             {ruleCard("follow_up")}
+            {hasFeature(user, "clients") && ruleCard("renewal")}
             {ruleCard("overdue_task")}
             {notificationCard("daily_digest")}
             {ruleCard("stalled_opportunity")}

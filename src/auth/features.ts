@@ -3,9 +3,10 @@ import type { AuthUser } from "../types/auth.ts";
 
 /**
  * Catálogo de funcionalidades CONTRATÁVEIS por tenant — espelha
- * `app/shared/features.py` do backend (mesmos códigos e defaults). SDR,
- * Prospecção e Clientes GSM NÃO estão aqui: são áreas internas da GSM
- * (`platform.internal`), nunca contratadas por cliente.
+ * `app/shared/features.py` do backend (mesmos códigos e defaults). SDR e
+ * Prospecção NÃO estão aqui: são áreas internas da GSM (`platform.internal`),
+ * nunca contratadas por cliente. Clientes (contratos, parcelas e renovações) é
+ * módulo de todos os tenants, ligado por padrão.
  *
  * Isto só decide o que a UI MOSTRA. Quem bloqueia é o backend
  * (`require_feature` → 403).
@@ -16,6 +17,7 @@ import type { AuthUser } from "../types/auth.ts";
  */
 export type TenantFeature =
   | "crm"
+  | "clients"
   | "dashboard"
   | "reports"
   | "api"
@@ -25,6 +27,7 @@ export type TenantFeature =
 
 export const FEATURE_DEFAULTS: Record<TenantFeature, boolean> = {
   crm: true,
+  clients: true,
   dashboard: true,
   reports: true,
   api: true,
@@ -35,6 +38,7 @@ export const FEATURE_DEFAULTS: Record<TenantFeature, boolean> = {
 
 export const FEATURE_LABELS: Record<TenantFeature, string> = {
   crm: "CRM",
+  clients: "Clientes",
   dashboard: "Dashboard",
   reports: "Relatórios",
   api: "API pública",

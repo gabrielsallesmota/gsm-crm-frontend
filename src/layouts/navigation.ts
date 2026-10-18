@@ -8,9 +8,9 @@ import type { AuthUser } from "../types/auth.ts";
  * Arquitetura de informação (Etapa 4). Duas áreas que nunca se misturam:
  *
  * - `crm`: o produto do cliente, na ordem do dia a dia —
- *   Dashboard, Pipeline, Leads, Tarefas, Agenda, Relatórios, Equipe,
+ *   Dashboard, Pipeline, Leads, Clientes, Tarefas, Agenda, Relatórios, Equipe,
  *   Integrações, Configurações.
- * - `gsm`: ferramentas INTERNAS da GSM (Clientes, SDR, Plataforma), só para
+ * - `gsm`: ferramentas INTERNAS da GSM (SDR, Plataforma), só para
  *   platform staff e num grupo separado com título próprio. O cliente nunca
  *   vê esse grupo (nem o título).
  *
@@ -50,6 +50,7 @@ export const CRM_NAV: NavItem[] = [
   { to: ROUTES.dashboard, icon: "dashboard", label: "Dashboard", feature: "dashboard" },
   { to: ROUTES.pipeline, icon: "pipeline", label: "Pipeline", feature: "crm" },
   { to: ROUTES.leads, icon: "leads", label: "Leads", feature: "crm" },
+  { to: ROUTES.clientes, icon: "clients", label: "Clientes", feature: "clients" },
   { to: ROUTES.tarefas, icon: "tasks", label: "Tarefas", feature: "crm" },
   { to: ROUTES.agenda, icon: "agenda", label: "Agenda", feature: "crm" },
   { to: ROUTES.relatorios, icon: "reports", label: "Relatórios", feature: "reports" },
@@ -65,7 +66,6 @@ export const CRM_NAV: NavItem[] = [
 ];
 
 export const GSM_NAV: NavItem[] = [
-  { to: ROUTES.clientes, icon: "clients", label: "Clientes GSM", permission: "platform.internal" },
   { to: ROUTES.sdrDashboard, icon: "prospects", label: "SDR", permission: "platform.internal" },
   { to: ROUTES.platform, icon: "platform", label: "Plataforma GSM", permission: "platform.console" },
 ];

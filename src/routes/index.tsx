@@ -21,7 +21,7 @@ import { LeadsPage } from "../pages/LeadsPage";
 
 /**
  * Carrega uma página sob demanda (chunk próprio). Usado para tudo que NÃO
- * é produto do cliente: SDR e Clientes GSM — quem não chega nessas rotas
+ * é produto do cliente: SDR e Prospecção GSM — quem não chega nessas rotas
  * nunca baixa esse código. Isso reduz
  * superfície e bundle; NÃO é controle de acesso (o backend é quem nega).
  */
@@ -153,7 +153,8 @@ export const router = createBrowserRouter([
       { path: ROUTES.pipeline, element: contracted("crm", <PipelinePage />) },
       { path: ROUTES.leads, element: contracted("crm", <LeadsPage />) },
       { path: `${ROUTES.leads}/:id`, element: contracted("crm", <LeadsPage />) },
-      { path: ROUTES.clientes, element: internal(<ClientsPage />) },
+      { path: ROUTES.clientes, element: contracted("clients", <ClientsPage />) },
+      { path: `${ROUTES.clientes}/:id`, element: contracted("clients", <ClientsPage />) },
       { path: ROUTES.sdrCampanhas, element: internal(<SdrCampaignsPage />) },
       { path: ROUTES.sdrCampanhaNova, element: internal(<SdrCampaignFormPage />) },
       { path: `${ROUTES.sdrCampanhas}/:id`, element: internal(<SdrCampaignFormPage />) },

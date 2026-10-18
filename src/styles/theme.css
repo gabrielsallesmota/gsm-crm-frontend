@@ -72,6 +72,11 @@
   --tone-pink-bg: rgba(225, 48, 108, 0.14);
   --tone-red: #ff6b6b;
   --tone-red-bg: rgba(255, 107, 107, 0.14);
+  /* Texto de badge com contraste AA sobre o tint do próprio tom (Clientes). No escuro o tom já passa. */
+  --tone-green-text: var(--tone-green);
+  --tone-blue-text: var(--tone-blue);
+  --tone-amber-text: var(--tone-amber);
+  --tone-red-text: var(--tone-red);
   --tone-gray: #9aa6b2;
   --tone-gray-bg: rgba(255, 255, 255, 0.06);
   --tone-gray-2: #7f8b96;
@@ -204,6 +209,10 @@
   --tone-pink-bg: rgba(194, 51, 111, 0.11);
   --tone-red: #d03535;
   --tone-red-bg: rgba(214, 59, 59, 0.1);
+  --tone-green-text: #0b6e34;
+  --tone-blue-text: #14589c;
+  --tone-amber-text: #7a4600;
+  --tone-red-text: #a62626;
   --tone-gray: #56626e;
   --tone-gray-bg: rgba(16, 24, 32, 0.07);
   --tone-gray-2: #6b7682;

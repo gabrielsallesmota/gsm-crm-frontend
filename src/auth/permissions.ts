@@ -23,7 +23,9 @@ import type { AuthUser } from "../types/auth";
  * - pipeline.reorder  → PATCH /stages/reorder (ADMIN, GESTOR)
  * - leads.assign      → PATCH /leads/{id} owner_id (ADMIN, GESTOR; vendedor → 403)
  * - leads.viewAll     → vendedor só enxerga os próprios leads (escopo no backend)
- * - platform.internal → SDR, Prospecção GSM, Clientes GSM (platform_staff)
+ * - clients.manage   → contratos, parcelas, valores, pagamento e exclusão de clientes (ADMIN, GESTOR);
+ *                       ver clientes é de qualquer papel (feature `clients`)
+ * - platform.internal → SDR e Prospecção GSM (platform_staff)
  * - platform.console  → control plane `/platform/*` (platform_staff)
  *
  * Etapa 2: durante uma SESSÃO DE SUPORTE (impersonation) a pessoa vê o
@@ -36,6 +38,7 @@ export type Permission =
   | "users.create"
   | "settings.manage"
   | "integrations.manage"
+  | "clients.manage"
   | "automations.view"
   | "automations.manage"
   | "notifications.view"
@@ -55,6 +58,7 @@ const ROLE_PERMISSIONS: Record<TenantRole, readonly Permission[]> = {
     "users.view",
     "users.create",
     "settings.manage",
+    "clients.manage",
     "integrations.manage",
     "automations.view",
     "automations.manage",
@@ -67,6 +71,7 @@ const ROLE_PERMISSIONS: Record<TenantRole, readonly Permission[]> = {
   gestor: [
     "users.view",
     "settings.manage",
+    "clients.manage",
     "automations.view",
     "notifications.view",
     "pipeline.reorder",
@@ -109,7 +114,7 @@ export function can(user: Principal, permission: Permission): boolean {
 
 /**
  * O que a UI faz quando alguém abre uma rota sem a permissão exigida:
- * - `not_found`: rota INTERNA da GSM (SDR, Clientes) — para quem não é
+ * - `not_found`: rota INTERNA da GSM (SDR, Prospecção) — para quem não é
  *   staff, a rota simplesmente "não existe" (não revela nem que há uma
  *   área interna, nem a estrutura dela).
  * - `forbidden`: rota do produto que existe para o tenant, mas não para

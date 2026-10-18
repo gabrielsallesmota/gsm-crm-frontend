@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useTasks } from "../hooks/useTasks";
 import { useTaskActions } from "../hooks/useTaskActions";
 import { useTeamDirectory } from "../hooks/useTeamDirectory";
@@ -264,7 +265,12 @@ export function TasksPage() {
                     {task.title}
                   </div>
                   <div className={styles.meta}>
-                    {task.leadName ?? "Pessoal"} ·{" "}
+                    {task.clientId && hasFeature(user, "clients") ? (
+                      <Link to={ROUTES.clienteDetail(task.clientId)}>Ver cliente</Link>
+                    ) : (
+                      (task.leadName ?? (task.clientId ? "Cliente" : "Pessoal"))
+                    )}{" "}
+                    ·{" "}
                     <span className={overdue ? styles.overdue : undefined}>
                       {task.dueAt === null
                         ? "sem data"

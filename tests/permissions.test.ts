@@ -51,7 +51,7 @@ describe("can() — espelha os papéis reais do backend", () => {
 });
 
 describe("evaluateRouteAccess() — guard de rota", () => {
-  it("usuário de tenant digitando /sdr ou /clientes: a rota 'não existe'", () => {
+  it("usuário de tenant digitando /sdr: a rota 'não existe'", () => {
     for (const user of [admin, gestor, vendedor]) {
       assert.equal(evaluateRouteAccess(user, "platform.internal"), "not_found");
     }

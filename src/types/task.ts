@@ -28,6 +28,9 @@ export interface Task {
   readOnly?: boolean;
   /** Link para abrir o item no provedor de origem. */
   externalUrl?: string | null;
+  /** Tarefa ligada a um cliente/contrato (ex.: "Renovação — cliente"). */
+  clientId?: string | null;
+  contractId?: string | null;
 }
 
 export interface TaskListQuery {

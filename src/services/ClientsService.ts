@@ -4,12 +4,17 @@ import { ClientsMockRepository } from "../repositories/mock/ClientsMockRepositor
 import { selectRepository } from "./factory";
 import type {
   Client,
+  ClientContract,
   ClientInstallment,
   ClientListFilter,
+  CreateClientFromLeadInput,
+  CreateClientFromLeadResult,
   CreateClientInput,
+  CreateContractInput,
   CustomInstallmentPlanInput,
   GenerateInstallmentsInput,
   UpdateClientInput,
+  UpdateContractInput,
   UpdateInstallmentInput,
 } from "../types/client";
 import type { Page } from "../types/common";
@@ -40,22 +45,56 @@ export class ClientsService {
     return repo.delete(id);
   }
 
-  listInstallments(clientId: string): Promise<ClientInstallment[]> {
-    return repo.listInstallments(clientId);
+  createFromLead(input: CreateClientFromLeadInput): Promise<CreateClientFromLeadResult> {
+    return repo.createFromLead(input);
+  }
+
+  findByLead(leadId: string): Promise<Client | null> {
+    return repo.findByLead(leadId);
+  }
+
+  listContracts(clientId: string): Promise<ClientContract[]> {
+    return repo.listContracts(clientId);
+  }
+
+  createContract(clientId: string, input: CreateContractInput): Promise<ClientContract> {
+    return repo.createContract(clientId, input);
+  }
+
+  updateContract(
+    clientId: string,
+    contractId: string,
+    input: UpdateContractInput,
+  ): Promise<ClientContract> {
+    return repo.updateContract(clientId, contractId, input);
+  }
+
+  endContract(clientId: string, contractId: string): Promise<ClientContract> {
+    return repo.endContract(clientId, contractId);
+  }
+
+  deleteContract(clientId: string, contractId: string): Promise<void> {
+    return repo.deleteContract(clientId, contractId);
+  }
+
+  listInstallments(clientId: string, contractId?: string): Promise<ClientInstallment[]> {
+    return repo.listInstallments(clientId, contractId);
   }
 
   generateInstallments(
     clientId: string,
     input: GenerateInstallmentsInput,
+    contractId?: string,
   ): Promise<ClientInstallment[]> {
-    return repo.generateInstallments(clientId, input);
+    return repo.generateInstallments(clientId, input, contractId);
   }
 
   createCustomInstallmentPlan(
     clientId: string,
     input: CustomInstallmentPlanInput,
+    contractId?: string,
   ): Promise<ClientInstallment[]> {
-    return repo.createCustomInstallmentPlan(clientId, input);
+    return repo.createCustomInstallmentPlan(clientId, input, contractId);
   }
 
   updateInstallment(
@@ -78,16 +117,16 @@ export class ClientsService {
     return repo.markInstallmentUnpaid(clientId, installmentId);
   }
 
-  uploadContract(clientId: string, file: File): Promise<Client> {
-    return repo.uploadContract(clientId, file);
+  uploadContractFile(clientId: string, file: File): Promise<Client> {
+    return repo.uploadContractFile(clientId, file);
   }
 
-  downloadContract(clientId: string): Promise<Blob> {
-    return repo.downloadContract(clientId);
+  downloadContractFile(clientId: string): Promise<Blob> {
+    return repo.downloadContractFile(clientId);
   }
 
-  deleteContract(clientId: string): Promise<Client> {
-    return repo.deleteContract(clientId);
+  deleteContractFile(clientId: string): Promise<Client> {
+    return repo.deleteContractFile(clientId);
   }
 }
 
