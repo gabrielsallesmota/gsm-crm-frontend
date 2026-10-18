@@ -35,6 +35,7 @@ export interface LeadDto {
   id: string;
   name: string;
   phone: string | null;
+  company?: string | null;
   stage_id: string;
   owner_id: string | null;
 }
@@ -149,13 +150,9 @@ export class Api {
   }
 
   async comment(leadId: string, text: string): Promise<void> {
-    // Reenvia em 404: sob carga da máquina, "criar e comentar logo em seguida" pode chegar antes do
-    // commit do lead (achado documentado; não reproduzido em isolamento — 0/60).
-    let r = await this.request("POST", `/api/v1/leads/${leadId}/comments`, { text });
-    for (let attempt = 0; r.status === 404 && attempt < 3; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      r = await this.request("POST", `/api/v1/leads/${leadId}/comments`, { text });
-    }
+    // Sem repetição em 404: "criar e comentar logo em seguida" já foi um bug real (commit depois da
+    // resposta, corrigido no backend); um 404 aqui precisa falhar o teste.
+    const r = await this.request("POST", `/api/v1/leads/${leadId}/comments`, { text });
     if (r.status !== 201) throw new Error(`comment ${r.status}: ${JSON.stringify(r.body)} (lead ${leadId})`);
   }
 

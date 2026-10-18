@@ -131,8 +131,12 @@ describe("F-13 abertura, fechamento e carregamento", () => {
     fireEvent.mouseDown(dialog().parentElement as HTMLElement);
     await new Promise((r) => setTimeout(r, 20));
     expect(onClose).not.toHaveBeenCalled();
+    // só o botão descarta — e depois de confirmar (Prompt 07: proteção contra perda acidental)
     fireEvent.click(screen.getByRole("button", { name: "Fechar lead" }));
-    expect(onClose).toHaveBeenCalledTimes(1); // só o botão descarta
+    expect(onClose).not.toHaveBeenCalled();
+    const confirm = await screen.findByRole("dialog", { name: "Descartar alterações?" });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Descartar" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("em modo de edição, Esc também não fecha", async () => {
@@ -182,10 +186,45 @@ describe("F-14 edição de dados", () => {
     open();
     edit();
     fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "Outro nome" } });
+    expect(screen.getByText("Alterações não salvas")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    // com alterações, descartar pede confirmação; "Voltar" (cancelar o diálogo) mantém o rascunho
+    const confirm = await screen.findByRole("dialog", { name: "Descartar alterações?" });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Cancelar" }));
+    expect((screen.getByLabelText("Nome") as HTMLInputElement).value).toBe("Outro nome");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog", { name: "Descartar alterações?" })).getByRole("button", {
+        name: "Descartar",
+      }),
+    );
     expect(screen.queryByRole("button", { name: "Salvar alterações" })).toBeNull();
     expect(screen.getByText("Maria Souza")).toBeTruthy();
     expect(api.update).not.toHaveBeenCalled();
+  });
+
+  it("Cancelar sem nenhuma alteração sai da edição direto, sem confirmação", async () => {
+    open();
+    edit();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("dialog", { name: "Descartar alterações?" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Salvar alterações" })).toBeNull();
+  });
+
+  it("validação ao lado do campo: nome vazio, e-mail inválido e limite de caracteres", async () => {
+    open();
+    edit();
+    fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "sem-arroba" } });
+    fireEvent.blur(screen.getByLabelText("E-mail"));
+    expect(await screen.findByText(/Informe um e-mail válido/)).toBeTruthy();
+    expect(screen.getByLabelText("E-mail").getAttribute("aria-invalid")).toBe("true");
+    fireEvent.change(screen.getByLabelText("Empresa"), { target: { value: "x".repeat(201) } });
+    fireEvent.blur(screen.getByLabelText("Empresa"));
+    expect(await screen.findByText(/Use no máximo 200 caracteres/)).toBeTruthy();
+    // tentar salvar com erro não chama a API e leva o foco ao primeiro campo inválido
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    expect(api.update).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Empresa")));
   });
 
   it("salvar envia SÓ os campos editáveis (nome, empresa, telefone, e-mail, valor, probabilidade, origem, notas, tags)", async () => {
@@ -301,13 +340,33 @@ describe("F-15 etapa e responsável (gravam NA HORA)", () => {
     expect(await screen.findByText("Movido para Em contato")).toBeTruthy();
   });
 
-  it("etapas finais têm rótulo (ganho)/(perdido) e avisam sem pedir confirmação (D-03: hoje não há)", async () => {
+  it("ganho move direto; perdido pede confirmação (D-03) e só então grava", async () => {
     api.move.mockResolvedValue(makeLead({ stageId: "s-perdido" }));
     open();
     expect(screen.getByRole("option", { name: "Ganho (ganho)" })).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Etapa"), { target: { value: "s-perdido" } });
+    const confirm = await screen.findByRole("dialog", { name: "Marcar como perdido?" });
+    expect(api.move).not.toHaveBeenCalled();
+    // recusar não move e a etapa exibida continua a do lead
+    fireEvent.click(within(confirm).getByRole("button", { name: "Cancelar" }));
+    expect(api.move).not.toHaveBeenCalled();
+    expect((screen.getByLabelText("Etapa") as HTMLSelectElement).value).toBe("s-novo");
+    fireEvent.change(screen.getByLabelText("Etapa"), { target: { value: "s-perdido" } });
+    fireEvent.click(
+      within(await screen.findByRole("dialog", { name: "Marcar como perdido?" })).getByRole("button", {
+        name: "Marcar como perdido",
+      }),
+    );
     expect(await screen.findByText("Negócio marcado como perdido")).toBeTruthy();
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(api.move).toHaveBeenCalledTimes(1);
+  });
+
+  it("ganho não pede confirmação", async () => {
+    api.move.mockResolvedValue(makeLead({ stageId: "s-ganho" }));
+    open();
+    fireEvent.change(screen.getByLabelText("Etapa"), { target: { value: "s-ganho" } });
+    expect(await screen.findByText("Negócio marcado como ganho")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Marcar como perdido?" })).toBeNull();
   });
 
   it("erro ao mover: toast de erro", async () => {
@@ -330,8 +389,11 @@ describe("F-15 etapa e responsável (gravam NA HORA)", () => {
 
   it("vendedor só VÊ o responsável (sem seletor)", async () => {
     open({ lead: makeLead({ ownerId: "u-vend" }) }, { user: VENDEDOR });
-    expect(await screen.findByText("Vera Vendedora")).toBeTruthy();
+    const summary = await screen.findByRole("region", { name: "Resumo comercial" });
+    expect(await within(summary).findByText("Vera Vendedora")).toBeTruthy();
     expect(screen.queryByRole("combobox", { name: "Responsável" })).toBeNull();
+    // o responsável também aparece no cabeçalho (pergunta 3 do painel)
+    expect(screen.getAllByText("Vera Vendedora").length).toBeGreaterThanOrEqual(2);
   });
 
   it("dono que saiu da equipe aparece como 'Usuário inativo' no seletor", async () => {

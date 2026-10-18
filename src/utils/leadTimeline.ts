@@ -126,3 +126,29 @@ export function timelineActor(item: LeadTimelineItem): string {
   if (item.actorType === "system") return "Sistema";
   return item.actorName ?? "Usuário removido";
 }
+
+export type TimelineKind = "comment" | "task" | "stage" | "data" | "activity" | "other";
+
+/** Família visual do evento (cor/ícone no painel). Só agrupa tipos que já existem. */
+export function timelineKind(type: string): TimelineKind {
+  switch (type) {
+    case "comment":
+      return "comment";
+    case "task_created":
+    case "task_completed":
+    case "task_reopened":
+      return "task";
+    case "created":
+    case "stage_changed":
+    case "won":
+    case "lost":
+    case "owner_changed":
+      return "stage";
+    case "updated":
+      return "data";
+    case "activity":
+      return "activity";
+    default:
+      return "other";
+  }
+}

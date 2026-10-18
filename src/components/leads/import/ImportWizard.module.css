@@ -1,0 +1,351 @@
+/* Assistente de importação CSV (Prompt 07). Só tokens de styles/theme.css. */
+.stepper {
+  display: flex;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+}
+
+.step {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  padding-bottom: var(--space-2);
+  border-bottom: 3px solid var(--border);
+}
+
+.stepDone {
+  color: var(--text-dim);
+  border-bottom-color: var(--accent-border);
+}
+
+.stepCurrent {
+  color: var(--heading);
+  font-weight: 700;
+  border-bottom-color: var(--accent);
+}
+
+.stepNumber {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  background: var(--tone-gray-bg);
+  color: var(--text-dim);
+}
+
+.stepCurrent .stepNumber {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.stepDone .stepNumber {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+
+.stepLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  /* no celular só o passo atual mostra o nome; os outros viram números */
+  .step:not(.stepCurrent) .stepLabel {
+    display: none;
+  }
+}
+
+.title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--fs-lg);
+  font-family: var(--font-heading);
+  color: var(--heading);
+}
+
+.lead {
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: var(--lh-normal);
+}
+
+.dropzone {
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-card);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--text-dim);
+  font-size: var(--fs-md);
+  margin-bottom: var(--space-4);
+}
+
+.dropzone input {
+  margin-top: var(--space-3);
+  max-width: 100%;
+}
+
+.limits {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.fileCard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: baseline;
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+.fileName {
+  font-weight: 700;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.mappingHead,
+.mappingRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.mappingHead {
+  padding: 0 0 var(--space-2);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.mappingRow {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mappingHeader {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.mappingSample {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mappingList {
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.required {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-bg);
+  color: var(--accent-soft);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .mappingHead {
+    display: none;
+  }
+
+  .mappingRow {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+    padding: var(--space-3) 0;
+  }
+
+  .mappingList {
+    max-height: none;
+  }
+}
+
+.select {
+  width: 100%;
+  min-height: 38px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: var(--fs-sm);
+}
+
+.settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.label {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: var(--space-1);
+}
+
+.summary {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.summaryTitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.stat dt {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.stat dd {
+  margin: 2px 0 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.statBad dd {
+  color: var(--tone-red);
+}
+
+.statGood dd {
+  color: var(--accent-text);
+}
+
+.note {
+  margin: var(--space-3) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  line-height: var(--lh-normal);
+}
+
+.warn {
+  color: var(--tone-amber);
+}
+
+.error {
+  color: var(--tone-red);
+}
+
+.callout {
+  border: 1px solid var(--tone-amber);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  background: var(--tone-amber-bg);
+}
+
+.calloutDanger {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+.progressBar {
+  width: 100%;
+  height: 14px;
+  accent-color: var(--accent);
+}
+
+.bigState {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.errorList {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: var(--space-3);
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.errorRow {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.guide {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  line-height: var(--lh-normal);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.actionsLeft {
+  margin-right: auto;
+}
+
+@media (max-width: 560px) {
+  .actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--card-bg-alt);
+    padding: var(--space-3) 0 0;
+  }
+
+  .actions > button {
+    flex: 1 1 auto;
+  }
+}

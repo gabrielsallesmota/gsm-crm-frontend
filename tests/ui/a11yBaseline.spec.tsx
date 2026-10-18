@@ -183,6 +183,7 @@ describe("Auditoria 01 — corrigidos na Fase 1A (testes comuns) e pendentes (it
     const input = document.querySelector("input[type=file]") as HTMLInputElement;
     fireEvent.change(input, { target: { files: [new File(["Nome\nAna"], "x.csv")] } });
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
     fireEvent.click(screen.getByRole("button", { name: /^Importar/ }));
     await screen.findAllByText(/falhou/);
     const modal = screen.getByRole("dialog", { name: "Importar leads via CSV" });
@@ -225,7 +226,8 @@ describe("Achados da Fase 0 (N-01..N-03) — corrigidos na Fase 1A", () => {
     fireEvent.change(input, { target: { files: [new File(["Telefone\n11999990000"], "x.csv")] } });
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
     expect(screen.getByText(/nome.*obrigat|obrigat.*nome/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Importar/ }).getAttribute("aria-describedby")).toBeTruthy();
+    // no assistente em etapas o bloqueio está em "Continuar" (a revisão e o "Importar" vêm depois)
+    expect((screen.getByRole("button", { name: "Continuar" }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
 

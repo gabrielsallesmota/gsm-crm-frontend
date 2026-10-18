@@ -55,7 +55,23 @@ async function upload(csv: string | Uint8Array, name = "leads.csv") {
   return file;
 }
 
-const submit = () => screen.getByRole("button", { name: /^Importar/ }) as HTMLButtonElement;
+/** Assistente em etapas (Prompt 07): Arquivo → Colunas → Revisão → Importação → Resultado. */
+const next = () => screen.queryByRole("button", { name: "Continuar" }) as HTMLButtonElement | null;
+/** Avança de "Colunas" para "Revisão" (onde ficam as opções e o botão Importar). */
+const toReview = () => {
+  const button = next();
+  if (button && !button.disabled) fireEvent.click(button);
+};
+/** Executa `f` já na etapa de revisão (onde ficam as opções, o resumo e o botão Importar). */
+function inReview<T>(f: () => T): T {
+  toReview();
+  return f();
+}
+/** Botão "Importar N lead(s)" — só existe na revisão, então navega até lá se preciso. */
+const submit = () => {
+  toReview();
+  return screen.getByRole("button", { name: /^Importar/ }) as HTMLButtonElement;
+};
 const rowsSent = (): ImportRowInput[] => api.bulkImport.mock.calls[0]![0];
 const instantSleep = () => Promise.resolve();
 /** Resposta do servidor para um lote: tudo criado. */
@@ -72,10 +88,11 @@ const csvOf = (n: number) =>
 
 // ---------------------------------------------------------------------------------------------
 describe("F-10 arquivo", () => {
-  it("estado inicial: pede o arquivo e o botão de importar está desabilitado", () => {
+  it("estado inicial: pede o arquivo e ainda não há botão de importar nem de continuar", () => {
     open();
     expect(screen.getByText("Selecione um arquivo .csv exportado da sua planilha")).toBeTruthy();
-    expect(submit().disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: /^Importar/ })).toBeNull();
+    expect(next()).toBeNull();
   });
 
   it("CSV válido: mostra o nº de linhas, o de/para e habilita 'Importar N lead(s)'", async () => {
@@ -90,7 +107,8 @@ describe("F-10 arquivo", () => {
     open();
     await upload("");
     expect(await screen.findByText("Não foi possível ler colunas nesse arquivo.")).toBeTruthy();
-    expect(submit().disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: /^Importar/ })).toBeNull();
+    expect(next()).toBeNull();
   });
 
   it("só cabeçalho (sem linhas de dados): permanece desabilitado", async () => {
@@ -142,7 +160,7 @@ describe("F-10 mapeamento", () => {
     open();
     await upload("Contato,Fone\nAna,11999990000");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
-    expect(submit().disabled).toBe(true); // sem coluna 'Nome' reconhecida, nada é importável
+    expect(next()!.disabled).toBe(true); // sem coluna 'Nome' reconhecida, não dá para continuar
     const selects = screen.getAllByRole("combobox").slice(-2) as HTMLSelectElement[];
     fireEvent.change(selects[0]!, { target: { value: "name" } });
     fireEvent.change(selects[1]!, { target: { value: "phone" } });
@@ -156,10 +174,9 @@ describe("F-10 mapeamento", () => {
     open();
     await upload("Telefone\n11999990000");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
-    expect(submit().disabled).toBe(true);
+    expect(next()!.disabled).toBe(true);
     const reason = screen.getByText(/Nome é obrigatório: associe uma coluna/);
     expect(reason.getAttribute("role")).toBe("status");
-    expect(submit().getAttribute("aria-describedby")).toBe(reason.id);
     // mapear o Nome tira o aviso e habilita o botão
     const mapSelect = screen.getByLabelText("Campo do lead para a coluna Telefone");
     fireEvent.change(mapSelect, { target: { value: "name" } });
@@ -192,8 +209,8 @@ describe("F-10 mapeamento", () => {
     await upload("Nome,Telefone\nAna,1\n,2\nBia,3\n   ,4");
     await screen.findByText(/4 linha\(s\) encontrada\(s\)/);
     expect(submit().textContent).toBe("Importar 2 lead(s)");
-    const preview = screen.getByRole("region", { name: "Pré-importação" });
-    expect(preview.textContent).toMatch(/Linhas:\s*4.*Válidas:\s*2.*Inválidas:\s*2/s);
+    const preview = inReview(() => screen.getByRole("region", { name: "Pré-importação" }));
+    expect(preview.textContent).toMatch(/Linhas\s*4.*Válidas\s*2.*Inválidas\s*2/s);
     expect(preview.textContent).toMatch(/linha 3: Nome é obrigatório/);
     fireEvent.click(submit());
     await waitFor(() => expect(api.bulkImport).toHaveBeenCalled());
@@ -213,7 +230,7 @@ describe("F-10 mapeamento", () => {
     open();
     await upload("Nome,Origem,Telefone\nAna,Indicação do vizinho,123");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
-    const preview = screen.getByRole("region", { name: "Pré-importação" });
+    const preview = inReview(() => screen.getByRole("region", { name: "Pré-importação" }));
     expect(preview.textContent).toMatch(/1 linha\(s\) com origem desconhecida/);
     expect(preview.textContent).toMatch(/1 linha\(s\) com telefone curto/);
     expect(preview.textContent).toMatch(/apenas que passou/);
@@ -240,7 +257,8 @@ describe("F-10 mapeamento", () => {
 
 // ---------------------------------------------------------------------------------------------
 describe("F-10 parâmetros da importação e permissões", () => {
-  const strategy = () => screen.getByRole("option", { name: "Ignorar a linha" }).closest("select") as HTMLSelectElement;
+  const strategy = () =>
+    inReview(() => screen.getByRole("option", { name: "Ignorar a linha" })).closest("select") as HTMLSelectElement;
 
   it("padrões: etapa de entrada = primeira etapa, duplicados = 'ignorar', pipeline do quadro", async () => {
     open();
@@ -277,7 +295,7 @@ describe("F-10 parâmetros da importação e permissões", () => {
     open();
     await upload("Nome\nAna");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
-    const stage = screen.getByRole("option", { name: "Em contato" }).closest("select") as HTMLSelectElement;
+    const stage = inReview(() => screen.getByRole("option", { name: "Em contato" })).closest("select") as HTMLSelectElement;
     fireEvent.change(stage, { target: { value: "s-contato" } });
     fireEvent.click(submit());
     await waitFor(() => expect(api.bulkImport).toHaveBeenCalled());
@@ -290,6 +308,7 @@ describe("F-10 parâmetros da importação e permissões", () => {
       const view = open({ user });
       await upload("Nome\nAna");
       await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+      toReview();
       const owner = (await screen.findByRole("option", { name: "Vera Vendedora" })).closest("select") as HTMLSelectElement;
       fireEvent.change(owner, { target: { value: "u-vend" } });
       fireEvent.click(submit());
@@ -303,6 +322,7 @@ describe("F-10 parâmetros da importação e permissões", () => {
     open({ user: VENDEDOR });
     await upload("Nome\nAna");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    toReview();
     expect(screen.queryByText("Responsável pelos leads novos")).toBeNull();
     fireEvent.click(submit());
     await waitFor(() => expect(api.bulkImport).toHaveBeenCalled());
@@ -327,8 +347,8 @@ describe("1B limites e lotes (D-10)", () => {
       await upload(csvOf(n));
       await screen.findByText(new RegExp(`${n} linha\\(s\\) encontrada\\(s\\)`));
       expect(submit().textContent).toBe(`Importar ${n} lead(s)`);
-      expect(screen.getByRole("region", { name: "Pré-importação" }).textContent).toMatch(
-        new RegExp(`Lotes:\\s*${calls}`),
+      expect(inReview(() => screen.getByRole("region", { name: "Pré-importação" })).textContent).toMatch(
+        new RegExp(`Lotes\\s*${calls}`),
       );
       fireEvent.click(submit());
       await screen.findByText("Concluído", undefined, { timeout: 20000 });
@@ -348,7 +368,7 @@ describe("1B limites e lotes (D-10)", () => {
     await upload(csvOf(10001));
     expect(await screen.findByText(/limite é 10\.000/)).toBeTruthy();
     expect(screen.getByText(/Nada foi importado/)).toBeTruthy();
-    expect(submit().disabled).toBe(true);
+    expect(screen.queryByRole("button", { name: /^Importar/ })).toBeNull();
     expect(api.bulkImport).not.toHaveBeenCalled();
   });
 
@@ -365,7 +385,7 @@ describe("1B limites e lotes (D-10)", () => {
 
 // ---------------------------------------------------------------------------------------------
 describe("F-10 / 1B processamento, progresso e resultado", () => {
-  it("durante a importação: barra de progresso real, contadores e 'Cancelar importação'", async () => {
+  it("durante a importação: barra de progresso real, contadores e 'Interromper importação'", async () => {
     const first = deferred<ImportSummary>();
     api.bulkImport.mockReturnValueOnce(first.promise);
     api.bulkImport.mockImplementation(async (rows) => created(rows));
@@ -377,10 +397,10 @@ describe("F-10 / 1B processamento, progresso e resultado", () => {
     expect(bar.max).toBe(600);
     expect(bar.value).toBe(0);
     expect(screen.getByText(/Enviando lote 1 de 2/)).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Cancelar importação" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Interromper importação" }) as HTMLButtonElement).disabled).toBe(false);
     first.resolve(created(Array.from({ length: 500 }, (_, i) => ({ name: `Lead ${i}` }))));
     await screen.findByText("Concluído");
-    expect(screen.getByText(/Criados:/).textContent).toMatch(/600/);
+    expect(screen.getByText("Criados").closest("div")!.textContent).toMatch(/600/);
   });
 
   it("resumo com totais por categoria; motivos por linha com o NÚMERO ORIGINAL; 'Ver no pipeline' recarrega e fecha", async () => {
@@ -402,8 +422,8 @@ describe("F-10 / 1B processamento, progresso e resultado", () => {
     await screen.findByText(/5 linha\(s\) encontrada\(s\)/);
     fireEvent.click(submit());
     expect(await screen.findByText("Concluído com erros")).toBeTruthy();
-    const stats = document.querySelector("[class*='summaryStats']") as HTMLElement;
-    expect(stats.textContent).toMatch(/arquivo:\s*5.*Criados:\s*1.*Atualizados:\s*1.*ignorados:\s*1.*permissão:\s*1.*validação:\s*1/s);
+    const stats = screen.getByText("Linhas no arquivo").closest("dl") as HTMLElement;
+    expect(stats.textContent).toMatch(/arquivo\s*5.*Criados\s*1.*Atualizados\s*1.*ignorados\s*1.*permissão\s*1.*validação\s*1/s);
     const list = screen.getByLabelText("Linhas que precisam de atenção");
     expect(list.textContent).toMatch(/Linha 4 \(Bia\) — Duplicado ignorado: Telefone já cadastrado/);
     expect(list.textContent).toMatch(/Linha 5 \(Dani\) — Sem permissão/);
@@ -464,7 +484,7 @@ describe("F-10 / 1B processamento, progresso e resultado", () => {
     await screen.findByText(/1000 linha\(s\) encontrada\(s\)/);
     fireEvent.click(submit());
     expect(await screen.findByText("Falhou")).toBeTruthy();
-    expect(screen.getByText(/Criados:/).textContent).toMatch(/500/);
+    expect(screen.getByText("Criados").closest("div")!.textContent).toMatch(/500/);
     expect(within(screen.getByRole("dialog")).getByRole("alert").textContent).toMatch(/lote 2 de 2/);
     api.bulkImport.mockImplementation(async (rows) => created(rows));
     fireEvent.click(screen.getByRole("button", { name: "Retomar importação" }));
@@ -473,7 +493,7 @@ describe("F-10 / 1B processamento, progresso e resultado", () => {
     const keys = api.bulkImport.mock.calls.map((c) => c[5]);
     expect(keys[1]).toBe(keys[2]); // o lote que falhou é reenviado com a mesma chave
     expect(keys[0]).not.toBe(keys[1]);
-    expect(screen.getByText(/Criados:/).textContent).toMatch(/1\.000/);
+    expect(screen.getByText("Criados").closest("div")!.textContent).toMatch(/1\.000/);
   });
 
   it("cancelar interrompe DEPOIS do lote em andamento e informa o que ficou sem processar", async () => {
@@ -484,11 +504,13 @@ describe("F-10 / 1B processamento, progresso e resultado", () => {
     await screen.findByText(/1200 linha\(s\) encontrada\(s\)/);
     fireEvent.click(submit());
     await screen.findByRole("progressbar");
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar importação" }));
+    fireEvent.click(screen.getByRole("button", { name: "Interromper importação" }));
+    const stopDialog = await screen.findByRole("dialog", { name: "Interromper a importação?" });
+    fireEvent.click(within(stopDialog).getByRole("button", { name: "Interromper" }));
     first.resolve(created(Array.from({ length: 500 }, (_, i) => ({ name: `Lead ${i}` }))));
     expect(await screen.findByText("Cancelada")).toBeTruthy();
     expect(api.bulkImport).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/Criados:/).textContent).toMatch(/500/);
+    expect(screen.getByText("Criados").closest("div")!.textContent).toMatch(/500/);
     expect(screen.getByLabelText("Linhas que precisam de atenção").textContent).toMatch(/Não processado/);
     expect(screen.getByRole("button", { name: "Retomar importação" })).toBeTruthy();
   });
@@ -500,7 +522,7 @@ describe("F-10 / 1B processamento, progresso e resultado", () => {
     open();
     await upload("Nome,Telefone\nAna,11999990000");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
-    fireEvent.change(screen.getByLabelText("Se o telefone já existir"), { target: { value: "duplicate" } });
+    fireEvent.change(inReview(() => screen.getByLabelText("Se o telefone já existir")), { target: { value: "duplicate" } });
     fireEvent.click(submit());
     await screen.findByText("Concluído");
     const [a, b] = api.bulkImport.mock.calls;
@@ -611,11 +633,11 @@ describe("F-10 / 1B processamento, progresso e resultado", () => {
     expect(screen.getByLabelText("Arquivo CSV com os leads")).toBeTruthy();
     await upload("Nome,Telefone\nAna,1");
     await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
-    for (const name of ["Estágio de entrada (leads novos)", "Responsável pelos leads novos", "Se o telefone já existir"]) {
-      expect(screen.getByLabelText(name)).toBeTruthy();
-    }
     expect((screen.getByLabelText("Campo do lead para a coluna Nome") as HTMLSelectElement).value).toBe("name");
     expect((screen.getByLabelText("Campo do lead para a coluna Telefone") as HTMLSelectElement).value).toBe("phone");
+    for (const name of ["Estágio de entrada (leads novos)", "Responsável pelos leads novos", "Se o telefone já existir"]) {
+      expect(inReview(() => screen.getByLabelText(name))).toBeTruthy();
+    }
   });
 
   it("A-10: erro da importação é anunciado UMA vez (role=alert) e o texto continua visível", async () => {
@@ -633,7 +655,7 @@ describe("F-10 / 1B processamento, progresso e resultado", () => {
   it("texto do modal descreve de/para e estratégia de telefone existente", () => {
     open();
     const dialog = screen.getByRole("dialog", { name: "Importar leads via CSV" });
-    expect(within(dialog).getByText(/telefone já existir cadastrado/)).toBeTruthy();
+    expect(within(dialog).getByText(/telefones já cadastrados seguem a estratégia/)).toBeTruthy();
   });
 });
 
@@ -662,7 +684,7 @@ describe("R4 janela segura de retomada (idempotência vale 24 h; retomamos só a
     await upload(csv);
     await screen.findByText(/linha\(s\) encontrada\(s\)/);
     if (strategy !== "skip") {
-      fireEvent.change(screen.getByLabelText("Se o telefone já existir"), { target: { value: strategy } });
+      fireEvent.change(inReview(() => screen.getByLabelText("Se o telefone já existir")), { target: { value: strategy } });
     }
     fireEvent.click(submit());
     await screen.findByText("Falhou");
@@ -676,7 +698,7 @@ describe("R4 janela segura de retomada (idempotência vale 24 h; retomamos só a
     await upload(csv);
     await screen.findByText(/linha\(s\) encontrada\(s\)/);
     if (strategy !== "skip") {
-      fireEvent.change(screen.getByLabelText("Se o telefone já existir"), { target: { value: strategy } });
+      fireEvent.change(inReview(() => screen.getByLabelText("Se o telefone já existir")), { target: { value: strategy } });
     }
     return view;
   }
@@ -733,7 +755,7 @@ describe("R4 janela segura de retomada (idempotência vale 24 h; retomamos só a
     await reopen(csvOf(600), "duplicate");
     fireEvent.click(submit());
     fireEvent.click(await screen.findByRole("button", { name: "Preparar nova importação" }));
-    expect((screen.getByLabelText("Se o telefone já existir") as HTMLSelectElement).value).toBe("skip");
+    expect((inReview(() => screen.getByLabelText("Se o telefone já existir")) as HTMLSelectElement).value).toBe("skip");
     fireEvent.click(submit());
     await screen.findByText("Concluído");
     expect(api.bulkImport.mock.calls.every((c) => c[4] === "skip")).toBe(true);
@@ -852,5 +874,100 @@ describe("A6 sair da tela no meio da importação", () => {
     first.resolve(created(Array.from({ length: 500 }, (_, i) => ({ name: `Lead ${i}` }))));
     await new Promise((r) => setTimeout(r, 200)); // dá tempo de um envio indevido acontecer
     expect(api.bulkImport).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+describe("Prompt 07 assistente em etapas", () => {
+  const stepper = () => screen.getByRole("list", { name: "Etapas da importação" });
+  const current = () => within(stepper()).getByText(/Etapa atual/).closest("li")!.textContent;
+
+  it("o indicador acompanha Arquivo → Colunas → Revisão → Importação → Resultado", async () => {
+    open();
+    expect(current()).toMatch(/Arquivo/);
+    await upload("Nome,Telefone\nAna,11999990000");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    expect(current()).toMatch(/Colunas/);
+    fireEvent.click(next()!);
+    expect(current()).toMatch(/Revisão/);
+    expect(screen.getByText("Nada foi enviado ainda. Confira os números e escolha como importar.")).toBeTruthy();
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(current()).toMatch(/Resultado/);
+    expect(within(stepper()).getAllByText(/Concluída/).length).toBe(4);
+  });
+
+  it("o campo Nome aparece como obrigatório e Voltar leva às etapas anteriores sem enviar nada", async () => {
+    open();
+    await upload("Nome,Telefone\nAna,11999990000");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    expect(screen.getByText("obrigatório")).toBeTruthy();
+    fireEvent.click(next()!);
+    fireEvent.click(screen.getByRole("button", { name: "Voltar" })); // revisão → colunas
+    expect(current()).toMatch(/Colunas/);
+    fireEvent.click(screen.getByRole("button", { name: "Voltar" })); // colunas → arquivo
+    expect(current()).toMatch(/Arquivo/);
+    expect(screen.getByLabelText("Arquivo CSV com os leads")).toBeTruthy();
+    expect(api.bulkImport).not.toHaveBeenCalled();
+  });
+
+  it("colunas ignoradas são listadas e o limite de linhas e o tamanho aparecem antes do envio", async () => {
+    open();
+    expect(screen.getByText(/Até 10\.000 linhas e 5 MB por arquivo/)).toBeTruthy();
+    await upload("Nome,Coluna Estranha\nAna,zzz");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    expect(screen.getByText(/Não serão importadas \(1\): Coluna Estranha/)).toBeTruthy();
+    expect(screen.getByText(/leads\.csv/)).toBeTruthy();
+  });
+
+  it("revisão resume o mapeamento e explica a estratégia de duplicados escolhida", async () => {
+    open();
+    await upload("Nome,Telefone\nAna,11999990000");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(next()!);
+    const summary = screen.getByRole("region", { name: "Resumo do mapeamento" });
+    expect(summary.textContent).toMatch(/Nome → Nome/);
+    expect(summary.textContent).toMatch(/Telefone → Telefone/);
+    expect(screen.getByText(/A linha é ignorada e aparece no relatório como duplicada/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Se o telefone já existir"), { target: { value: "update" } });
+    expect(screen.getByText(/O cadastro existente é atualizado/)).toBeTruthy();
+  });
+
+  it("interromper pede confirmação, não desfaz o que foi gravado e explica a janela de retomada", async () => {
+    const first = deferred<ImportSummary>();
+    api.bulkImport.mockReturnValueOnce(first.promise);
+    api.bulkImport.mockImplementation(async (rows) => created(rows));
+    open();
+    await upload(csvOf(600));
+    await screen.findByText(/600 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(submit());
+    await screen.findByRole("progressbar", { name: "Progresso da importação" });
+    fireEvent.click(screen.getByRole("button", { name: "Interromper importação" }));
+    const confirm = await screen.findByRole("dialog", { name: "Interromper a importação?" });
+    // "Cancelar" no diálogo mantém a importação rodando
+    fireEvent.click(within(confirm).getByRole("button", { name: "Cancelar" }));
+    expect((screen.getByRole("button", { name: "Interromper importação" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Interromper importação" }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog", { name: "Interromper a importação?" })).getByRole("button", {
+        name: "Interromper",
+      }),
+    );
+    expect(await screen.findByText(/Interrompendo depois do lote em andamento/)).toBeTruthy();
+    first.resolve(created(Array.from({ length: 500 }, (_, i) => ({ name: `Lead ${i}` }))));
+    expect(await screen.findByText("Cancelada")).toBeTruthy();
+    expect(screen.getByText(/continuam no CRM/)).toBeTruthy();
+    expect(screen.getByText(/Você pode retomar esta importação até/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retomar importação" })).toBeTruthy();
+    expect(api.bulkImport).toHaveBeenCalledTimes(1); // o 2º lote nunca foi enviado
+  });
+
+  it("o relatório pode ser baixado mesmo quando tudo deu certo e há orientação para os problemas", async () => {
+    open();
+    await upload("Nome\nAna");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    fireEvent.click(submit());
+    await screen.findByText("Concluído");
+    expect(screen.getByRole("button", { name: "Baixar relatório (CSV)" })).toBeTruthy();
   });
 });

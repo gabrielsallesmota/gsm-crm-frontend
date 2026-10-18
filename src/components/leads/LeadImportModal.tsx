@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "../common/Button";
+import { ConfirmDialog } from "../common/ConfirmDialog";
 import { Modal } from "../common/Modal";
 import { useAuth } from "../../hooks/useAuth";
 import { useLeadActions } from "../../hooks/useLeadActions";
@@ -9,13 +10,8 @@ import { IMPORTABLE_LEAD_FIELDS, type DedupeStrategy } from "../../types/lead";
 import type { PipelineStage } from "../../types/pipeline";
 import { useTeamDirectory } from "../../hooks/useTeamDirectory";
 import { can } from "../../auth/permissions";
-import styles from "../prospects/ProspectImportModal.module.css";
-import { describeError } from "../../utils/apiErrors";
 import {
   BATCH_SIZE,
-  IGNORE,
-  KIND_LABEL,
-  MAX_IMPORT_ROWS,
   buildReport,
   checkLimits,
   chunk,
@@ -35,21 +31,14 @@ import {
   type ResumeRecord,
   type RunOutcome,
 } from "../../utils/leadImport";
-
-const STATE_LABEL: Record<ImportState, string> = {
-  waiting: "Aguardando",
-  validating: "Validando",
-  processing: "Processando",
-  completed: "Concluído",
-  completed_with_errors: "Concluído com erros",
-  failed: "Falhou",
-  cancelled: "Cancelada",
-};
-
-/** Quantas linhas problemáticas aparecem na tela; o relatório completo é o CSV baixável. */
-const REPORT_ROWS_SHOWN = 200;
-
-const fmt = (n: number) => n.toLocaleString("pt-BR");
+import { ImportStepper, type WizardStep } from "./import/ImportStepper";
+import { StepColumns } from "./import/StepColumns";
+import { StepFile } from "./import/StepFile";
+import { StepProgress } from "./import/StepProgress";
+import { StepResult } from "./import/StepResult";
+import { dateTime } from "./import/format";
+import { StepReview } from "./import/StepReview";
+import wizard from "./import/ImportWizard.module.css";
 
 /** Um registro por (tenant, usuário, assinatura da planilha+parâmetros): importar outra planilha
  * não apaga o registro de uma interrompida. */
@@ -104,9 +93,6 @@ function pruneResume(prefix: string, now: number) {
   }
 }
 
-const dateTime = (ms: number) =>
-  ms > 0 ? new Date(ms).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "data desconhecida";
-
 function downloadCsv(name: string, content: string) {
   if (typeof URL.createObjectURL !== "function") return;
   const url = URL.createObjectURL(new Blob([content], { type: "text/csv;charset=utf-8" }));
@@ -152,6 +138,11 @@ export function LeadImportModal({
   const [ownerId, setOwnerId] = useState(user?.id ?? "");
   const [dedupeStrategy, setDedupeStrategy] = useState<DedupeStrategy>("skip");
   const [parseError, setParseError] = useState("");
+  const [reading, setReading] = useState(false);
+  // Passo dentro da configuração (depois do arquivo lido): colunas → revisão.
+  const [setupStep, setSetupStep] = useState<"columns" | "review">("columns");
+  const [confirmStop, setConfirmStop] = useState(false);
+  const [stopping, setStopping] = useState(false);
 
   // execução
   const [phase, setPhase] = useState<"setup" | "running" | "done">("setup");
@@ -207,6 +198,7 @@ export function LeadImportModal({
     setParseError("");
     setFileName(file.name);
     setFileBytes(file.size);
+    setReading(true);
     try {
       const text = await readFileAsText(file);
       const parsed = parseCsv(text);
@@ -222,9 +214,23 @@ export function LeadImportModal({
       setHeaders(parsed.headers);
       setRows(parsed.rows);
       setMapping(parsed.headers.map((h) => guessMapping(h, IMPORTABLE_LEAD_FIELDS)));
+      setSetupStep("columns");
     } catch {
       setParseError("Não foi possível ler esse arquivo como CSV.");
+    } finally {
+      setReading(false);
     }
+  }
+
+  /** Volta à escolha do arquivo (nada foi enviado nessa fase). */
+  function backToFile() {
+    setHeaders([]);
+    setRows([]);
+    setMapping([]);
+    setParseError("");
+    setFileName("");
+    setFileBytes(0);
+    setSetupStep("columns");
   }
 
   const resumePrefix = `gsm.leadImport.${currentTenantId ?? "-"}.${user?.id ?? "-"}`;
@@ -281,6 +287,7 @@ export function LeadImportModal({
     }
     setExpired(null);
     cancelRef.current = false;
+    setStopping(false);
     setPhase("running");
     setResult(null);
 
@@ -316,6 +323,8 @@ export function LeadImportModal({
     setExpired(null);
     setResult(null);
     setProgress(null);
+    setStopping(false);
+    setSetupStep("review");
     setPhase("setup");
   }
 
@@ -330,326 +339,138 @@ export function LeadImportModal({
     onClose();
   }
 
-  const counts = result?.report.counts;
-  const problemRows = result ? result.report.rows.filter((r) => r.kind !== "created" && r.kind !== "updated") : [];
+  const step: WizardStep =
+    phase === "running"
+      ? "importing"
+      : phase === "done"
+        ? "result"
+        : headers.length === 0
+          ? "file"
+          : setupStep;
   const canRetry = result && (result.state === "failed" || result.state === "cancelled");
+  const settingsError = parseError && step !== "file" ? parseError : "";
 
   return (
     // IMP-01: diálogo acessível compartilhado (papel, nome, foco preso/devolvido, Esc, proteção de dados).
     // Durante o envio o fechamento fica bloqueado, como no ConfirmDialog.
     <Modal
       title="Importar leads via CSV"
-      subtitle="Suba a planilha, relacione cada coluna com um campo do lead (de/para) e escolha o que fazer quando o telefone já existir cadastrado."
+      subtitle="Importe uma planilha em 5 passos. Nada é enviado ao servidor até você confirmar a revisão; telefones já cadastrados seguem a estratégia que você escolher."
+      size="wide"
       onClose={running ? () => undefined : handleClose}
     >
-      {phase === "running" && progress && (
-        <div className={styles.summary}>
-          <p style={{ margin: "0 0 8px", fontWeight: 600 }}>
-            Estado: {STATE_LABEL[progress.state]}
-          </p>
-          <progress
-            aria-label="Progresso da importação"
-            max={progress.validRows}
-            value={progress.processed}
-            style={{ width: "100%" }}
-          />
-          <p role="status" style={{ margin: "8px 0", fontSize: 13 }}>
-            {progress.currentBatch !== null
-              ? `Enviando lote ${progress.currentBatch} de ${progress.batchesTotal}${progress.attempt > 1 ? ` (nova tentativa ${progress.attempt})` : ""}… `
-              : "Aguardando o próximo lote… "}
-            {fmt(progress.processed)} de {fmt(progress.validRows)} linhas processadas.
-          </p>
-          <div className={styles.summaryStats}>
-            <span>
-              Criados: <strong>{fmt(progress.created)}</strong>
-            </span>
-            <span>
-              Atualizados: <strong>{fmt(progress.updated)}</strong>
-            </span>
-            <span>
-              Ignorados: <strong>{fmt(progress.skipped)}</strong>
-            </span>
-            <span>
-              Com erro: <strong>{fmt(progress.errors)}</strong>
-            </span>
-          </div>
-          <p style={{ fontSize: 12.5, color: "var(--text-muted, inherit)" }}>
-            Mantenha esta janela aberta até terminar. Cancelar interrompe depois do lote em andamento; o que já foi
-            gravado permanece.
-          </p>
-        </div>
+      <ImportStepper current={step} />
+
+      {step === "file" && (
+        <StepFile
+          fileName={fileName}
+          fileBytes={fileBytes}
+          reading={reading}
+          error={parseError}
+          onFile={(f) => void handleFile(f)}
+        />
       )}
 
-      {phase === "done" && result && counts && (
-        <div className={styles.summary}>
-          <p role="status" style={{ margin: "0 0 8px", fontWeight: 600 }}>
-            {STATE_LABEL[result.state]}
-          </p>
-          {resumed && (
-            <p style={{ fontSize: 12.5, margin: "0 0 8px" }}>
-              Esta planilha retomou uma importação interrompida (iniciada em {dateTime(startedAtRef.current)},
-              dentro da janela de proteção de 24 h): o servidor reconhece os lotes já gravados e não os
-              grava de novo.
-            </p>
-          )}
-          <div className={styles.summaryStats}>
-            <span>
-              Linhas no arquivo: <strong>{fmt(prepared?.totalRows ?? 0)}</strong>
-            </span>
-            <span>
-              Criados: <strong>{fmt(counts.created)}</strong>
-            </span>
-            <span>
-              Atualizados: <strong>{fmt(counts.updated)}</strong>
-            </span>
-            <span>
-              Duplicados ignorados: <strong>{fmt(counts.duplicate)}</strong>
-            </span>
-            <span>
-              Sem permissão: <strong>{fmt(counts.permission)}</strong>
-            </span>
-            <span>
-              Falha de validação: <strong>{fmt(counts.validation)}</strong>
-            </span>
-            <span>
-              Não confirmadas: <strong>{fmt(counts.processing + counts.unprocessed)}</strong>
-            </span>
-          </div>
-          {result.outcome.failure && (
-            <p role="alert" style={{ color: "var(--tone-red)", fontSize: 12.5 }}>
-              {describeError(result.outcome.failure.error, "Não foi possível importar.")} A importação parou no lote{" "}
-              {result.outcome.failure.batchIndex + 1} de {batches.length}. Os lotes anteriores foram gravados; use
-              “Retomar importação” para continuar sem duplicar.
-            </p>
-          )}
-          {problemRows.length > 0 && (
-            <>
-              <div className={styles.errorList} aria-label="Linhas que precisam de atenção">
-                {problemRows.slice(0, REPORT_ROWS_SHOWN).map((r) => (
-                  <div key={`${r.rowNumber}-${r.kind}`} className={styles.errorRow}>
-                    Linha {r.rowNumber} ({r.name || "sem nome"}) — {KIND_LABEL[r.kind]}
-                    {r.detail ? `: ${r.detail}` : ""}
-                  </div>
-                ))}
-              </div>
-              {problemRows.length > REPORT_ROWS_SHOWN && (
-                <p style={{ fontSize: 12.5 }}>
-                  Mostrando {REPORT_ROWS_SHOWN} de {fmt(problemRows.length)}. Baixe o relatório para ver todas.
-                </p>
-              )}
-              <Button onClick={() => downloadCsv("relatorio-importacao.csv", reportToCsv(result.report))}>
-                Baixar relatório (CSV)
-              </Button>
-            </>
-          )}
-        </div>
+      {step === "columns" && prepared && (
+        <StepColumns
+          fileName={fileName}
+          fileBytes={fileBytes}
+          headers={headers}
+          rows={rows}
+          mapping={mapping}
+          nameMapped={prepared.nameMapped}
+          onMap={(colIndex, field) =>
+            setMapping((m) => {
+              const next = [...m];
+              next[colIndex] = field;
+              return next;
+            })
+          }
+        />
       )}
 
-      {phase === "setup" && (
-        <>
-          {headers.length === 0 ? (
-            <div className={styles.dropzone}>
-              {fileName && !parseError ? `Lendo ${fileName}…` : "Selecione um arquivo .csv exportado da sua planilha"}
-              <div>
-                <input
-                  className={styles.fileInput}
-                  type="file"
-                  aria-label="Arquivo CSV com os leads"
-                  accept=".csv,text/csv"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void handleFile(file);
-                  }}
-                />
-              </div>
-              <p style={{ fontSize: 12, margin: "8px 0 0" }}>
-                Até {fmt(MAX_IMPORT_ROWS)} linhas e 5 MB por arquivo; o envio é feito em lotes de {BATCH_SIZE}.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className={styles.row}>
-                <div>
-                  <label className={styles.label} htmlFor={`${uid}-stage`} style={{ display: "block" }}>
-                    Estágio de entrada (leads novos)
-                  </label>
-                  <select
-                    id={`${uid}-stage`}
-                    className={styles.select}
-                    value={stageId}
-                    onChange={(e) => setStageId(e.target.value)}
-                  >
-                    {stages.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {canAssign && (
-                  <div>
-                    <label className={styles.label} htmlFor={`${uid}-owner`} style={{ display: "block" }}>
-                      Responsável pelos leads novos
-                    </label>
-                    <select
-                      id={`${uid}-owner`}
-                      className={styles.select}
-                      value={ownerId}
-                      onChange={(e) => setOwnerId(e.target.value)}
-                    >
-                      {team?.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                      {!team && user && <option value={user.id}>Eu</option>}
-                    </select>
-                  </div>
-                )}
-                <div>
-                  <label className={styles.label} htmlFor={`${uid}-dedupe`} style={{ display: "block" }}>
-                    Se o telefone já existir
-                  </label>
-                  <select
-                    id={`${uid}-dedupe`}
-                    className={styles.select}
-                    value={dedupeStrategy}
-                    onChange={(e) => setDedupeStrategy(e.target.value as DedupeStrategy)}
-                  >
-                    <option value="skip">Ignorar a linha</option>
-                    <option value="update">Atualizar o cadastro existente</option>
-                    <option value="duplicate">Cadastrar mesmo assim (duplicar)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className={styles.label} style={{ marginBottom: 8 }}>
-                {rows.length} linha(s) encontrada(s) — relacione as colunas:
-              </div>
-              {headers.map((header, colIndex) => (
-                <div key={header + colIndex} className={styles.mappingRow}>
-                  <div>
-                    <div className={styles.mappingHeader}>{header}</div>
-                    <div className={styles.mappingSample}>{rows[0]?.[colIndex] || "—"}</div>
-                  </div>
-                  <select
-                    className={styles.select}
-                    aria-label={`Campo do lead para a coluna ${header}`}
-                    value={mapping[colIndex] ?? IGNORE}
-                    onChange={(e) =>
-                      setMapping((m) => {
-                        const next = [...m];
-                        next[colIndex] = e.target.value;
-                        return next;
-                      })
-                    }
-                  >
-                    <option value={IGNORE}>Ignorar coluna</option>
-                    {IMPORTABLE_LEAD_FIELDS.map((f) => (
-                      <option key={f.key} value={f.key}>
-                        {f.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-
-              {prepared && (
-                <section aria-label="Pré-importação" className={styles.summary} style={{ marginTop: 12 }}>
-                  <p style={{ margin: "0 0 6px", fontWeight: 600 }}>Pré-importação: {fileName}</p>
-                  <div className={styles.summaryStats}>
-                    <span>
-                      Linhas: <strong>{fmt(prepared.totalRows)}</strong>
-                    </span>
-                    <span>
-                      Válidas: <strong>{fmt(validCount)}</strong>
-                    </span>
-                    <span>
-                      Inválidas: <strong>{fmt(prepared.invalid.length)}</strong>
-                    </span>
-                    <span>
-                      Lotes: <strong>{fmt(batches.length)}</strong>
-                    </span>
-                  </div>
-                  {prepared.invalid.length > 0 && prepared.nameMapped && (
-                    <p style={{ fontSize: 12.5, margin: "6px 0 0" }}>
-                      {fmt(prepared.invalid.length)} linha(s) não serão enviadas e aparecerão no relatório com o motivo
-                      (ex.: linha {prepared.invalid[0]!.rowNumber}: {prepared.invalid[0]!.detail})
-                    </p>
-                  )}
-                  {prepared.warnings.unknownOrigin > 0 && (
-                    <p style={{ fontSize: 12.5, margin: "6px 0 0", color: "var(--tone-amber)" }}>
-                      {fmt(prepared.warnings.unknownOrigin)} linha(s) com origem desconhecida: os leads serão criados sem
-                      origem.
-                    </p>
-                  )}
-                  {prepared.warnings.shortPhone > 0 && (
-                    <p style={{ fontSize: 12.5, margin: "6px 0 0", color: "var(--tone-amber)" }}>
-                      {fmt(prepared.warnings.shortPhone)} linha(s) com telefone curto (menos de 10 dígitos): não
-                      detectam duplicados por telefone.
-                    </p>
-                  )}
-                  <p style={{ fontSize: 12.5, margin: "6px 0 0" }}>
-                    “Válida” significa apenas que passou nas checagens do navegador; o servidor ainda pode ignorar
-                    duplicados ou recusar linhas, e tudo aparece no relatório final.
-                  </p>
-                </section>
-              )}
-            </>
-          )}
-          {parseError && (
-            <p role="alert" style={{ color: "var(--tone-red)", fontSize: 12.5 }}>
-              {parseError}
-            </p>
-          )}
-        </>
+      {step === "review" && prepared && (
+        <StepReview
+          fileName={fileName}
+          prepared={prepared}
+          batchCount={batches.length}
+          headers={headers}
+          mapping={mapping}
+          stages={stages}
+          stageId={stageId}
+          onStage={setStageId}
+          canAssign={canAssign}
+          team={team}
+          ownerId={ownerId}
+          onOwner={setOwnerId}
+          currentUserId={user?.id}
+          dedupe={dedupeStrategy}
+          onDedupe={setDedupeStrategy}
+          blockedReason={blockedReason}
+          blockedId={`${uid}-blocked`}
+        />
       )}
 
-      {blockedReason && phase === "setup" && (
-        <p id={`${uid}-blocked`} role="status" style={{ color: "var(--tone-amber)", fontSize: 12.5 }}>
-          {blockedReason}
+      {settingsError && (
+        <p role="alert" className={`${wizard.note} ${wizard.error}`}>
+          {settingsError}
         </p>
       )}
 
+      {step === "importing" && <StepProgress progress={progress} stopping={stopping} />}
+
+      {step === "result" && result && (
+        <StepResult
+          state={result.state}
+          report={result.report}
+          outcome={result.outcome}
+          totalRows={prepared?.totalRows ?? 0}
+          batchesTotal={batches.length}
+          resumed={resumed}
+          startedAt={startedAtRef.current}
+          now={Date.now()}
+          onDownload={() => downloadCsv("relatorio-importacao.csv", reportToCsv(result.report))}
+        />
+      )}
+
       {expired && (
-        <div role="alert" className={styles.summary} style={{ borderColor: "var(--tone-amber)" }}>
-          <p style={{ margin: "0 0 8px", fontWeight: 600 }}>A proteção contra duplicação desta importação venceu</p>
-          <p style={{ margin: "0 0 8px", fontSize: 12.5 }}>
-            Esta planilha foi enviada pela primeira vez em {dateTime(expired.startedAt)}. O servidor só guarda
-            o registro dos lotes por 24 h, então não é seguro reenviá-los: alguns ou todos os leads desta
-            planilha podem já ter sido importados. <strong>Nada foi reenviado.</strong>
+        <div role="alert" className={wizard.callout}>
+          <p className={wizard.summaryTitle}>A proteção contra duplicação desta importação venceu</p>
+          <p className={wizard.note}>
+            Esta planilha foi enviada pela primeira vez em {dateTime(expired.startedAt)}. O servidor só guarda o
+            registro dos lotes por 24 h, então não é seguro reenviá-los: alguns ou todos os leads desta planilha
+            podem já ter sido importados. <strong>Nada foi reenviado.</strong>
           </p>
-          <p style={{ margin: "0 0 8px", fontSize: 12.5 }}>
-            Para continuar, prepare uma nova importação: telefones já cadastrados serão tratados pela
-            estratégia escolhida{dedupeStrategy === "duplicate" ? " (que será trocada para “Ignorar a linha”)" : ""}.
+          <p className={wizard.note}>
+            Para continuar, prepare uma nova importação: telefones já cadastrados serão tratados pela estratégia
+            escolhida
+            {dedupeStrategy === "duplicate" ? " (que será trocada para “Ignorar a linha”)" : ""}.
           </p>
           <Button onClick={prepareFreshImport}>Preparar nova importação</Button>
         </div>
       )}
 
-      <div className={styles.modalActions}>
+      <div className={wizard.actions}>
         {running ? (
-          <Button
-            onClick={() => {
-              cancelRef.current = true;
-            }}
-          >
-            Cancelar importação
+          <Button className={wizard.actionsLeft} onClick={() => setConfirmStop(true)} disabled={stopping}>
+            {stopping ? "Interrompendo…" : "Interromper importação"}
           </Button>
         ) : (
-          <Button onClick={phase === "done" ? handleClose : onClose}>{phase === "done" ? "Fechar" : "Cancelar"}</Button>
+          <Button className={wizard.actionsLeft} onClick={phase === "done" ? handleClose : onClose}>
+            {phase === "done" ? "Fechar" : "Cancelar"}
+          </Button>
         )}
-        {phase === "done" ? (
+        {step === "columns" && (
           <>
-            {canRetry && (
-              <Button onClick={() => void start(true)}>Retomar importação</Button>
-            )}
-            <Button variant="primary" onClick={handleFinish}>
-              Ver no pipeline
+            <Button onClick={backToFile}>Voltar</Button>
+            <Button variant="primary" onClick={() => setSetupStep("review")} disabled={!prepared?.nameMapped}>
+              Continuar
             </Button>
           </>
-        ) : (
-          phase === "setup" && (
+        )}
+        {step === "review" && (
+          <>
+            <Button onClick={() => setSetupStep("columns")}>Voltar</Button>
             <Button
               variant="primary"
               onClick={() => void start(false)}
@@ -658,9 +479,31 @@ export function LeadImportModal({
             >
               {`Importar ${validCount || ""} lead(s)`}
             </Button>
-          )
+          </>
+        )}
+        {step === "result" && (
+          <>
+            {canRetry && <Button onClick={() => void start(true)}>Retomar importação</Button>}
+            <Button variant="primary" onClick={handleFinish}>
+              Ver no pipeline
+            </Button>
+          </>
         )}
       </div>
+
+      {confirmStop && (
+        <ConfirmDialog
+          title="Interromper a importação?"
+          message="A importação para depois do lote em andamento. O que já foi gravado permanece no CRM (não é desfeito) e você poderá retomar de onde parou dentro da janela segura de 20 h."
+          confirmLabel="Interromper"
+          onConfirm={async () => {
+            cancelRef.current = true;
+            setStopping(true);
+            return true;
+          }}
+          onClose={() => setConfirmStop(false)}
+        />
+      )}
     </Modal>
   );
 }

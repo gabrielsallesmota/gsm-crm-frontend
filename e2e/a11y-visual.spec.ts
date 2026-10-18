@@ -216,7 +216,7 @@ test.describe("teclado e foco", () => {
     await expect(importDialog(page)).toHaveCount(0);
   });
 
-  test("durante o processamento nada fecha o diálogo (Esc, fundo e ×); só 'Cancelar importação'", async ({ page }, testInfo) => {
+  test("durante o processamento nada fecha o diálogo (Esc, fundo e ×); só 'Interromper importação'", async ({ page }, testInfo) => {
     const tenant = tenantOf(testInfo, 81);
     await loginUi(page, tenant);
     await openPipeline(page);
@@ -228,7 +228,7 @@ test.describe("teclado e foco", () => {
     await page.keyboard.press("Escape");
     await page.mouse.click(5, 5);
     await expect(importDialog(page)).toBeVisible();
-    await expect(importDialog(page).getByRole("button", { name: "Cancelar importação" })).toBeEnabled();
+    await expect(importDialog(page).getByRole("button", { name: "Interromper importação" })).toBeEnabled();
     await first.release();
     await (await held.next()).release();
     await expect(stateText(page, "Concluído")).toBeVisible();

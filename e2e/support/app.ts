@@ -56,10 +56,25 @@ export async function openImport(page: Page): Promise<void> {
   await expect(importDialog(page)).toBeVisible();
 }
 
-/** Escolhe o arquivo e espera a leitura (pré-importação pronta). */
+/**
+ * Escolhe o arquivo, espera a leitura e — se a coluna Nome foi reconhecida — avança até a revisão
+ * (onde ficam as opções, a pré-importação e o botão Importar). Com Nome não reconhecido fica em
+ * "Colunas" para o teste mapear.
+ */
 export async function chooseFile(page: Page, file: { name: string; mimeType: string; buffer: Buffer }, rows: number): Promise<void> {
   await importDialog(page).getByLabel("Arquivo CSV com os leads").setInputFiles(file);
   await expect(importDialog(page).getByText(new RegExp(`${rows} linha[(]s[)] encontrada[(]s[)]`))).toBeVisible({ timeout: 60_000 });
+  const next = importDialog(page).getByRole("button", { name: "Continuar" });
+  if (await next.isEnabled()) {
+    await next.click();
+    await expect(importDialog(page).getByRole("region", { name: "Pré-importação" })).toBeVisible();
+  }
+}
+
+/** Interrompe a importação em andamento (pede e confirma o diálogo). */
+export async function interruptImport(page: Page): Promise<void> {
+  await importDialog(page).getByRole("button", { name: "Interromper importação" }).click();
+  await page.getByRole("dialog", { name: "Interromper a importação?" }).getByRole("button", { name: "Interromper" }).click();
 }
 
 export const importButton = (page: Page): Locator => importDialog(page).getByRole("button", { name: /^Importar/ });
@@ -72,8 +87,13 @@ export async function progressValue(page: Page): Promise<{ value: number; max: n
 
 /** Números do resumo final (Criados, Atualizados…), lidos da tela. */
 export async function summaryNumbers(page: Page): Promise<Record<string, number>> {
-  const text = (await importDialog(page).locator("[class*='summaryStats']").first().textContent()) ?? "";
+  const pairs = await importDialog(page)
+    .locator("dl")
+    .first()
+    .evaluate((dl) =>
+      [...dl.children].map((c) => [c.querySelector("dt")?.textContent ?? "", c.querySelector("dd")?.textContent ?? ""]),
+    );
   const out: Record<string, number> = {};
-  for (const m of text.matchAll(/([A-Za-zÀ-ú ]+?):\s*([\d.]+)/g)) out[m[1]!.trim()] = Number(m[2]!.replace(/\./g, ""));
+  for (const [label, value] of pairs) out[label!.trim()] = Number(value!.split(".").join(""));
   return out;
 }

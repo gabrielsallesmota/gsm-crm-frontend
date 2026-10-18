@@ -15,11 +15,14 @@ export function Modal({
   title,
   subtitle,
   onClose,
+  size = "default",
   children,
 }: {
   title: string;
   subtitle?: string;
   onClose: () => void;
+  /** `wide`: assistentes com tabela/etapas (importação); tela cheia no celular. */
+  size?: "default" | "wide";
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -37,7 +40,7 @@ export function Modal({
     >
       <div
         ref={ref}
-        className={styles.modal}
+        className={size === "wide" ? `${styles.modal} ${styles.wide}` : styles.modal}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

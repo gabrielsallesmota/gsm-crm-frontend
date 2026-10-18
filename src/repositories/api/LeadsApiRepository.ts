@@ -224,8 +224,9 @@ export class LeadsApiRepository implements LeadsRepository {
     return toLead(moved);
   }
 
-  async timeline(id: string): Promise<LeadTimelineItem[]> {
-    const items = await apiRequest<TimelineItemDto[]>(`/api/v1/leads/${id}/timeline`);
+  async timeline(id: string, limit?: number): Promise<LeadTimelineItem[]> {
+    const query = limit ? `?limit=${limit}` : "";
+    const items = await apiRequest<TimelineItemDto[]>(`/api/v1/leads/${id}/timeline${query}`);
     return items.map((i) => ({
       id: i.id,
       type: i.type,

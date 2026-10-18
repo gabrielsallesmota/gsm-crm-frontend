@@ -6,6 +6,7 @@ import { Api, phoneOf } from "./support/api";
 import {
   chooseFile,
   importButton,
+  interruptImport,
   importDialog,
   loginUi,
   openImport,
@@ -35,8 +36,8 @@ test.describe("Importação — volumes e lotes", () => {
     await begin(page, tenant);
     await chooseFile(page, file(validCsv(1, 20)), 1);
     const preview = importDialog(page).getByRole("region", { name: "Pré-importação" });
-    await expect(preview).toContainText("Válidas: 1");
-    await expect(preview).toContainText("Lotes: 1");
+    await expect(preview).toContainText(/Válidas\s*1(?!\d)/);
+    await expect(preview).toContainText(/Lotes\s*1(?!\d)/);
     await importButton(page).click();
     await expect(stateText(page, "Concluído")).toBeVisible();
     expect((await summaryNumbers(page))["Criados"]).toBe(1);
@@ -59,7 +60,7 @@ test.describe("Importação — volumes e lotes", () => {
       });
       await begin(page, tenant);
       await chooseFile(page, file(validCsv(rows, 21 + tenantNo)), rows);
-      await expect(importDialog(page).getByRole("region", { name: "Pré-importação" })).toContainText(`Lotes: ${batches}`);
+      await expect(importDialog(page).getByRole("region", { name: "Pré-importação" })).toContainText(new RegExp(`Lotes\\s*${batches}(?!\\d)`));
       await importButton(page).click();
       await expect(stateText(page, "Concluído")).toBeVisible({ timeout: 120_000 });
       expect(requests.length).toBe(batches);
@@ -93,7 +94,7 @@ test.describe("Importação — volumes e lotes", () => {
     const seenProgress: number[] = [];
     await begin(page, tenant);
     await chooseFile(page, file(validCsv(10_000, 50)), 10_000);
-    await expect(importDialog(page).getByRole("region", { name: "Pré-importação" })).toContainText("Lotes: 20");
+    await expect(importDialog(page).getByRole("region", { name: "Pré-importação" })).toContainText(/Lotes\s*20(?!\d)/);
     await importButton(page).click();
     // amostra o progresso enquanto roda: nunca regride e sempre é múltiplo de 500 (lotes confirmados)
     const sampler = (async () => {
@@ -123,7 +124,7 @@ test.describe("Importação — volumes e lotes", () => {
     await importDialog(page).getByLabel("Arquivo CSV com os leads").setInputFiles(file(validCsv(10_001, 51)));
     await expect(importDialog(page).getByText(/limite é 10\.000/)).toBeVisible({ timeout: 60_000 });
     await expect(importDialog(page).getByText(/Nada foi importado/)).toBeVisible();
-    await expect(importButton(page)).toBeDisabled();
+    await expect(importButton(page)).toHaveCount(0); // nem chega às etapas seguintes
     expect(sent).toBe(0);
     expect(await (await Api.login(tenant)).leadCount()).toBe(0);
   });
@@ -171,7 +172,7 @@ test.describe("Importação — progresso real, cancelar e retomar", () => {
     await importDialog(page).getByLabel("Se o telefone já existir").selectOption("duplicate");
     await importButton(page).click();
     const first = await batches.next();
-    await importDialog(page).getByRole("button", { name: "Cancelar importação" }).click();
+    await interruptImport(page);
     await first.release();
     await expect(stateText(page, "Cancelada")).toBeVisible();
     expect(await api.leadCount()).toBe(500); // o lote 2 NUNCA foi enviado
@@ -426,8 +427,8 @@ test.describe("Importação — dados, relatório e segurança", () => {
     ]);
     await chooseFile(page, file(csv), 9);
     const preview = importDialog(page).getByRole("region", { name: "Pré-importação" });
-    await expect(preview).toContainText("Válidas: 7");
-    await expect(preview).toContainText("Inválidas: 2");
+    await expect(preview).toContainText(/Válidas\s*7(?!\d)/);
+    await expect(preview).toContainText(/Inválidas\s*2(?!\d)/);
     await expect(preview).toContainText("origem desconhecida");
     await expect(preview).toContainText("telefone curto");
     await importButton(page).click();
@@ -457,7 +458,7 @@ test.describe("Importação — dados, relatório e segurança", () => {
       file(toCsv([["Nome", "Telefone", "Observações"], ["Boa 1", "11977774441", ""], ["Venenosa", "11977774442", huge], ["Boa 2", "11977774443", ""]])),
       3,
     );
-    await expect(importDialog(page).getByRole("region", { name: "Pré-importação" })).toContainText("Inválidas: 1");
+    await expect(importDialog(page).getByRole("region", { name: "Pré-importação" })).toContainText(/Inválidas\s*1(?!\d)/);
     await importButton(page).click();
     await expect(stateText(page, "Concluído com erros")).toBeVisible();
     await expect(importDialog(page).getByLabel("Linhas que precisam de atenção")).toContainText(
@@ -482,9 +483,10 @@ test.describe("Importação — dados, relatório e segurança", () => {
     await begin(page, tenant);
     await chooseFile(page, file(toCsv([["Contato", "Fone", "Outra"], ["Maria", "11977771111", "x"]])), 1);
     await expect(importDialog(page).getByText(/Nome é obrigatório: associe uma coluna/)).toBeVisible();
-    await expect(importButton(page)).toBeDisabled();
+    await expect(importDialog(page).getByRole("button", { name: "Continuar" })).toBeDisabled();
     await importDialog(page).getByLabel("Campo do lead para a coluna Contato").selectOption("name");
     await importDialog(page).getByLabel("Campo do lead para a coluna Fone").selectOption("phone");
+    await importDialog(page).getByRole("button", { name: "Continuar" }).click();
     await expect(importButton(page)).toBeEnabled();
     await importButton(page).click();
     await expect(stateText(page, "Concluído")).toBeVisible();

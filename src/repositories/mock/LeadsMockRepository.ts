@@ -117,7 +117,7 @@ export class LeadsMockRepository implements LeadsRepository {
 
   /** A demonstração não grava eventos — mostra só os comentários (dado
    * de exemplo real da sessão), nunca uma timeline inventada. */
-  async timeline(id: string): Promise<LeadTimelineItem[]> {
+  async timeline(id: string, _limit?: number): Promise<LeadTimelineItem[]> {
     await delay(150);
     return (mockState.leadComments[id] ?? []).map((c) => ({
       id: c.id,

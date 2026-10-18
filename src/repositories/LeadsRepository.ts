@@ -20,7 +20,8 @@ export interface LeadsRepository {
   update(id: string, input: UpdateLeadInput): Promise<Lead>;
   /** Move para uma etapa REAL (UUID) do pipeline do lead. */
   move(id: string, stageId: string): Promise<Lead>;
-  timeline(id: string): Promise<LeadTimelineItem[]>;
+  /** `limit` opcional (o backend aceita 1–500; sem ele devolve os 100 mais recentes). */
+  timeline(id: string, limit?: number): Promise<LeadTimelineItem[]>;
   delete(id: string): Promise<void>;
 
   bulkImport(
