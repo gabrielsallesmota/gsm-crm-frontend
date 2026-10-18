@@ -31,5 +31,6 @@
 .danger {
   background: transparent;
   border-color: var(--danger-border);
-  color: var(--red);
+  /* tema claro: escurece o vermelho (mesma mistura dos selos de dados) para passar de 4,5:1 */
+  color: color-mix(in srgb, var(--red), #000 var(--badge-mix));
 }

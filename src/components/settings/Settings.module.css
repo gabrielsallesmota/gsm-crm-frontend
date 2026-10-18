@@ -1,0 +1,474 @@
+.pageTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.pageSubtitle {
+  margin: 4px 0 24px;
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.loading {
+  color: var(--muted);
+  font-size: var(--fs-md);
+}
+
+.section {
+  margin-bottom: 28px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sectionTitle {
+  font-family: var(--font-heading);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--heading);
+  margin: 0 0 14px;
+}
+
+.sectionHeader .sectionTitle {
+  margin: 0;
+}
+
+.inlineForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.input {
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  color: var(--text);
+  padding: 9px 13px;
+  font-size: var(--fs-sm);
+  min-width: 220px;
+}
+
+.pipelineGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.pipelineCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 15px;
+}
+
+.pipelineHeader {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.pipelineDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.pipelineName {
+  flex: 1;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.setDefaultBtn {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  padding: 4px 10px;
+}
+
+.editIconBtn {
+  background: transparent;
+  border: none;
+  color: var(--muted-2);
+  font-size: var(--fs-sm);
+  padding: 2px 4px;
+}
+
+.editIconBtn:hover {
+  color: var(--text);
+}
+
+.pipelineEditForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stageDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+
+.stageChip {
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  /* fundo do cartão (não o cinza de hover): garante 4,5:1 com a cor da etapa no tema claro */
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.stageChip:hover {
+  background: var(--hover-bg-3);
+}
+
+.stageEditForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 10px;
+  width: 100%;
+}
+
+.stageFlagLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.noStages {
+  margin-top: 4px;
+}
+
+.noStagesText {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.originChip {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+}
+
+.colorInput {
+  width: 40px;
+  height: 36px;
+  padding: 2px;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+}
+
+.tagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tagDeleteBtn {
+  background: transparent;
+  border: none;
+  color: var(--muted-2);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  padding: 2px;
+}
+
+.tagDeleteBtn:hover {
+  color: var(--danger);
+}
+
+/* CRM-001 — tenant sem pipeline padrão (integrações sem destino). */
+.warning {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--tone-amber);
+  background: var(--tone-amber-bg);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+/* ---- Prompt 08: layout com navegação por categoria + seções em cartões ---- */
+.layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.nav {
+  position: sticky;
+  top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navGroupTitle {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-3);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.navItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.navItem:hover {
+  background: var(--hover-bg-2);
+  color: var(--text);
+}
+
+.navItemActive {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--heading);
+}
+
+.navItemHint {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.navMobile {
+  display: none;
+}
+
+.content {
+  min-width: 0;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.cardTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--fs-lg);
+  color: var(--heading);
+}
+
+.cardDesc {
+  margin: var(--space-1) 0 0;
+  max-width: 62ch;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: var(--lh-normal);
+}
+
+.badgeInternal {
+  display: inline-block;
+  margin-bottom: var(--space-1);
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--tone-purple-bg);
+  color: var(--tone-purple);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.help {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  line-height: var(--lh-normal);
+}
+
+.rowBtn {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rowBtn:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.rowBtnDanger:hover {
+  color: var(--danger);
+  border-color: var(--danger-border);
+}
+
+.originList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.originItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg-alt);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.linkCard {
+  display: block;
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg-alt);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.linkCard:hover {
+  border-color: var(--accent-border);
+}
+
+.linkCardTitle {
+  display: block;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+.linkCardDesc {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+@media (max-width: 860px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .navMobile {
+    display: block;
+  }
+
+  .card {
+    padding: var(--space-4);
+  }
+
+  .input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .inlineForm {
+    width: 100%;
+  }
+}

@@ -50,3 +50,27 @@ test("timelineKind agrupa só tipos conhecidos", () => {
   assert.equal(timelineKind("activity"), "activity");
   assert.equal(timelineKind("novo_tipo"), "other");
 });
+
+import { needsLostConfirmation } from "../src/utils/pipelineBoard.ts";
+
+test("D-03: só pede confirmação ao ENTRAR em etapa perdida (não entre duas perdidas, não na mesma)", () => {
+  const novo = { id: "a", isLost: false };
+  const perdido = { id: "p", isLost: true };
+  const outroPerdido = { id: "p2", isLost: true };
+  assert.equal(needsLostConfirmation(novo, perdido), true);
+  assert.equal(needsLostConfirmation(undefined, perdido), true);
+  assert.equal(needsLostConfirmation(perdido, perdido), false);
+  assert.equal(needsLostConfirmation(perdido, outroPerdido), false);
+  assert.equal(needsLostConfirmation(novo, { id: "g", isLost: false }), false);
+});
+
+import { activeNavTarget } from "../src/layouts/navigation.ts";
+
+test("menu: só UM item ativo — o de caminho mais específico (Integrações × Configurações)", () => {
+  const items = [{ to: "/configuracoes" }, { to: "/configuracoes/integracoes" }, { to: "/pipeline" }];
+  assert.equal(activeNavTarget(items, "/configuracoes/integracoes"), "/configuracoes/integracoes");
+  assert.equal(activeNavTarget(items, "/configuracoes"), "/configuracoes");
+  assert.equal(activeNavTarget(items, "/configuracoes/automacoes"), "/configuracoes");
+  assert.equal(activeNavTarget(items, "/pipeline/x"), "/pipeline");
+  assert.equal(activeNavTarget(items, "/pipelinex"), null);
+});

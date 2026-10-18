@@ -21,8 +21,11 @@ export const email = (tenant: number, role: Role): string =>
  * atropelar). Números por arquivo: pipeline 3–23 · importação 24–59 · acessibilidade/visual 61–84 ·
  * segurança 85–96 · evidências visuais do redesign 101–110. */
 export function tenantOf(testInfo: TestInfo, n: number): number {
+  const isChromium = (testInfo.project.name ?? "chromium") === "chromium";
+  // Faixa extra só do Chromium (151–200 → tenants 351–400): números novos sem deslocar as demais faixas.
+  if (isChromium && n > 150 && n <= 200) return 350 + (n - 150);
   const base = { chromium: 0, firefox: 150, webkit: 250 }[testInfo.project.name] ?? 0;
   const max = base === 0 ? 150 : 100;
-  if (n < 1 || n > max) throw new Error(`tenant ${n} fora da faixa (1–${max})`);
+  if (n < 1 || n > max) throw new Error(`tenant ${n} fora da faixa (1–${max}; Chromium também 151–200)`);
   return base + n;
 }

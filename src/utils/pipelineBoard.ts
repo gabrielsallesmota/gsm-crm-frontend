@@ -126,3 +126,14 @@ export function reorderIds(ids: string[], draggedId: string, targetId: string): 
   next.splice(to, 0, draggedId);
   return next;
 }
+
+/**
+ * D-03: mover para uma etapa PERDIDO exige confirmação — exceto quando o lead já está numa etapa
+ * perdido (não é uma nova perda). Regra única usada pelo painel e pelo quadro.
+ */
+export function needsLostConfirmation(
+  from: Pick<PipelineStage, "id" | "isLost"> | undefined | null,
+  to: Pick<PipelineStage, "id" | "isLost">,
+): boolean {
+  return to.isLost && from?.id !== to.id && !from?.isLost;
+}

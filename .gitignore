@@ -27,3 +27,5 @@ dist-ssr
 e2e/.artifacts/
 test-results/
 playwright-report/
+dist-e2e
+dist-perf

@@ -51,6 +51,8 @@ const STRICT_RULES = [
 ];
 
 async function audit(page: Page, name: string, scope?: string) {
+  // espera o fim das animações de entrada (o axe mede contraste com a opacidade do momento)
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => null))));
   let builder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]);
   if (scope) builder = builder.include(scope);
   const { violations } = await builder.analyze();

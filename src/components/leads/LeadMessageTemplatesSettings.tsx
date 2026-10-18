@@ -64,7 +64,11 @@ export function LeadMessageTemplatesSettings() {
   if (error) {
     return <EmptyState title="Não foi possível carregar os templates" message={error.message} />;
   }
-  if (loadingPipelines || loadingTemplates) return <div className={styles.hint}>Carregando…</div>;
+  // "Carregando…" só na PRIMEIRA carga: numa recarga (depois de criar/editar/excluir) o formulário
+  // não pode ser desmontado — senão apaga o que a pessoa estava digitando.
+  if ((loadingPipelines && !pipelines) || (loadingTemplates && !templates)) {
+    return <div className={styles.hint}>Carregando…</div>;
+  }
 
   const pipelineList = pipelines ?? [];
   const templateList = templates ?? [];

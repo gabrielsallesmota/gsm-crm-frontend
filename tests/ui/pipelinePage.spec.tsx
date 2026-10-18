@@ -350,16 +350,78 @@ describe("F-02/F-03 mover lead", () => {
     await act(async () => pending.resolve(makeLead({ stageId: "s-contato" })));
   });
 
-  it("mover para Ganho mostra o aviso de negócio ganho; para Perdido, o de perdido (sem confirmação extra)", async () => {
+  it("mover para Ganho não pede confirmação", async () => {
     api.move.mockImplementation(async (_id: string, stageId: string) => makeLead({ stageId }));
     render();
     await screen.findByText("Maria Souza");
     fireEvent.change(moveSelect("Maria Souza"), { target: { value: "s-ganho" } });
     expect(await screen.findByText(/marcado como ganho/)).toBeTruthy();
-    fireEvent.change(moveSelect("Maria Souza"), { target: { value: "s-perdido" } });
-    expect(await screen.findByText(/marcado como perdido/)).toBeTruthy();
-    // D-03 (futuro): hoje NÃO há diálogo de confirmação ao perder — caracterização
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Marcar como perdido?" })).toBeNull();
+  });
+
+  // D-03 (aprovada; Prompt 08): TODO caminho do quadro que leva a "perdido" confirma ANTES de mover.
+  describe("D-03 — confirmação ao marcar como perdido (quadro)", () => {
+    const lostDialog = () => screen.findByRole("dialog", { name: "Marcar como perdido?" });
+
+    it("seletor 'mover': nada é movido nem otimista até confirmar; confirmar move e avisa", async () => {
+      api.move.mockImplementation(async (_id: string, stageId: string) => makeLead({ stageId }));
+      render();
+      await screen.findByText("Maria Souza");
+      fireEvent.change(moveSelect("Maria Souza"), { target: { value: "s-perdido" } });
+      const dialog = await lostDialog();
+      expect(within(dialog).getByText(/"Maria Souza" será movido para "Perdido"/)).toBeTruthy();
+      expect(api.move).not.toHaveBeenCalled();
+      expect(document.querySelector("[data-stage-name='Perdido']")?.textContent).not.toMatch(/Maria Souza/);
+      fireEvent.click(within(dialog).getByRole("button", { name: "Marcar como perdido" }));
+      await waitFor(() => expect(api.move).toHaveBeenCalledWith("l1", "s-perdido"));
+      expect(await screen.findByText(/marcado como perdido/)).toBeTruthy();
+      expect(screen.queryByRole("dialog", { name: "Marcar como perdido?" })).toBeNull();
+    });
+
+    it("cancelar preserva o estado anterior: o lead continua na etapa de origem e nada é gravado", async () => {
+      render();
+      await screen.findByText("Maria Souza");
+      fireEvent.change(moveSelect("Maria Souza"), { target: { value: "s-perdido" } });
+      fireEvent.click(within(await lostDialog()).getByRole("button", { name: "Cancelar" }));
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Marcar como perdido?" })).toBeNull());
+      expect(api.move).not.toHaveBeenCalled();
+      expect(screen.getByText("Maria Souza")).toBeTruthy();
+      expect(moveSelect("Maria Souza").value).toBe("s-novo");
+    });
+
+    it("arrastar para a coluna Perdido: também confirma antes de mover", async () => {
+      api.move.mockImplementation(async (_id: string, stageId: string) => makeLead({ stageId }));
+      render();
+      await screen.findByText("Maria Souza");
+      const target = [...document.querySelectorAll("[class*='column']")].find((c) => c.textContent?.startsWith("Perdido"));
+      fireEvent.dragStart(card("Maria Souza"));
+      fireEvent.drop(target as Element);
+      const dialog = await lostDialog();
+      expect(api.move).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole("button", { name: "Marcar como perdido" }));
+      await waitFor(() => expect(api.move).toHaveBeenCalledWith("l1", "s-perdido"));
+    });
+
+    it("erro do servidor depois de confirmar: volta para a etapa de origem e avisa (rollback)", async () => {
+      api.move.mockRejectedValue(new ApiError(500, "falhou"));
+      render();
+      await screen.findByText("Maria Souza");
+      fireEvent.change(moveSelect("Maria Souza"), { target: { value: "s-perdido" } });
+      fireEvent.click(within(await lostDialog()).getByRole("button", { name: "Marcar como perdido" }));
+      expect(await screen.findByText(/Erro inesperado no servidor/)).toBeTruthy();
+      await waitFor(() => expect(moveSelect("Maria Souza").value).toBe("s-novo"));
+    });
+
+    it("pelo painel aberto no quadro: uma única confirmação (o quadro não pergunta de novo)", async () => {
+      api.move.mockImplementation(async (_id: string, stageId: string) => makeLead({ stageId }));
+      render();
+      fireEvent.click(await screen.findByRole("button", { name: "Abrir Maria Souza" }));
+      const drawer = await screen.findByRole("dialog", { name: "Lead Maria Souza" });
+      fireEvent.change(within(drawer).getByLabelText("Etapa"), { target: { value: "s-perdido" } });
+      fireEvent.click(within(await lostDialog()).getByRole("button", { name: "Marcar como perdido" }));
+      await waitFor(() => expect(api.move).toHaveBeenCalledTimes(1));
+      expect(screen.queryAllByRole("dialog", { name: "Marcar como perdido?" })).toHaveLength(0);
+    });
   });
 
   it("arrastar o card para outra coluna chama a API de mover", async () => {

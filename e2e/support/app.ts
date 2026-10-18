@@ -1,10 +1,37 @@
 // Ações de tela compartilhadas pelos E2E. Sempre aguardam estados/respostas observáveis
 // (nunca `waitForTimeout` fixo).
-import { expect, type Locator, type Page } from "@playwright/test";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { email, password, type Role } from "./env";
 
-/** Login pela tela (fluxo real). Pula o tour de boas-vindas, se aparecer. */
+/**
+ * Diagnóstico de intermitência (Prompt 08): falhas de rede e respostas 5xx da API durante o teste são
+ * gravadas em `e2e/.artifacts/network-failures.log` — FORA de `results/`, que o Playwright apaga a cada
+ * execução (a evidência da intermitência de login se perdeu assim). Não muda o comportamento do teste.
+ */
+const traced = new WeakSet<Page>();
+function traceNetwork(page: Page): void {
+  if (traced.has(page)) return;
+  traced.add(page);
+  const log = (kind: string, detail: string) => {
+    mkdirSync("e2e/.artifacts", { recursive: true });
+    appendFileSync(
+      "e2e/.artifacts/network-failures.log",
+      `${new Date().toISOString()} | ${test.info().title.slice(0, 90)} | ${kind} | ${detail}
+`,
+    );
+  };
+  page.on("requestfailed", (r) => {
+    if (r.url().includes("127.0.0.1:8110")) log("requestfailed", `${r.method()} ${r.url()} ${r.failure()?.errorText ?? ""}`);
+  });
+  page.on("response", (r) => {
+    if (r.url().includes("127.0.0.1:8110") && r.status() >= 500) log("http5xx", `${r.status()} ${r.request().method()} ${r.url()}`);
+  });
+}
+
+/** Login pela tela (fluxo real). */
 export async function loginUi(page: Page, tenant: number, role: Role = "admin"): Promise<void> {
+  traceNetwork(page);
   await page.goto("/login");
   await page.getByLabel("E-mail").fill(email(tenant, role));
   await page.getByLabel("Senha", { exact: true }).fill(password());

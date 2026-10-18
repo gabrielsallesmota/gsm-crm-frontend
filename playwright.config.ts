@@ -41,7 +41,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "python scripts/e2e_backend.py --tenants 350 --port 8110",
+      command: "python scripts/e2e_backend.py --tenants 400 --port 8110",
       cwd: backendDir,
       url: "http://127.0.0.1:8110/health/live",
       timeout: 240_000,
@@ -49,9 +49,14 @@ export default defineConfig({
       env: { E2E_PASSWORD: process.env.E2E_PASSWORD },
     },
     {
-      command: "npx vite --port 5174 --strictPort --host localhost",
+      // Por padrão serve o BUILD de produção (`vite build` + `vite preview`): o servidor de desenvolvimento
+      // compila cada rota na primeira visita e, sob carga, uma tela podia ficar em "Carregando a tela…" por
+      // mais que o timeout (intermitência de login/rotas observada nos Prompts 07/08). `E2E_DEV=1` volta ao dev.
+      command: process.env.E2E_DEV === "1"
+        ? "npx vite --port 5174 --strictPort --host localhost"
+        : "npx vite build --outDir dist-e2e --emptyOutDir && npx vite preview --outDir dist-e2e --port 5174 --strictPort --host localhost",
       url: "http://localhost:5174",
-      timeout: 120_000,
+      timeout: 180_000,
       reuseExistingServer: reuse,
       env: { VITE_CRM_API_URL: "http://127.0.0.1:8110", VITE_CRM_MODE: "api" },
     },

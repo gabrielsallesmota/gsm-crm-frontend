@@ -86,3 +86,16 @@ export function navSections(user: Principal): NavSection[] {
   if (gsm.length > 0) sections.push({ id: "gsm", title: "Área interna GSM", items: gsm });
   return sections;
 }
+
+/**
+ * Qual item do menu está ativo: o de MAIOR caminho que casa com a URL (igual ou prefixo por "/").
+ * Sem isto `/configuracoes/integracoes` acendia "Integrações" E "Configurações" ao mesmo tempo.
+ */
+export function activeNavTarget(items: readonly { to: string }[], pathname: string): string | null {
+  let best: string | null = null;
+  for (const { to } of items) {
+    const matches = pathname === to || pathname.startsWith(`${to}/`);
+    if (matches && (best === null || to.length > best.length)) best = to;
+  }
+  return best;
+}

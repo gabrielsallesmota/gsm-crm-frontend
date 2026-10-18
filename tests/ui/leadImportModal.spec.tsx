@@ -971,3 +971,15 @@ describe("Prompt 07 assistente em etapas", () => {
     expect(screen.getByRole("button", { name: "Baixar relatório (CSV)" })).toBeTruthy();
   });
 });
+
+describe("Prompt 08 — etapa de entrada de perda", () => {
+  it("avisa quando a etapa de entrada escolhida é de perda (os leads entram como perdidos)", async () => {
+    open();
+    await upload("Nome\nAna");
+    await screen.findByText(/1 linha\(s\) encontrada\(s\)/);
+    toReview();
+    expect(screen.queryByText(/etapa escolhida é de perda/)).toBeNull();
+    fireEvent.change(screen.getByLabelText("Estágio de entrada (leads novos)"), { target: { value: "s-perdido" } });
+    expect(screen.getByText(/etapa escolhida é de perda/)).toBeTruthy();
+  });
+});

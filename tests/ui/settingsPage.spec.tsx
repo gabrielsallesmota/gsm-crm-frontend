@@ -1,7 +1,7 @@
 // FASE 0 — caracterização de Configurações (F-24..F-31): pipelines, etapas, tags, origens e
 // templates de WhatsApp. Descreve o comportamento ATUAL (inclusive exclusões sem confirmação,
 // que são falhas conhecidas CFG-02 documentadas à parte).
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/services/PipelinesService", () => ({
@@ -54,6 +54,7 @@ import {
   GESTOR,
   STAFF,
   STAGES,
+  deferred,
   makePipeline,
   makeStage,
   makeTemplate,
@@ -188,8 +189,8 @@ describe("F-24 pipelines", () => {
   it("erro ao carregar os pipelines mostra aviso com 'Tentar de novo'", async () => {
     pipes.list.mockRejectedValueOnce(new ApiError(500, "x"));
     open();
-    // o aviso aparece na página e também no bloco de templates (dois avisos iguais — caracterização)
-    expect((await screen.findAllByText("Não foi possível carregar os pipelines")).length).toBe(2);
+    // Prompt 08: os templates ficam em outra categoria, então o aviso aparece uma vez aqui
+    expect((await screen.findAllByText("Não foi possível carregar os pipelines")).length).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
     expect(await screen.findByText("Comercial")).toBeTruthy();
   });
@@ -387,13 +388,16 @@ describe("F-26 tags e F-27 origens", () => {
 });
 
 // ---------------------------------------------------------------------------------------------
+const openComm = (options: Parameters<typeof renderApp>[1] = {}) =>
+  open({ route: "/?secao=comunicacao", ...options });
+
 describe("F-28 mensagens de WhatsApp (templates)", () => {
   const section = () => screen.getByRole("heading", { name: "Pipeline — mensagens de WhatsApp" }).closest("section") as HTMLElement;
   const stageSelect = () => within(section()).getAllByRole("combobox")[0] as HTMLSelectElement;
   const originSelect = () => within(section()).getAllByRole("combobox")[1] as HTMLSelectElement;
 
   it("sem templates: mostra a dica de placeholders e o estado vazio", async () => {
-    open();
+    openComm();
     expect(await screen.findByText("Nenhum template cadastrado ainda.")).toBeTruthy();
     for (const p of ["{nome}", "{empresa}", "{cidade}", "{estado}"]) {
       expect(within(section()).getByText(p)).toBeTruthy();
@@ -401,7 +405,7 @@ describe("F-28 mensagens de WhatsApp (templates)", () => {
   });
 
   it("etapas de todos os pipelines aparecem no seletor, prefixadas pelo pipeline (há mais de um)", async () => {
-    open();
+    openComm();
     await screen.findByText("Nenhum template cadastrado ainda.");
     const options = within(stageSelect()).getAllByRole("option").map((o) => o.textContent);
     expect(options).toContain("Comercial — Novo");
@@ -413,16 +417,32 @@ describe("F-28 mensagens de WhatsApp (templates)", () => {
       makeTemplate({ id: "a", origin: null, message: "Coringa {nome}" }),
       makeTemplate({ id: "b", origin: "instagram", message: "Específico" }),
     ]);
-    open();
+    openComm();
     expect(await screen.findByText("Coringa {nome}")).toBeTruthy();
     expect(within(section()).getByText("Qualquer origem")).toBeTruthy();
     expect(within(section()).getAllByText("Instagram").length).toBeGreaterThanOrEqual(1); // selo + opção do seletor
     expect(within(section()).getAllByText("Comercial — Novo").length).toBeGreaterThanOrEqual(2);
   });
 
+  it("Prompt 08: recarregar a lista depois de salvar NÃO desmonta o formulário (o que a pessoa digita continua lá)", async () => {
+    leads.createMessageTemplate.mockResolvedValue(makeTemplate());
+    const reload = deferred<ReturnType<typeof makeTemplate>[]>();
+    leads.listMessageTemplates.mockResolvedValueOnce([]).mockReturnValueOnce(reload.promise);
+    openComm();
+    await screen.findByText("Nenhum template cadastrado ainda.");
+    fireEvent.change(within(section()).getByPlaceholderText(/Olá \{nome\}/), { target: { value: "Primeira" } });
+    fireEvent.click(within(section()).getByRole("button", { name: "Adicionar template" }));
+    await waitFor(() => expect(leads.listMessageTemplates).toHaveBeenCalledTimes(2)); // recarga em andamento
+    // durante a recarga o formulário continua montado e aceita digitação
+    const box = within(section()).getByPlaceholderText(/Olá \{nome\}/) as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "Segunda mensagem" } });
+    await act(async () => reload.resolve([makeTemplate()]));
+    expect((within(section()).getByPlaceholderText(/Olá \{nome\}/) as HTMLTextAreaElement).value).toBe("Segunda mensagem");
+  });
+
   it("criar template coringa (origem em branco): não envia 'origin'", async () => {
     leads.createMessageTemplate.mockResolvedValue(makeTemplate());
-    open();
+    openComm();
     await screen.findByText("Nenhum template cadastrado ainda.");
     fireEvent.change(within(section()).getByPlaceholderText(/Olá \{nome\}/), { target: { value: "  Olá {nome}!  " } });
     fireEvent.click(within(section()).getByRole("button", { name: "Adicionar template" }));
@@ -432,7 +452,7 @@ describe("F-28 mensagens de WhatsApp (templates)", () => {
 
   it("criar template específico por origem e etapa: envia stageId, origin e mensagem", async () => {
     leads.createMessageTemplate.mockResolvedValue(makeTemplate());
-    open();
+    openComm();
     await screen.findByText("Nenhum template cadastrado ainda.");
     fireEvent.change(stageSelect(), { target: { value: "s-contato" } });
     fireEvent.change(originSelect(), { target: { value: "whatsapp" } });
@@ -444,14 +464,14 @@ describe("F-28 mensagens de WhatsApp (templates)", () => {
   });
 
   it("mensagem vazia desabilita o botão (a validação de conteúdo vazio é do botão)", async () => {
-    open();
+    openComm();
     await screen.findByText("Nenhum template cadastrado ainda.");
     expect((within(section()).getByRole("button", { name: "Adicionar template" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("duplicidade (mesma etapa e origem): o 409 aparece NO formulário, sem toast", async () => {
     leads.createMessageTemplate.mockRejectedValue(new ApiError(409, "Já existe um template para esta etapa e origem"));
-    open();
+    openComm();
     await screen.findByText("Nenhum template cadastrado ainda.");
     fireEvent.change(within(section()).getByPlaceholderText(/Olá \{nome\}/), { target: { value: "x" } });
     fireEvent.click(within(section()).getByRole("button", { name: "Adicionar template" }));
@@ -461,7 +481,7 @@ describe("F-28 mensagens de WhatsApp (templates)", () => {
   it("editar: etapa fica travada; salvar envia origin (ou null para coringa) e a mensagem", async () => {
     leads.listMessageTemplates.mockResolvedValue([makeTemplate({ id: "a", origin: "google", message: "Antiga" })]);
     leads.updateMessageTemplate.mockResolvedValue(makeTemplate());
-    open();
+    openComm();
     fireEvent.click(await screen.findByRole("button", { name: "Editar" }));
     const selects = within(section()).getAllByRole("combobox");
     const editing = selects[selects.length - 2] as HTMLSelectElement;
@@ -477,7 +497,7 @@ describe("F-28 mensagens de WhatsApp (templates)", () => {
     leads.listMessageTemplates.mockResolvedValue([
       makeTemplate({ id: "a", origin: "instagram", message: "Mensagem do Instagram" }),
     ]);
-    open();
+    openComm();
     fireEvent.click(await screen.findByRole("button", { name: "Excluir" }));
     const confirm = await screen.findByRole("dialog", { name: "Excluir template?" });
     expect(within(confirm).getByText(/Comercial — Novo \(Instagram\)/)).toBeTruthy();
@@ -491,7 +511,7 @@ describe("F-28 mensagens de WhatsApp (templates)", () => {
   it("CFG-02: confirmar exclui o template com a MESMA chamada de antes; mensagem de sucesso só depois", async () => {
     leads.listMessageTemplates.mockResolvedValue([makeTemplate({ id: "a" })]);
     leads.deleteMessageTemplate.mockResolvedValue(undefined);
-    open();
+    openComm();
     fireEvent.click(await screen.findByRole("button", { name: "Excluir" }));
     const confirm = await screen.findByRole("dialog", { name: "Excluir template?" });
     expect(within(confirm).getByText(/qualquer origem/)).toBeTruthy(); // coringa
@@ -504,7 +524,7 @@ describe("F-28 mensagens de WhatsApp (templates)", () => {
   it("CFG-02: falha ao excluir o template mantém o diálogo e não diz que excluiu", async () => {
     leads.listMessageTemplates.mockResolvedValue([makeTemplate({ id: "a" })]);
     leads.deleteMessageTemplate.mockRejectedValue(new ApiError(500, "x"));
-    open();
+    openComm();
     fireEvent.click(await screen.findByRole("button", { name: "Excluir" }));
     const confirm = await screen.findByRole("dialog", { name: "Excluir template?" });
     fireEvent.click(within(confirm).getByRole("button", { name: "Excluir" }));
@@ -516,7 +536,7 @@ describe("F-28 mensagens de WhatsApp (templates)", () => {
   it("CFG-06/CFG-07: campos de pipeline, etapa, tag e template têm nome acessível", async () => {
     open();
     await screen.findByText("Comercial");
-    for (const name of ["Nome do novo pipeline", "Nome da nova tag", "Etapa do template", "Origem do template", "Mensagem do template"]) {
+    for (const name of ["Nome do novo pipeline", "Nome da nova tag"]) {
       expect(screen.getByLabelText(name)).toBeTruthy();
     }
     fireEvent.click(screen.getByRole("button", { name: "Editar pipeline Comercial" }));
@@ -527,11 +547,16 @@ describe("F-28 mensagens de WhatsApp (templates)", () => {
     fireEvent.click(within(pipelineCard("Comercial")).getByRole("button", { name: "Cancelar" }));
     fireEvent.click(within(pipelineCard("Comercial")).getByRole("button", { name: "+ Etapa" }));
     expect(screen.getByLabelText("Nome da nova etapa")).toBeTruthy();
+    cleanup();
+    openComm();
+    for (const name of ["Etapa do template", "Origem do template", "Mensagem do template"]) {
+      expect(await screen.findByLabelText(name)).toBeTruthy();
+    }
   });
 
   it("sem pipeline não há formulário de template; orienta a criar um", async () => {
     pipes.list.mockResolvedValue([]);
-    open();
+    openComm();
     expect(await screen.findByText("Crie um pipeline acima antes de configurar mensagens.")).toBeTruthy();
   });
 });
@@ -567,9 +592,52 @@ describe("F-29..F-31 navegação, áreas internas e permissões da página", () 
     await screen.findByText("Comercial");
     expect(screen.queryByText(/Prospecção — /)).toBeNull();
     cleanup();
-    open({ user: STAFF });
+    open({ user: STAFF, route: "/?secao=interno" });
     expect(await screen.findByRole("heading", { name: "Prospecção — Estágios" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Prospecção — mensagens de WhatsApp" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Prospecção — IA dos textos" })).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+describe("Prompt 08 — navegação por categorias (uma rota, `?secao=`)", () => {
+  const nav = () => screen.getByRole("navigation", { name: "Seções das configurações" });
+
+  it("o padrão é 'Funil de vendas' (pipelines, tags, origens) e o botão ativo é anunciado", async () => {
+    open();
+    expect(await screen.findByRole("heading", { name: "Pipelines e etapas" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Tags" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Origens" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Pipeline — mensagens de WhatsApp" })).toBeNull();
+    expect(within(nav()).getByRole("button", { name: /Pipelines, tags e origens/ }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("clicar em 'Mensagens de WhatsApp' troca a categoria sem sair da página", async () => {
+    open();
+    await screen.findByRole("heading", { name: "Pipelines e etapas" });
+    fireEvent.click(within(nav()).getByRole("button", { name: /Mensagens de WhatsApp/ }));
+    expect(await screen.findByRole("heading", { name: "Pipeline — mensagens de WhatsApp" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Pipelines e etapas" })).toBeNull();
+  });
+
+  it("?secao=interno para cliente comum volta ao padrão: a área interna nunca é montada", async () => {
+    open({ route: "/?secao=interno" });
+    expect(await screen.findByRole("heading", { name: "Pipelines e etapas" })).toBeTruthy();
+    expect(screen.queryByText(/Prospecção — /)).toBeNull();
+    expect(within(nav()).queryByRole("button", { name: /Prospecção \(GSM\)/ })).toBeNull();
+    // e a IA dos textos (chamada interna) nem é solicitada
+    expect(vi.mocked(sdrService.getAiSettings)).not.toHaveBeenCalled();
+  });
+
+  it("staff vê a categoria interna; atalhos de Equipe e Integrações só com permissão/feature", async () => {
+    open({ user: STAFF });
+    await screen.findByRole("heading", { name: "Pipelines e etapas" });
+    expect(within(nav()).getByRole("button", { name: /Prospecção \(GSM\)/ })).toBeTruthy();
+    cleanup();
+    open({ user: GESTOR });
+    await screen.findByRole("heading", { name: "Pipelines e etapas" });
+    expect(within(nav()).getByRole("link", { name: "Equipe e usuários" }).getAttribute("href")).toBe("/equipe");
+    expect(within(nav()).queryByRole("link", { name: "Integrações" })).toBeNull();
+    expect(within(nav()).queryByRole("button", { name: /Prospecção \(GSM\)/ })).toBeNull();
   });
 });

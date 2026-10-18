@@ -80,6 +80,11 @@ export function StepReview({
               </option>
             ))}
           </select>
+          {stages.find((s) => s.id === stageId)?.isLost && (
+            <p className={`${styles.note} ${styles.warn}`} role="status">
+              Atenção: a etapa escolhida é de perda — todos os leads importados entrarão como perdidos.
+            </p>
+          )}
         </div>
         {canAssign && (
           <div>

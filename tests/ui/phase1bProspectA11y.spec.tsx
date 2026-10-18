@@ -129,7 +129,7 @@ describe("Configurações da Prospecção — campos com nome acessível (1B)", 
   });
 
   it("estágios de prospecção: nome do novo estágio e IA dos textos sem campos anônimos", async () => {
-    renderApp(<SettingsPage />, { user: STAFF });
+    renderApp(<SettingsPage />, { user: STAFF, route: "/?secao=interno" });
     await screen.findByText("Prospecção — Estágios");
     await screen.findByText("Prospecção — IA dos textos");
     await screen.findByLabelText("Mensagem de WhatsApp");

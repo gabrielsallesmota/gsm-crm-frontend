@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ROUTES } from "../constants/routes";
 import { useAuth } from "../hooks/useAuth";
 import { Avatar } from "../components/common/Avatar";
@@ -11,7 +11,7 @@ import { useToast } from "../hooks/useToast";
 import { isDemoMode } from "../services/factory";
 import type { AuthUser } from "../types/auth";
 import { roleLabel as labelForRole } from "../auth/permissions";
-import { navSections } from "./navigation";
+import { activeNavTarget, navSections } from "./navigation";
 import { DEFAULT_BRAND } from "../config/brand";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { SupportBanner } from "../components/common/SupportBanner";
@@ -35,6 +35,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const sections = navSections(user);
+  const activeTo = activeNavTarget(sections.flatMap((s) => s.items), location.pathname);
   const { toastError } = useToast();
   // Sidebar em telas estreitas vira drawer off-canvas (ver media query em
   // `AppLayout.module.css`) — controlado só aqui porque em desktop o botão
@@ -162,26 +164,28 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
 
           <nav className={styles.nav} aria-label="Menu principal">
-            {navSections(user).map((section) => (
+            {sections.map((section) => (
               <div key={section.id} className={styles.navSection}>
                 {section.title && (
                   <div className={styles.navSectionTitle} aria-hidden={collapsed}>
                     {section.title}
                   </div>
                 )}
-                {section.items.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    title={item.label}
-                    className={({ isActive }) =>
-                      isActive ? `${styles.navItem} ${styles.navItemActive}` : styles.navItem
-                    }
-                  >
-                    <NavIcon name={item.icon} />
-                    <span>{item.label}</span>
-                  </NavLink>
-                ))}
+                {section.items.map((item) => {
+                  const active = item.to === activeTo;
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      title={item.label}
+                      aria-current={active ? "page" : undefined}
+                      className={active ? `${styles.navItem} ${styles.navItemActive}` : styles.navItem}
+                    >
+                      <NavIcon name={item.icon} />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
               </div>
             ))}
           </nav>

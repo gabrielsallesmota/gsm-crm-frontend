@@ -69,7 +69,10 @@ test.describe("filtros", () => {
     await expect(chips).toContainText("Ordem: Nome A-Z");
     await expect(column(page, "Novo").getByRole("button", { name: /^Abrir / })).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Abrir Maria Gestora" })).toBeVisible();
-    expect(requests.some((u) => u.includes("search=maria") && u.includes("owner_id=") && u.includes("date_from=") && u.includes("sort_by=name"))).toBe(true);
+    // a busca tem debounce (300 ms): espera a CONSULTA com os quatro filtros juntos, em vez de supor o tempo
+    await expect
+      .poll(() => requests.some((u) => u.includes("search=maria") && u.includes("owner_id=") && u.includes("date_from=") && u.includes("sort_by=name")))
+      .toBe(true);
     // remover um chip refaz a consulta sem aquele filtro e mantém os demais
     await chips.getByRole("button", { name: /Remover filtro Criados em/ }).click();
     await expect(chips).not.toContainText("Criados em");

@@ -32,7 +32,8 @@ import { useIsMobile } from "../hooks/useMediaQuery";
 import { usePipelineDrag } from "../hooks/usePipelineDrag";
 import { useStageReorder } from "../hooks/useStageReorder";
 import { serverSortFor, type BoardSortOption } from "../utils/boardSort";
-import { findLead } from "../utils/pipelineBoard";
+import { findLead, needsLostConfirmation } from "../utils/pipelineBoard";
+import { ConfirmLostDialog } from "../components/leads/ConfirmLostDialog";
 import { boardSummary } from "../utils/pipelineView";
 import { EMPTY_PERIOD, type Period } from "../utils/periods";
 import type { PipelineStage } from "../types/pipeline";
@@ -169,7 +170,21 @@ function LeadsPipelineBoard({
 
   const ownerNames = new Map((team ?? []).map((m) => [m.id, m.name]));
 
+  // D-03: UM só ponto de entrada para mover lead no quadro (arrastar e seletor "mover" passam
+  // por aqui). Mover para "perdido" espera a confirmação ANTES de qualquer mudança (nem a otimista).
+  const [pendingLost, setPendingLost] = useState<{ leadId: string; stage: PipelineStage } | null>(null);
+
   async function moveLead(leadId: string, stage: PipelineStage) {
+    const current = findLead(board.board, leadId);
+    const from = current ? stages.find((s) => s.id === current.stageId) : undefined;
+    if (current && needsLostConfirmation(from, stage)) {
+      setPendingLost({ leadId, stage });
+      return;
+    }
+    await performMove(leadId, stage);
+  }
+
+  async function performMove(leadId: string, stage: PipelineStage) {
     const result = await board.move(leadId, stage.id);
     if (result.ok) {
       if (stage.isWon) toast("Negócio marcado como ganho 🏆");
@@ -363,6 +378,18 @@ function LeadsPipelineBoard({
           onClose={() => setSelectedLeadId(null)}
           onSaved={(lead) => board.applyLead(lead)}
           onDeleted={() => board.reload()}
+        />
+      )}
+
+      {pendingLost && (
+        <ConfirmLostDialog
+          leadName={findLead(board.board, pendingLost.leadId)?.name ?? "Este lead"}
+          stageLabel={pendingLost.stage.label}
+          onConfirm={async () => {
+            await performMove(pendingLost.leadId, pendingLost.stage);
+            return true;
+          }}
+          onClose={() => setPendingLost(null)}
         />
       )}
 

@@ -5,6 +5,8 @@ import type { Task } from "../../types/task";
 import { ApiError } from "../../types/common";
 import { Button } from "../common/Button";
 import { ConfirmDialog } from "../common/ConfirmDialog";
+import { ConfirmLostDialog } from "./ConfirmLostDialog";
+import { needsLostConfirmation } from "../../utils/pipelineBoard";
 import { TaskFormModal } from "../tasks/TaskFormModal";
 import {
   formFromLead,
@@ -144,7 +146,8 @@ export function LeadDrawer({
   /** D-03: marcar como perdido pede confirmação (sem motivo obrigatório). */
   function requestMove(stageId: string) {
     if (stageId === lead.stageId) return;
-    if (pipelineStages.find((s) => s.id === stageId)?.isLost) setConfirmLostStage(stageId);
+    const target = pipelineStages.find((s) => s.id === stageId);
+    if (target && needsLostConfirmation(stage, target)) setConfirmLostStage(stageId);
     else void handleMove(stageId);
   }
 
@@ -423,12 +426,9 @@ export function LeadDrawer({
       )}
       {confirmLostStage && (
         <div onClick={(e) => e.stopPropagation()}>
-          <ConfirmDialog
-            title="Marcar como perdido?"
-            message={`"${lead.name}" será movido para "${
-              pipelineStages.find((s) => s.id === confirmLostStage)?.label ?? "perdido"
-            }" e contado como negócio perdido. Você poderá movê-lo de volta depois.`}
-            confirmLabel="Marcar como perdido"
+          <ConfirmLostDialog
+            leadName={lead.name}
+            stageLabel={pipelineStages.find((s) => s.id === confirmLostStage)?.label ?? "perdido"}
             onConfirm={() => handleMove(confirmLostStage)}
             onClose={() => setConfirmLostStage(null)}
           />

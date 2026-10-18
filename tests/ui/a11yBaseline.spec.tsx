@@ -194,14 +194,13 @@ describe("Auditoria 01 — corrigidos na Fase 1A (testes comuns) e pendentes (it
   it("[CORRIGIDO 1A CFG-06] campos de Configurações (nome do pipeline, da tag, da etapa) deveriam ter nome acessível", async () => {
     renderApp(<SettingsPage />);
     await screen.findByText("Comercial");
-    const named = unnamedFields(screen.getByRole("heading", { name: "Pipelines" }).closest("section")!);
+    const named = unnamedFields(screen.getByRole("heading", { name: "Pipelines e etapas" }).closest("section")!);
     expect(named).toEqual([]);
   });
 
   it("[CORRIGIDO 1A CFG-07] formulário de template deveria ter rótulos nos selects e na mensagem", async () => {
-    renderApp(<SettingsPage />);
-    await screen.findByText("Comercial");
-    const section = screen.getByRole("heading", { name: "Pipeline — mensagens de WhatsApp" }).closest("section")!;
+    renderApp(<SettingsPage />, { route: "/?secao=comunicacao" });
+    const section = (await screen.findByRole("heading", { name: "Pipeline — mensagens de WhatsApp" })).closest("section")!;
     await within(section).findByText("Nenhum template cadastrado ainda.");
     expect(unnamedFields(section)).toEqual([]);
   });
