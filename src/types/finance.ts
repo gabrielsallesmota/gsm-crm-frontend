@@ -523,3 +523,19 @@ export const ACCOUNT_KIND_LABEL: Record<AccountKind, string> = {
   dinheiro: "Dinheiro",
   investimento: "Investimento",
 };
+
+/** Cliente → conta de recebimento: as parcelas do cliente viram receita prevista nela. */
+export interface ClientLink {
+  clientId: string;
+  profileId: string;
+  accountId: string;
+  categoryId: string | null;
+}
+
+export interface ClientLinkSync {
+  link: ClientLink;
+  created: number;
+  updated: number;
+  removed: number;
+  skippedClosed: number;
+}

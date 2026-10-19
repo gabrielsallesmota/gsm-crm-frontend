@@ -4,6 +4,7 @@ import { CLIENT_SOURCE_LABEL } from "../../types/client";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { EmptyState } from "../common/EmptyState";
+import { ClientReceivingAccount } from "./ClientReceivingAccount";
 import { ContractsSection } from "./ContractsSection";
 import { useClientActions } from "../../hooks/useClientActions";
 import { useClientAccess } from "../../hooks/useClientAccess";
@@ -316,6 +317,8 @@ export function ClientDrawer({
           canManage={canManage}
           onChanged={() => onReload?.()}
         />
+
+        <ClientReceivingAccount clientId={client.id} canManage={canManage} />
 
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Contrato assinado (PDF)</h3>

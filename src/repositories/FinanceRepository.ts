@@ -15,6 +15,8 @@ import type {
   ImportCommitResult,
   ImportFile,
   ImportHistoryItem,
+  ClientLink,
+  ClientLinkSync,
   ImportPreview,
   ReconcileResult,
   EntryFilter,
@@ -102,6 +104,11 @@ export interface FinanceRepository {
   closePeriod(profileId: string, month: string): Promise<void>;
   /** Exige a senha (reautenticação) e um motivo; fica auditado. */
   reopenPeriod(profileId: string, month: string, reason: string, reauthToken: string): Promise<void>;
+
+  /** Vínculos cliente → conta (só o proprietário; qualquer outro recebe 403). */
+  listClientLinks(): Promise<ClientLink[]>;
+  setClientLink(clientId: string, accountId: string): Promise<ClientLinkSync>;
+  removeClientLink(clientId: string): Promise<number>;
 
   listRecurrences(status?: "active" | "ended"): Promise<FinRecurrence[]>;
   endRecurrence(id: string): Promise<void>;

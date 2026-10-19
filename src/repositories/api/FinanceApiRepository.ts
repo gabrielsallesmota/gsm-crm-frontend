@@ -45,6 +45,8 @@ import type {
   UpdateAccountInput,
   UpdateCategoryInput,
   UpdateEntryInput,
+  ClientLink,
+  ClientLinkSync,
 } from "../../types/finance";
 import type { FinanceOverview, PeriodState, ReportKind } from "../../types/financeReports";
 import { apiRequest, apiRequestBlob } from "./ApiClient";
@@ -952,6 +954,26 @@ export class FinanceApiRepository implements FinanceRepository {
       `/api/v1/finance/imports/${importId}/undo`,
       { method: "POST" },
     );
+  }
+
+  async listClientLinks(): Promise<ClientLink[]> {
+    return camelize<ClientLink[]>(await apiRequest<unknown>("/api/v1/finance/client-links"));
+  }
+
+  async setClientLink(clientId: string, accountId: string): Promise<ClientLinkSync> {
+    return camelize<ClientLinkSync>(
+      await apiRequest<unknown>(`/api/v1/finance/client-links/${clientId}`, {
+        method: "PUT",
+        body: JSON.stringify({ account_id: accountId }),
+      }),
+    );
+  }
+
+  async removeClientLink(clientId: string): Promise<number> {
+    const body = await apiRequest<{ removed: number }>(`/api/v1/finance/client-links/${clientId}`, {
+      method: "DELETE",
+    });
+    return body.removed;
   }
 
   async report<T>(

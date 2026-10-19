@@ -486,6 +486,19 @@ describe("Cartões", () => {
     expect(api.refundPurchase.mock.calls[0]![1]).toMatchObject({ amountCents: 10_000 });
   });
 
+  it("edita uma compra direto na fatura do cartão", async () => {
+    api.updateEntry.mockResolvedValue(entry({ id: "p1", description: "Notebook novo" }));
+    open("/financeiro?aba=cartoes");
+    fireEvent.click(await screen.findByRole("button", { name: "Editar compra Notebook" }));
+    const dialog = await screen.findByRole("dialog");
+    const description = within(dialog).getByLabelText("Descrição") as HTMLInputElement;
+    expect(description.value).toBe("Notebook");
+    fireEvent.change(description, { target: { value: "Notebook novo" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Salvar/ }));
+    await waitFor(() => expect(api.updateEntry).toHaveBeenCalledTimes(1));
+    expect(api.updateEntry.mock.calls[0]![0]).toBe("p1");
+  });
+
   it("cadastra cartão com fechamento, vencimento e limite — e bloqueia dia inválido", async () => {
     api.listCards.mockResolvedValue([]);
     api.createAccount.mockResolvedValue(CARD);

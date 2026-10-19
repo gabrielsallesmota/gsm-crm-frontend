@@ -16,8 +16,16 @@ import form from "../common/Form.module.css";
 import { CurrencyInput } from "../common/CurrencyInput";
 import { EmptyState } from "../common/EmptyState";
 import { AccountEditModal } from "./EditModals";
+import { EntryFormModal } from "./EntryFormModal";
 import { SkeletonRows } from "../common/Skeleton";
-import { useFinanceAccounts, useFinanceCards, useInvoice, useInvoices } from "../../hooks/useFinance";
+import {
+  useFinanceAccounts,
+  useFinanceCards,
+  useFinanceCategories,
+  useFinanceProfiles,
+  useInvoice,
+  useInvoices,
+} from "../../hooks/useFinance";
 import { useToast } from "../../hooks/useToast";
 import { financeService } from "../../services/FinanceService";
 import { barRatio, budgetTone, formatCents, limitUsage, monthTitle, todayIso } from "../../utils/finance";
@@ -221,6 +229,9 @@ function CardDetail({
   const [paying, setPaying] = useState(false);
   const [undoing, setUndoing] = useState<{ id: string; amountCents: number } | null>(null);
   const [refunding, setRefunding] = useState<FinEntry | null>(null);
+  const [editingEntry, setEditingEntry] = useState<FinEntry | null>(null);
+  const categories = useFinanceCategories(false);
+  const profiles = useFinanceProfiles();
   const [editingCard, setEditingCard] = useState(false);
   const history = invoices.data ?? [];
 
@@ -369,11 +380,18 @@ function CardDetail({
                       <td>{e.paidAt ? "Paga" : "Em aberto"}</td>
                       <td className={styles.num}>{e.isRefund ? "−" : ""}{formatCents(e.amountCents)}</td>
                       <td>
-                        {!e.isRefund && (
-                          <Button onClick={() => setRefunding(e)} aria-label={`Estornar compra ${e.description}`}>
-                            Estornar
-                          </Button>
-                        )}
+                        <div className={styles.rowActions}>
+                          {!e.isRefund && (
+                            <Button onClick={() => setEditingEntry(e)} aria-label={`Editar compra ${e.description}`}>
+                              Editar
+                            </Button>
+                          )}
+                          {!e.isRefund && (
+                            <Button onClick={() => setRefunding(e)} aria-label={`Estornar compra ${e.description}`}>
+                              Estornar
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -384,6 +402,16 @@ function CardDetail({
         </div>
       )}
 
+      {editingEntry && (
+        <EntryFormModal
+          entry={editingEntry}
+          categories={categories.data ?? []}
+          accounts={accounts.data ?? []}
+          profiles={profiles.data ?? []}
+          onClose={() => setEditingEntry(null)}
+          onSaved={changed}
+        />
+      )}
       {editingCard && (
         <AccountEditModal account={card.account} onClose={() => setEditingCard(false)} onSaved={changed} />
       )}
