@@ -32,7 +32,7 @@ const KINDS = Object.keys(REPORT_LABEL) as ReportKind[];
 
 function Table({ caption, head, children }: { caption: string; head: string[]; children: ReactNode }) {
   return (
-    <div className={styles.tableWrap}>
+    <div className={styles.tableWrap} role="region" aria-label={caption} tabIndex={0}>
       <table className={styles.table}>
         <caption className="sr-only">{caption}</caption>
         <thead>

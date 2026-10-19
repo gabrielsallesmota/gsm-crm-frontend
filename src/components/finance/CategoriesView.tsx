@@ -5,6 +5,7 @@ import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { CurrencyInput } from "../common/CurrencyInput";
 import { AccountEditModal, CategoryEditModal } from "./EditModals";
+import { ValueModal } from "./ValueModal";
 import { useToast } from "../../hooks/useToast";
 import { financeService } from "../../services/FinanceService";
 import { formatCents } from "../../utils/finance";
@@ -64,6 +65,7 @@ function ProfilesSection({ profiles, onChanged }: { profiles: FinProfile[]; onCh
   const [busy, setBusy] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [taxFor, setTaxFor] = useState<FinProfile | null>(null);
 
   async function create() {
     setBusy(true);
@@ -79,18 +81,7 @@ function ProfilesSection({ profiles, onChanged }: { profiles: FinProfile[]; onCh
     }
   }
 
-  async function setTax(p: FinProfile) {
-    const current = p.taxProvisionBps === null ? "" : String(p.taxProvisionBps / 100);
-    const typed = window.prompt(
-      "Provisão GERENCIAL de impostos sobre a receita (%). Não é apuração fiscal. Deixe vazio para desligar.",
-      current,
-    );
-    if (typed === null) return;
-    const percent = typed.trim() === "" ? null : Number(typed.replace(",", "."));
-    if (percent !== null && (!Number.isFinite(percent) || percent < 0 || percent > 100)) {
-      toastError(new Error("Use um valor entre 0 e 100"), "Percentual inválido");
-      return;
-    }
+  async function setTax(p: FinProfile, percent: number | null) {
     await update(p, { taxProvisionBps: percent === null ? null : Math.round(percent * 100) }, "Provisão atualizada");
   }
 
@@ -166,7 +157,7 @@ function ProfilesSection({ profiles, onChanged }: { profiles: FinProfile[]; onCh
                 <>
                   <Button onClick={() => { setRenaming(p.id); setDraft(p.name); }} aria-label={`Renomear ${p.name}`}>Renomear</Button>
                   {p.kind === "pj" && (
-                    <Button onClick={() => void setTax(p)} aria-label={`Definir provisão de impostos de ${p.name}`}>
+                    <Button onClick={() => setTaxFor(p)} aria-label={`Definir provisão de impostos de ${p.name}`}>
                       Provisão de impostos
                     </Button>
                   )}
@@ -179,6 +170,20 @@ function ProfilesSection({ profiles, onChanged }: { profiles: FinProfile[]; onCh
           </li>
         ))}
       </ul>
+      {taxFor && (
+        <ValueModal
+          title={`Provisão de impostos — ${taxFor.name}`}
+          label="Percentual sobre a receita (%)"
+          hint="Provisão GERENCIAL, não é apuração fiscal. Deixe vazio para desligar."
+          initial={taxFor.taxProvisionBps === null ? "" : String(taxFor.taxProvisionBps / 100).replace(".", ",")}
+          min={0}
+          max={100}
+          allowEmpty
+          confirmLabel="Salvar"
+          onConfirm={(v) => setTax(taxFor, v)}
+          onClose={() => setTaxFor(null)}
+        />
+      )}
     </section>
   );
 }

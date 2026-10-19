@@ -206,7 +206,7 @@ export function EntriesView({
       {error && <EmptyState title="Não foi possível carregar os lançamentos" message={error.message} />}
 
       {!error && (
-        <div className={styles.tableWrap}>
+        <div className={styles.tableWrap} role="region" aria-label="Lançamentos" tabIndex={0}>
           <table className={styles.table}>
             <thead>
               <tr>

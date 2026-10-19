@@ -9,6 +9,7 @@ import type {
 } from "../../types/finance";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
+import { ValueModal } from "./ValueModal";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { CurrencyInput } from "../common/CurrencyInput";
 import { EmptyState } from "../common/EmptyState";
@@ -276,7 +277,7 @@ function BudgetsSection({
       {!budgets.error && !budgets.data && <SkeletonRows rows={3} label="Carregando os orçamentos" />}
       {budgets.data && lines.length === 0 && <p className={styles.empty}>Este perfil não tem categorias de despesa.</p>}
       {lines.length > 0 && (
-        <div className={styles.tableWrap}>
+        <div className={styles.tableWrap} role="region" aria-label="Orçamento do mês" tabIndex={0}>
           <table className={styles.table}>
             <thead>
               <tr>
@@ -403,6 +404,7 @@ function GoalsSection({
   const [months, setMonths] = useState(6);
   const [accountId, setAccountId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [moving, setMoving] = useState<{ goal: FinGoal; sign: 1 | -1 } | null>(null);
   const profileName = profiles.find((p) => p.id === profileId)?.name;
   const eligible = accounts.filter((a) => a.kind !== "cartao" && !a.archived && a.profileId === profileId);
 
@@ -429,11 +431,8 @@ function GoalsSection({
     }
   }
 
-  async function contribute(goal: FinGoal, sign: 1 | -1) {
-    const typed = window.prompt(`${sign > 0 ? "Quanto guardar" : "Quanto retirar"} em “${goal.name}” (R$)?`, "100");
-    if (typed === null) return;
-    const value = Number(typed.replace(/\./g, "").replace(",", "."));
-    if (!Number.isFinite(value) || value <= 0) return;
+  async function contribute(goal: FinGoal, sign: 1 | -1, value: number | null) {
+    if (value === null || value <= 0) return;
     try {
       await financeService.contributeGoal(goal.id, sign * Math.round(value * 100));
       goals.reload();
@@ -530,8 +529,8 @@ function GoalsSection({
               <span className={styles.rowActions}>
                 {!g.accountId && (
                   <>
-                    <Button onClick={() => void contribute(g, 1)} aria-label={`Guardar em ${g.name}`}>Guardar</Button>
-                    <Button onClick={() => void contribute(g, -1)} aria-label={`Retirar de ${g.name}`}>Retirar</Button>
+                    <Button onClick={() => setMoving({ goal: g, sign: 1 })} aria-label={`Guardar em ${g.name}`}>Guardar</Button>
+                    <Button onClick={() => setMoving({ goal: g, sign: -1 })} aria-label={`Retirar de ${g.name}`}>Retirar</Button>
                   </>
                 )}
                 <Button onClick={() => void archive(g)} aria-label={`Arquivar ${g.name}`}>Arquivar</Button>
@@ -539,6 +538,17 @@ function GoalsSection({
             </li>
           ))}
         </ul>
+      )}
+      {moving && (
+        <ValueModal
+          title={moving.sign > 0 ? "Guardar na meta" : "Retirar da meta"}
+          label={`${moving.sign > 0 ? "Quanto guardar" : "Quanto retirar"} em “${moving.goal.name}” (R$)`}
+          initial="100"
+          min={0.01}
+          confirmLabel={moving.sign > 0 ? "Guardar" : "Retirar"}
+          onConfirm={(v) => contribute(moving.goal, moving.sign, v)}
+          onClose={() => setMoving(null)}
+        />
       )}
       <p className={form.hint}>
         A reserva de emergência usa a média de despesa dos últimos 3 meses completos do perfil.

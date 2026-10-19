@@ -220,9 +220,13 @@ describe("Planejamento", () => {
 
   it("guarda um valor numa meta manual", async () => {
     api.contributeGoal.mockResolvedValue(GOAL);
-    vi.spyOn(window, "prompt").mockReturnValue("250,50");
+    const prompt = vi.spyOn(window, "prompt");
     open();
     fireEvent.click(await screen.findByRole("button", { name: "Guardar em Reserva de emergência" }));
+    const dialog = await screen.findByRole("dialog", { name: "Guardar na meta" });
+    fireEvent.change(within(dialog).getByLabelText(/Quanto guardar/), { target: { value: "250,50" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Guardar" }));
+    expect(prompt).not.toHaveBeenCalled();
     await waitFor(() => expect(api.contributeGoal).toHaveBeenCalledWith("g1", 25_050));
   });
 });

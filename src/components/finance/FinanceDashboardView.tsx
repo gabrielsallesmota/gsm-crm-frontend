@@ -197,11 +197,26 @@ function ScopeSplit({ data }: { data: FinanceDashboard }) {
           <div className={styles.splitRow}>
             <span className={styles.splitName}>{name}</span>
             <div>
-              <div className={styles.bar} role="img" aria-label={`${name}: receitas ${formatCents(totals.income)}`}>
-                <span className={styles.barIncome} style={{ width: `${barRatio(totals.income, max) * 100}%` }} />
+              <div
+                className={styles.bar}
+                role="img"
+                aria-label={`${name}: receitas ${formatCents(totals.income)}`}
+              >
+                <span
+                  className={styles.barIncome}
+                  style={{ width: `${barRatio(totals.income, max) * 100}%` }}
+                />
               </div>
-              <div className={styles.bar} style={{ marginTop: 4 }} role="img" aria-label={`${name}: despesas ${formatCents(totals.expense)}`}>
-                <span className={styles.barExpense} style={{ width: `${barRatio(totals.expense, max) * 100}%` }} />
+              <div
+                className={styles.bar}
+                style={{ marginTop: 4 }}
+                role="img"
+                aria-label={`${name}: despesas ${formatCents(totals.expense)}`}
+              >
+                <span
+                  className={styles.barExpense}
+                  style={{ width: `${barRatio(totals.expense, max) * 100}%` }}
+                />
               </div>
             </div>
           </div>
@@ -256,7 +271,11 @@ function PendingPanel({ data }: { data: FinanceDashboard }) {
                   {u.overdue && (
                     <>
                       {" "}
-                      <Badge label="Atrasado" color="var(--tone-red-text)" bg="var(--tone-red-bg)" />
+                      <Badge
+                        label="Atrasado"
+                        color="var(--tone-red-text)"
+                        bg="var(--tone-red-bg)"
+                      />
                     </>
                   )}
                 </span>
@@ -297,7 +316,10 @@ function CategoryBars({ items, total }: { items: CategoryBreakdown[]; total: num
             >
               <div
                 className={styles.fill}
-                style={{ width: `${total > 0 ? (c.total / total) * 100 : 0}%`, background: c.color }}
+                style={{
+                  width: `${total > 0 ? (c.total / total) * 100 : 0}%`,
+                  background: c.color,
+                }}
               />
             </div>
             {c.budgetCents !== null && c.budgetUsed !== null && (
@@ -328,7 +350,10 @@ function MonthlyChart({ series }: { series: FinanceDashboard["series"] }) {
   const y = (v: number) => PAD.top + innerH - barRatio(v, max) * innerH;
   const ticks = [0, 0.5, 1].map((r) => Math.round(max * r));
   const points = series
-    .map((s, i) => `${PAD.left + slot * i + slot / 2},${PAD.top + innerH - Math.max(0, s.result) / max * innerH}`)
+    .map(
+      (s, i) =>
+        `${PAD.left + slot * i + slot / 2},${PAD.top + innerH - (Math.max(0, s.result) / max) * innerH}`,
+    )
     .join(" ");
 
   return (
@@ -341,7 +366,13 @@ function MonthlyChart({ series }: { series: FinanceDashboard["series"] }) {
       >
         {ticks.map((t) => (
           <g key={t}>
-            <line className={styles.chartGrid} x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} />
+            <line
+              className={styles.chartGrid}
+              x1={PAD.left}
+              x2={W - PAD.right}
+              y1={y(t)}
+              y2={y(t)}
+            />
             <text className={styles.chartLabel} x={PAD.left - 6} y={y(t) + 3} textAnchor="end">
               {compactCents(t)}
             </text>
@@ -351,8 +382,22 @@ function MonthlyChart({ series }: { series: FinanceDashboard["series"] }) {
           const cx = PAD.left + slot * i + slot / 2;
           return (
             <g key={s.month}>
-              <rect x={cx - bar - 1} width={bar} y={y(s.income)} height={PAD.top + innerH - y(s.income)} fill="var(--tone-green)" rx={2} />
-              <rect x={cx + 1} width={bar} y={y(s.expense)} height={PAD.top + innerH - y(s.expense)} fill="var(--tone-red)" rx={2} />
+              <rect
+                x={cx - bar - 1}
+                width={bar}
+                y={y(s.income)}
+                height={PAD.top + innerH - y(s.income)}
+                fill="var(--tone-green)"
+                rx={2}
+              />
+              <rect
+                x={cx + 1}
+                width={bar}
+                y={y(s.expense)}
+                height={PAD.top + innerH - y(s.expense)}
+                fill="var(--tone-red)"
+                rx={2}
+              />
               <text className={styles.chartLabel} x={cx} y={H - 8} textAnchor="middle">
                 {monthLabel(s.month)}
               </text>
@@ -362,26 +407,42 @@ function MonthlyChart({ series }: { series: FinanceDashboard["series"] }) {
         <polyline points={points} fill="none" stroke="var(--tone-blue)" strokeWidth={2} />
       </svg>
       <ul className={styles.legend} aria-hidden="true">
-        <li><span className={styles.dot} style={{ background: "var(--tone-green)" }} />Receitas</li>
-        <li><span className={styles.dot} style={{ background: "var(--tone-red)" }} />Despesas</li>
-        <li><span className={styles.dot} style={{ background: "var(--tone-blue)" }} />Resultado (quando positivo)</li>
+        <li>
+          <span className={styles.dot} style={{ background: "var(--tone-green)" }} />
+          Receitas
+        </li>
+        <li>
+          <span className={styles.dot} style={{ background: "var(--tone-red)" }} />
+          Despesas
+        </li>
+        <li>
+          <span className={styles.dot} style={{ background: "var(--tone-blue)" }} />
+          Resultado (quando positivo)
+        </li>
       </ul>
-      <table className="sr-only">
-        <caption>Receitas, despesas e resultado por mês</caption>
-        <thead>
-          <tr><th scope="col">Mês</th><th scope="col">Receitas</th><th scope="col">Despesas</th><th scope="col">Resultado</th></tr>
-        </thead>
-        <tbody>
-          {series.map((s) => (
-            <tr key={s.month}>
-              <th scope="row">{monthLabel(s.month)}</th>
-              <td>{formatCents(s.income)}</td>
-              <td>{formatCents(s.expense)}</td>
-              <td>{formatCents(s.result)}</td>
+      <div className="sr-only">
+        <table>
+          <caption>Receitas, despesas e resultado por mês</caption>
+          <thead>
+            <tr>
+              <th scope="col">Mês</th>
+              <th scope="col">Receitas</th>
+              <th scope="col">Despesas</th>
+              <th scope="col">Resultado</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {series.map((s) => (
+              <tr key={s.month}>
+                <th scope="row">{monthLabel(s.month)}</th>
+                <td>{formatCents(s.income)}</td>
+                <td>{formatCents(s.expense)}</td>
+                <td>{formatCents(s.result)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -395,16 +456,35 @@ function DailyBars({ daily }: { daily: FinanceDashboard["daily"] }) {
         <li key={d.date} className={styles.listItem}>
           <span style={{ width: 42 }}>{fmtDate(d.date).slice(0, 5)}</span>
           <span style={{ flex: 1 }}>
-            <span className={styles.bar} role="img" aria-label={`Receitas ${formatCents(d.income)}`}>
-              <span className={styles.barIncome} style={{ width: `${barRatio(d.income, max) * 100}%` }} />
+            <span
+              className={styles.bar}
+              role="img"
+              aria-label={`Receitas ${formatCents(d.income)}`}
+            >
+              <span
+                className={styles.barIncome}
+                style={{ width: `${barRatio(d.income, max) * 100}%` }}
+              />
             </span>
-            <span className={styles.bar} style={{ marginTop: 3 }} role="img" aria-label={`Despesas ${formatCents(d.expense)}`}>
-              <span className={styles.barExpense} style={{ width: `${barRatio(d.expense, max) * 100}%` }} />
+            <span
+              className={styles.bar}
+              style={{ marginTop: 3 }}
+              role="img"
+              aria-label={`Despesas ${formatCents(d.expense)}`}
+            >
+              <span
+                className={styles.barExpense}
+                style={{ width: `${barRatio(d.expense, max) * 100}%` }}
+              />
             </span>
           </span>
           <span className={styles.num} style={{ minWidth: 96 }}>
-            {d.expense > 0 && <span className={styles.negative}>-{formatCents(d.expense).replace("R$ ", "")}</span>}
-            {d.income > 0 && <span className={styles.positive}> +{formatCents(d.income).replace("R$ ", "")}</span>}
+            {d.expense > 0 && (
+              <span className={styles.negative}>-{formatCents(d.expense).replace("R$ ", "")}</span>
+            )}
+            {d.income > 0 && (
+              <span className={styles.positive}> +{formatCents(d.income).replace("R$ ", "")}</span>
+            )}
           </span>
         </li>
       ))}
@@ -447,9 +527,10 @@ function OverviewPanel({ overview }: { overview: FinanceOverview }) {
       </h3>
       <p className={styles.kpiNote}>
         Saldos das contas {formatCents(overview.positions.liquidCents)} · dívida de cartões{" "}
-        {formatCents(overview.positions.cardDebtCents)} · posição líquida {formatCents(overview.positions.netCents)}
+        {formatCents(overview.positions.cardDebtCents)} · posição líquida{" "}
+        {formatCents(overview.positions.netCents)}
       </p>
-      <div className={styles.tableWrap}>
+      <div className={styles.tableWrap} role="region" aria-label="Perfis lado a lado" tabIndex={0}>
         <table className={styles.table}>
           <caption className="sr-only">Resultado do mês por perfil</caption>
           <thead>
@@ -476,8 +557,8 @@ function OverviewPanel({ overview }: { overview: FinanceOverview }) {
       </div>
       {overview.consolidated && (
         <p className={styles.budgetNote}>
-          Os totais acima do painel somam só o fluxo externo (transferências entre contas ficam de fora). O resultado da
-          empresa e a sobra pessoal não se somam: são coisas diferentes.
+          Os totais acima do painel somam só o fluxo externo (transferências entre contas ficam de
+          fora). O resultado da empresa e a sobra pessoal não se somam: são coisas diferentes.
         </p>
       )}
     </section>

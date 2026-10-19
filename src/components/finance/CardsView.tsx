@@ -348,7 +348,7 @@ function CardDetail({
           {detail.data.entries.length === 0 ? (
             <p className={styles.empty}>Nenhuma compra nesta fatura.</p>
           ) : (
-            <div className={styles.tableWrap}>
+            <div className={styles.tableWrap} role="region" aria-label="Compras da fatura" tabIndex={0}>
               <table className={styles.table}>
                 <thead>
                   <tr>

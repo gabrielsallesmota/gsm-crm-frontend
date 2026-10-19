@@ -205,7 +205,7 @@ export function ImportView({
                 {preview.ledgerDate ? ` em ${fmtDate(preview.ledgerDate)}` : ""}.
               </p>
             )}
-            <div className={styles.tableWrap}>
+            <div className={styles.tableWrap} role="region" aria-label="Prévia da importação" tabIndex={0}>
               <table className={styles.table}>
                 <caption className="sr-only">Linhas do extrato</caption>
                 <thead>

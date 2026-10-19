@@ -654,6 +654,24 @@ describe("Perfis", () => {
     await waitFor(() => expect(api.updateProfile).toHaveBeenCalledWith(PF_ID, { name: "Pessoal" }));
   });
 
+  it("define a provisão gerencial de impostos num modal (sem window.prompt) e valida o intervalo", async () => {
+    api.updateProfile.mockResolvedValue(PROFILES[1]!);
+    const prompt = vi.spyOn(window, "prompt");
+    open("/financeiro?aba=categorias");
+    const section = await screen.findByRole("region", { name: "Perfis" });
+    fireEvent.click(within(section).getByRole("button", { name: /Definir provisão de impostos de GSM/ }));
+    const dialog = await screen.findByRole("dialog", { name: /Provisão de impostos/ });
+    const input = within(dialog).getByLabelText(/Percentual/);
+    const save = within(dialog).getByRole("button", { name: "Salvar" }) as HTMLButtonElement;
+    fireEvent.change(input, { target: { value: "150" } });
+    expect(save.disabled).toBe(true);
+    fireEvent.change(input, { target: { value: "6,5" } });
+    expect(save.disabled).toBe(false);
+    fireEvent.click(save);
+    await waitFor(() => expect(api.updateProfile).toHaveBeenCalledWith(PJ_ID, { taxProvisionBps: 650 }));
+    expect(prompt).not.toHaveBeenCalled();
+  });
+
   it("com um perfil escolhido, categorias e contas mostram só as dele", async () => {
     open("/financeiro?aba=categorias");
     await screen.findByRole("region", { name: "Categorias" });
