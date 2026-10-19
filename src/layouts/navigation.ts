@@ -10,7 +10,7 @@ import type { AuthUser } from "../types/auth.ts";
  * - `crm`: o produto do cliente, na ordem do dia a dia —
  *   Dashboard, Pipeline, Leads, Clientes, Tarefas, Agenda, Relatórios, Equipe,
  *   Integrações, Configurações.
- * - `gsm`: ferramentas INTERNAS da GSM (SDR, Plataforma), só para
+ * - `gsm`: ferramentas INTERNAS da GSM (SDR, Financeiro, Plataforma), só para
  *   platform staff e num grupo separado com título próprio. O cliente nunca
  *   vê esse grupo (nem o título).
  *
@@ -27,6 +27,7 @@ export type NavIconName =
   | "integrations"
   | "settings"
   | "clients"
+  | "finance"
   | "prospects"
   | "platform";
 
@@ -67,6 +68,7 @@ export const CRM_NAV: NavItem[] = [
 
 export const GSM_NAV: NavItem[] = [
   { to: ROUTES.sdrDashboard, icon: "prospects", label: "SDR", permission: "platform.internal" },
+  { to: ROUTES.financeiro, icon: "finance", label: "Financeiro", permission: "platform.internal" },
   { to: ROUTES.platform, icon: "platform", label: "Plataforma GSM", permission: "platform.console" },
 ];
 

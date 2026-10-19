@@ -1,0 +1,440 @@
+// Financeiro interno da GSM — página, painel, lançamentos e categorias com os componentes REAIS
+// (jsdom). O serviço de API é substituído: nada aqui chama rede.
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../src/services/FinanceService", () => ({
+  financeService: {
+    dashboard: vi.fn(),
+    listEntries: vi.fn(),
+    createEntries: vi.fn(),
+    updateEntry: vi.fn(),
+    payEntry: vi.fn(),
+    unpayEntry: vi.fn(),
+    deleteEntry: vi.fn(),
+    exportCsv: vi.fn(),
+    listCategories: vi.fn(),
+    createCategory: vi.fn(),
+    updateCategory: vi.fn(),
+    listAccounts: vi.fn(),
+    createAccount: vi.fn(),
+    updateAccount: vi.fn(),
+    listCards: vi.fn(),
+    listInvoices: vi.fn(),
+    getInvoice: vi.fn(),
+    payInvoice: vi.fn(),
+    unpayInvoice: vi.fn(),
+  },
+}));
+
+import { FinancePage } from "../../src/pages/FinancePage";
+import { financeService } from "../../src/services/FinanceService";
+import type {
+  CardOverview,
+  FinAccount,
+  FinCategory,
+  FinEntry,
+  FinanceDashboard,
+  InvoiceDetail,
+  InvoiceSummary,
+} from "../../src/types/finance";
+import { STAFF, renderApp } from "./support/harness";
+
+const api = vi.mocked(financeService);
+
+afterEach(cleanup);
+
+const CATEGORIES: FinCategory[] = [
+  { id: "c-soft", name: "Ferramentas e software", kind: "expense", scope: "pj", color: "#4aa3ff", monthlyBudgetCents: 20000, archived: false },
+  { id: "c-home", name: "Moradia", kind: "expense", scope: "pf", color: "#f5b13d", monthlyBudgetCents: null, archived: false },
+  { id: "c-cli", name: "Clientes (serviços)", kind: "income", scope: "pj", color: "#2ee66e", monthlyBudgetCents: null, archived: false },
+];
+
+function dashboard(overrides: Partial<FinanceDashboard> = {}): FinanceDashboard {
+  return {
+    month: "2031-03",
+    scope: "all",
+    kpis: {
+      income: 1_300_000,
+      expense: 220_000,
+      result: 1_080_000,
+      incomePaid: 900_000,
+      incomePending: 400_000,
+      expensePaid: 220_000,
+      expensePending: 0,
+      savingsRate: 0.83,
+      previous: { income: 500_000, expense: 0, result: 500_000 },
+    },
+    byScope: {
+      pj: { income: 1_000_000, expense: 20_000, result: 980_000 },
+      pf: { income: 300_000, expense: 200_000, result: 100_000 },
+    },
+    series: Array.from({ length: 12 }, (_, i) => ({
+      month: `2030-${String(((i + 3) % 12) + 1).padStart(2, "0")}`,
+      income: i * 1000,
+      expense: i * 500,
+      result: i * 500,
+    })),
+    categories: {
+      expense: [
+        { categoryId: "c-soft", name: "Ferramentas e software", color: "#4aa3ff", total: 25_000, count: 2, budgetCents: 20_000, budgetUsed: 1.25 },
+        { categoryId: "c-home", name: "Moradia", color: "#f5b13d", total: 200_000, count: 1, budgetCents: null, budgetUsed: null },
+      ],
+      income: [{ categoryId: "c-cli", name: "Clientes (serviços)", color: "#2ee66e", total: 600_000, count: 1, budgetCents: null, budgetUsed: null }],
+    },
+    pending: {
+      payableOverdue: { total: 1000, count: 1 },
+      payableSoon: { total: 2000, count: 1 },
+      receivableOverdue: { total: 0, count: 0 },
+      receivableSoon: { total: 400_000, count: 1 },
+      upcoming: [
+        { id: "u1", description: "Servidor", kind: "expense", scope: "pj", amountCents: 1000, dueDate: "2031-03-05", overdue: true, category: "Servidor e hospedagem" },
+      ],
+    },
+    topExpenses: [{ id: "t1", description: "Aluguel", scope: "pf", amountCents: 200_000, entryDate: "2031-03-08", category: "Moradia" }],
+    daily: [{ date: "2031-03-08", income: 0, expense: 200_000 }],
+    ...overrides,
+  };
+}
+
+function entry(overrides: Partial<FinEntry> = {}): FinEntry {
+  return {
+    id: "e1",
+    kind: "expense",
+    scope: "pj",
+    categoryId: "c-soft",
+    accountId: null,
+    amountCents: 15_000,
+    description: "Ferramentas",
+    entryDate: "2031-03-02",
+    dueDate: null,
+    paidAt: null,
+    paymentMethod: "",
+    notes: "",
+    recurrenceId: null,
+    installmentNo: null,
+    installmentTotal: null,
+    status: "pending",
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  api.dashboard.mockResolvedValue(dashboard());
+  api.listCategories.mockResolvedValue(CATEGORIES);
+  api.listAccounts.mockResolvedValue([]);
+  api.listCards.mockResolvedValue([]);
+  api.listEntries.mockResolvedValue({ items: [entry()], total: 1, page: 1, pageSize: 50 });
+});
+
+function open(route = "/financeiro") {
+  return renderApp(<FinancePage />, { user: STAFF, route });
+}
+
+describe("Painel", () => {
+  it("mostra receitas, despesas, resultado, PF × PJ e a variação contra o mês anterior", async () => {
+    open();
+    expect(await screen.findByRole("heading", { name: "Receitas" })).toBeTruthy();
+    expect(screen.getAllByText(/R\$\s13\.000,00/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/R\$\s10\.800,00/)).toBeTruthy(); // resultado
+    expect(screen.getByText(/83% da receita sobra/)).toBeTruthy();
+    expect(screen.getByText("+160%")).toBeTruthy(); // receita 13.000 vs 5.000
+    const split = screen.getByRole("heading", { name: "PF × PJ" }).closest("section") as HTMLElement;
+    expect(within(split).getByText(/Resultado\s+R\$\s9\.800,00/)).toBeTruthy();
+    expect(within(split).getByText(/Resultado\s+R\$\s1\.000,00/)).toBeTruthy();
+  });
+
+  it("avisa orçamento estourado e lista pendências e o gráfico acessível por tabela", async () => {
+    open();
+    expect(await screen.findByText(/Orçamento R\$\s200,00 · 125% usado — estourou/)).toBeTruthy();
+    expect(screen.getByText("A pagar vencido")).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Próximos vencimentos" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: /últimos 12 meses/ })).toBeTruthy();
+    expect(screen.getByRole("table", { name: /por mês/ })).toBeTruthy();
+  });
+
+  it("mês sem lançamentos mostra o estado vazio com a ação de criar", async () => {
+    api.dashboard.mockResolvedValue(
+      dashboard({
+        kpis: { ...dashboard().kpis, income: 0, expense: 0, result: 0 },
+        pending: { ...dashboard().pending, upcoming: [] },
+      }),
+    );
+    open();
+    expect(await screen.findByText(/Nenhum lançamento neste mês/)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "+ Novo lançamento" })).toHaveLength(2); // cabeçalho + estado vazio
+  });
+
+  it("troca de mês e de PF/PJ refaz a consulta com os parâmetros certos", async () => {
+    open();
+    await screen.findByRole("heading", { name: "Receitas" });
+    fireEvent.click(screen.getByRole("button", { name: "Mês anterior" }));
+    await waitFor(() => expect(api.dashboard).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: "PF" }));
+    await waitFor(() => expect(api.dashboard).toHaveBeenLastCalledWith(expect.stringMatching(/^\d{4}-\d{2}$/), "pf"));
+  });
+
+  it("erro do servidor vira mensagem com 'Tentar de novo'", async () => {
+    api.dashboard.mockRejectedValueOnce(new Error("falhou"));
+    open();
+    expect(await screen.findByText("Não foi possível carregar o painel")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    expect(await screen.findByRole("heading", { name: "Receitas" })).toBeTruthy();
+  });
+});
+
+describe("Novo lançamento", () => {
+  async function openForm() {
+    open();
+    await screen.findByRole("heading", { name: "Receitas" });
+    fireEvent.click(screen.getByRole("button", { name: "+ Novo lançamento" }));
+    return await screen.findByRole("dialog", { name: "Novo lançamento" });
+  }
+
+  it("só oferece categorias do tipo e do PF/PJ escolhidos", async () => {
+    const dialog = await openForm();
+    const select = within(dialog).getByLabelText("Categoria") as HTMLSelectElement;
+    const options = () => Array.from(select.options).map((o) => o.textContent);
+    expect(options()).toEqual(["Sem categoria", "Ferramentas e software"]); // despesa PJ
+    fireEvent.click(within(dialog).getByLabelText("PF (pessoal)"));
+    expect(options()).toEqual(["Sem categoria", "Moradia"]);
+    fireEvent.click(within(dialog).getByLabelText("Receita"));
+    expect(options()).toEqual(["Sem categoria"]); // nenhuma receita PF cadastrada
+  });
+
+  it("bloqueia envio inválido e mostra o motivo", async () => {
+    const dialog = await openForm();
+    const create = within(dialog).getByRole("button", { name: "Criar lançamento" }) as HTMLButtonElement;
+    expect(create.disabled).toBe(true);
+    expect(within(dialog).getByRole("alert").textContent).toMatch(/descrição/);
+    fireEvent.change(within(dialog).getByLabelText("Descrição"), { target: { value: "Hospedagem" } });
+    expect(within(dialog).getByRole("alert").textContent).toMatch(/maior que zero/);
+  });
+
+  it("cria uma série mensal com valor, categoria e repetição", async () => {
+    api.createEntries.mockResolvedValue([entry(), entry({ id: "e2" })]);
+    const dialog = await openForm();
+    fireEvent.change(within(dialog).getByLabelText("Descrição"), { target: { value: "Hospedagem" } });
+    fireEvent.change(within(dialog).getByLabelText("Valor"), { target: { value: "9900" } }); // R$ 99,00
+    fireEvent.change(within(dialog).getByLabelText("Categoria"), { target: { value: "c-soft" } });
+    fireEvent.change(within(dialog).getByLabelText("Repetir por (meses)"), { target: { value: "12" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Criar lançamento" }));
+    await waitFor(() => expect(api.createEntries).toHaveBeenCalledTimes(1));
+    expect(api.createEntries.mock.calls[0]![0]).toMatchObject({
+      kind: "expense",
+      scope: "pj",
+      description: "Hospedagem",
+      amountCents: 9900,
+      categoryId: "c-soft",
+      repeatMonths: 12,
+    });
+  });
+});
+
+describe("Lançamentos", () => {
+  async function openEntries() {
+    open("/financeiro?aba=lancamentos");
+    return await screen.findByText("Ferramentas");
+  }
+
+  it("lista, baixa e estorna", async () => {
+    api.payEntry.mockResolvedValue(entry({ paidAt: "2031-03-02", status: "paid" }));
+    await openEntries();
+    fireEvent.click(screen.getByRole("button", { name: "Pagar" }));
+    await waitFor(() => expect(api.payEntry).toHaveBeenCalledWith("e1"));
+  });
+
+  it("exclusão de lançamento de série oferece 'só este' e 'este e os próximos'", async () => {
+    api.listEntries.mockResolvedValue({
+      items: [entry({ recurrenceId: "r1", installmentNo: 2, installmentTotal: 6 })],
+      total: 1,
+      page: 1,
+      pageSize: 50,
+    });
+    api.deleteEntry.mockResolvedValue(4);
+    await openEntries();
+    fireEvent.click(screen.getByRole("button", { name: "Excluir Ferramentas" }));
+    const dialog = await screen.findByRole("dialog", { name: "Excluir lançamento?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Este e os próximos" }));
+    await waitFor(() => expect(api.deleteEntry).toHaveBeenCalledWith("e1", true));
+  });
+
+  it("filtra por situação enviando o parâmetro ao servidor", async () => {
+    await openEntries();
+    fireEvent.change(screen.getByLabelText("Situação"), { target: { value: "overdue" } });
+    await waitFor(() =>
+      expect(api.listEntries).toHaveBeenLastCalledWith(expect.objectContaining({ status: "overdue" })),
+    );
+  });
+});
+
+describe("Categorias e contas", () => {
+  it("cria despesa com orçamento e arquiva", async () => {
+    api.createCategory.mockResolvedValue(CATEGORIES[0]!);
+    api.updateCategory.mockResolvedValue(CATEGORIES[0]!);
+    open("/financeiro?aba=categorias");
+    const cats = await screen.findByRole("region", { name: "Categorias" });
+    fireEvent.change(within(cats).getByLabelText("Nome"), { target: { value: "Cursos" } });
+    fireEvent.change(within(cats).getByLabelText("Orçamento mensal"), { target: { value: "50000" } });
+    fireEvent.click(within(cats).getByRole("button", { name: "Adicionar" }));
+    await waitFor(() => expect(api.createCategory).toHaveBeenCalledTimes(1));
+    expect(api.createCategory.mock.calls[0]![0]).toMatchObject({
+      name: "Cursos",
+      kind: "expense",
+      scope: "both",
+      monthlyBudgetCents: 50000,
+    });
+    fireEvent.click(within(cats).getByRole("button", { name: "Arquivar Moradia" }));
+    await waitFor(() => expect(api.updateCategory).toHaveBeenCalledWith("c-home", { archived: true }));
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Cartão de crédito e faturas
+// ---------------------------------------------------------------------------------------------
+
+const CARD: FinAccount = {
+  id: "card1",
+  name: "Nubank PJ",
+  scope: "pj",
+  kind: "cartao",
+  archived: false,
+  closingDay: 10,
+  dueDay: 20,
+  creditLimitCents: 500_000,
+};
+
+function invoice(overrides: Partial<InvoiceSummary> = {}): InvoiceSummary {
+  return {
+    ref: "2031-03",
+    periodStart: "2031-02-11",
+    closingDate: "2031-03-10",
+    dueDate: "2031-03-20",
+    total: 50_000,
+    paidTotal: 0,
+    count: 2,
+    unpaidCount: 2,
+    paidOn: null,
+    status: "closed",
+    ...overrides,
+  };
+}
+
+function overview(overrides: Partial<CardOverview> = {}): CardOverview {
+  return {
+    account: CARD,
+    usedCents: 450_000,
+    availableCents: 50_000,
+    current: invoice(),
+    next: invoice({ ref: "2031-04", total: 0, count: 0, unpaidCount: 0, status: "open" }),
+    ...overrides,
+  };
+}
+
+function detail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetail {
+  return {
+    card: CARD,
+    invoice: invoice(),
+    entries: [
+      entry({ id: "p1", description: "Notebook", amountCents: 30_000, accountId: "card1", installmentNo: 1, installmentTotal: 3 }),
+      entry({ id: "p2", description: "Domínio", amountCents: 20_000, accountId: "card1" }),
+    ],
+    byCategory: [{ name: "Ferramentas e software", color: "#4aa3ff", total: 50_000, count: 2 }],
+    ...overrides,
+  };
+}
+
+describe("Cartões", () => {
+  beforeEach(() => {
+    api.listAccounts.mockResolvedValue([CARD]);
+    api.listCards.mockResolvedValue([overview()]);
+    api.listInvoices.mockResolvedValue([invoice(), invoice({ ref: "2031-02", total: 1000, status: "paid", unpaidCount: 0 })]);
+    api.getInvoice.mockResolvedValue(detail());
+  });
+
+  it("mostra o cartão, a fatura atual, o limite e o detalhe das compras com parcelas", async () => {
+    open("/financeiro?aba=cartoes");
+    const tile = await screen.findByRole("button", { name: /Nubank PJ/ });
+    expect(within(tile).getAllByText(/R\$\s500,00/).length).toBeGreaterThan(0);
+    expect(within(tile).getByText(/Fechada/)).toBeTruthy();
+    expect(within(tile).getByText(/disponível de/)).toBeTruthy();
+    expect(await screen.findByText("Notebook")).toBeTruthy();
+    expect(screen.getByText("1/3")).toBeTruthy();
+    expect(screen.getByText("à vista")).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Fatura por categoria" })).toBeTruthy();
+    expect(api.getInvoice).toHaveBeenCalledWith("card1", "2031-03");
+  });
+
+  it("paga a fatura depois de confirmar e avisa que não duplica a despesa", async () => {
+    api.payInvoice.mockResolvedValue(2);
+    open("/financeiro?aba=cartoes");
+    fireEvent.click(await screen.findByRole("button", { name: "Pagar fatura" }));
+    const dialog = await screen.findByRole("dialog", { name: "Pagar a fatura?" });
+    expect(within(dialog).getByText(/não cria uma despesa nova/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pagar fatura" }));
+    await waitFor(() => expect(api.payInvoice).toHaveBeenCalledWith("card1", "2031-03", undefined));
+  });
+
+  it("estorna o pagamento de fatura paga e troca de fatura pelo seletor", async () => {
+    api.getInvoice.mockResolvedValue(
+      detail({ invoice: invoice({ status: "paid", paidTotal: 50_000, unpaidCount: 0, paidOn: "2031-03-18" }) }),
+    );
+    api.unpayInvoice.mockResolvedValue(2);
+    open("/financeiro?aba=cartoes");
+    expect(screen.queryByRole("button", { name: "Pagar fatura" })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Estornar pagamento" }));
+    const dialog = await screen.findByRole("dialog", { name: "Estornar o pagamento?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Estornar" }));
+    await waitFor(() => expect(api.unpayInvoice).toHaveBeenCalledWith("card1", "2031-03"));
+
+    const picker = screen.getByRole("group", { name: "Escolher fatura" });
+    fireEvent.click(within(picker).getAllByRole("button")[1]!);
+    await waitFor(() => expect(api.getInvoice).toHaveBeenLastCalledWith("card1", "2031-02"));
+  });
+
+  it("cadastra cartão com fechamento, vencimento e limite — e bloqueia dia inválido", async () => {
+    api.listCards.mockResolvedValue([]);
+    api.createAccount.mockResolvedValue(CARD);
+    open("/financeiro?aba=cartoes");
+    fireEvent.click(await screen.findByRole("button", { name: "+ Novo cartão" }));
+    const form = screen.getByRole("group", { name: "Novo cartão" });
+    fireEvent.change(within(form).getByLabelText("Nome"), { target: { value: "Inter PF" } });
+    fireEvent.change(within(form).getByLabelText("De quem"), { target: { value: "pf" } });
+    fireEvent.change(within(form).getByLabelText("Dia do fechamento"), { target: { value: "30" } });
+    expect((within(form).getByRole("button", { name: "Cadastrar cartão" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(within(form).getByLabelText("Dia do fechamento"), { target: { value: "25" } });
+    fireEvent.change(within(form).getByLabelText("Dia do vencimento"), { target: { value: "5" } });
+    fireEvent.change(within(form).getByLabelText("Limite"), { target: { value: "800000" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Cadastrar cartão" }));
+    await waitFor(() => expect(api.createAccount).toHaveBeenCalledTimes(1));
+    expect(api.createAccount.mock.calls[0]![0]).toEqual({
+      name: "Inter PF",
+      scope: "pf",
+      kind: "cartao",
+      closingDay: 25,
+      dueDay: 5,
+      creditLimitCents: 800000,
+    });
+  });
+
+  it("compra no cartão nasce 'a pagar', só despesa, e mostra em que fatura cai", async () => {
+    open("/financeiro?aba=cartoes");
+    fireEvent.click(await screen.findByRole("button", { name: "+ Compra no cartão" }));
+    const dialog = await screen.findByRole("dialog", { name: "Novo lançamento" });
+    expect((within(dialog).getByLabelText("Conta / cartão") as HTMLSelectElement).value).toBe("card1");
+    expect((within(dialog).getByLabelText("Já pago?") as HTMLSelectElement).value).toBe("0");
+    fireEvent.change(within(dialog).getByLabelText("Data do lançamento"), { target: { value: "2031-03-11" } });
+    expect(within(dialog).getByText(/entra na fatura que vence em 20\/04\/2031/)).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText("Data do lançamento"), { target: { value: "2031-03-10" } });
+    expect(within(dialog).getByText(/vence em 20\/03\/2031/)).toBeTruthy();
+    expect(within(dialog).getByLabelText("Parcelado em (vezes)")).toBeTruthy();
+  });
+
+  it("o painel resume a fatura atual dos cartões", async () => {
+    open("/financeiro");
+    const list = await screen.findByRole("list", { name: "Faturas dos cartões" });
+    expect(within(list).getByText(/Nubank PJ/)).toBeTruthy();
+    expect(within(list).getAllByText(/R\$\s500,00/).length).toBeGreaterThan(0);
+  });
+});

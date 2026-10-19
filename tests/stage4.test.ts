@@ -81,7 +81,7 @@ describe("navegação (cenários A, C e D)", () => {
     assert.equal(sections[1]!.id, "gsm");
     assert.deepEqual(
       sections[1]!.items.map((i) => i.label),
-      ["SDR", "Plataforma GSM"],
+      ["SDR", "Financeiro", "Plataforma GSM"],
     );
   });
 

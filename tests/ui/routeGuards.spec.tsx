@@ -69,6 +69,7 @@ describe("F-32 mapa de guards por rota (o que cada tela exige)", () => {
     [ROUTES.equipe, { features: [], permissions: ["users.view"] }],
     [ROUTES.clientes, { features: ["clients"], permissions: [] }],
     [`${ROUTES.clientes}/:id`, { features: ["clients"], permissions: [] }],
+    [ROUTES.financeiro, { features: [], permissions: ["platform.internal"] }],
     [ROUTES.sdrCampanhas, { features: [], permissions: ["platform.internal"] }],
     [ROUTES.sdrCandidates, { features: [], permissions: ["platform.internal"] }],
     [ROUTES.sdrDashboard, { features: [], permissions: ["platform.internal"] }],
@@ -126,7 +127,7 @@ describe("F-32/F-33 decisão de acesso por papel, feature e sessão", () => {
     for (const p of [ROUTES.pipeline, ROUTES.leads, ROUTES.configuracoes, ROUTES.integracoes, ROUTES.automacoes, ROUTES.notificacoes, ROUTES.equipe]) {
       expect(allow(admin, p), p).toBe(true);
     }
-    for (const p of [ROUTES.sdrCampanhas, "/sdr/*"]) expect(allow(admin, p), p).toBe(false);
+    for (const p of [ROUTES.sdrCampanhas, ROUTES.financeiro, "/sdr/*"]) expect(allow(admin, p), p).toBe(false);
     expect(allow(admin, ROUTES.clientes)).toBe(true); // Clientes é de todos os tenants
   });
 
@@ -149,8 +150,10 @@ describe("F-32/F-33 decisão de acesso por papel, feature e sessão", () => {
 
   it("staff da GSM: acessa as áreas internas; em SESSÃO DE SUPORTE perde o acesso interno", () => {
     expect(allow(STAFF, ROUTES.sdrCampanhas)).toBe(true);
+    expect(allow(STAFF, ROUTES.financeiro)).toBe(true);
     const supporting = makeUser({ isPlatformStaff: true, impersonation: SUPPORT_READ_ONLY.impersonation });
     expect(allow(supporting, ROUTES.sdrCampanhas)).toBe(false);
+    expect(allow(supporting, ROUTES.financeiro)).toBe(false);
     // Clientes é o produto do tenant: a sessão de suporte enxerga como o cliente enxerga
     expect(allow(supporting, ROUTES.clientes)).toBe(true);
   });

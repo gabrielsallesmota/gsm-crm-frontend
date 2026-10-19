@@ -25,7 +25,7 @@ import type { AuthUser } from "../types/auth";
  * - leads.viewAll     → vendedor só enxerga os próprios leads (escopo no backend)
  * - clients.manage   → contratos, parcelas, valores, pagamento e exclusão de clientes (ADMIN, GESTOR);
  *                       ver clientes é de qualquer papel (feature `clients`)
- * - platform.internal → SDR e Prospecção GSM (platform_staff)
+ * - platform.internal → SDR, Prospecção e Financeiro da GSM (platform_staff)
  * - platform.console  → control plane `/platform/*` (platform_staff)
  *
  * Etapa 2: durante uma SESSÃO DE SUPORTE (impersonation) a pessoa vê o

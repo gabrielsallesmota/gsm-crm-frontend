@@ -8,6 +8,7 @@ export const ROUTES = {
   leads: "/leads",
   leadDetail: (id: string) => `/leads/${id}`,
   clientes: "/clientes",
+  financeiro: "/financeiro",
   clienteDetail: (id: string) => `/clientes/${id}`,
   sdrCampanhas: "/sdr/campanhas",
   sdrCampanhaNova: "/sdr/campanhas/nova",

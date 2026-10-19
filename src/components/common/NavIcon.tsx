@@ -10,6 +10,8 @@ const PATHS = {
   prospects: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v3M12 19v3M2 12h3M19 12h3",
   // "Clientes" — maleta (contrato fechado), diferencia de "leads" (pessoas)
   // e "prospects" (alvo) já usados no menu.
+  // Financeiro (área interna) — moeda.
+  finance: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.7 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2M12 6.5V8M12 16v1.5",
   clients: "M9 7V5a3 3 0 0 1 3-3h0a3 3 0 0 1 3 3v2M3 10h18M4 7h16l-1 13H5z",
   // Usados só pelos toggles da sidebar (ver `AppLayout.tsx`) — não são
   // itens de navegação, por isso ficam fora de `NAV_ITEMS`.
