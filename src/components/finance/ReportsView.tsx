@@ -23,8 +23,8 @@ import { useFinancePeriods } from "../../hooks/useFinance";
 import { useToast } from "../../hooks/useToast";
 import { financeService } from "../../services/FinanceService";
 import { TRANSFER_KIND_LABEL, type TransferKind } from "../../types/finance";
-import { formatCents, monthTitle, shiftMonth, currentMonth } from "../../utils/finance";
-import { fmtDate, toIsoDate } from "../../utils/renewal";
+import { formatCents, monthTitle, shiftMonth, currentMonth, todayIso } from "../../utils/finance";
+import { fmtDate } from "../../utils/renewal";
 import form from "../common/Form.module.css";
 import styles from "./Finance.module.css";
 
@@ -70,7 +70,7 @@ export function ReportsView({
   const [kind, setKind] = useState<ReportKind>("cash-flow");
   const [months, setMonths] = useState(12);
   const [from, setFrom] = useState(`${currentMonth()}-01`);
-  const [to, setTo] = useState(toIsoDate(new Date()));
+  const [to, setTo] = useState(todayIso());
   const [accountId, setAccountId] = useState("");
   const [pjId, setPjId] = useState("");
   // O resultado guarda de qual relatório veio: nunca desenha dados de um relatório no outro.

@@ -69,8 +69,18 @@ export function shiftMonth(month: string, delta: number): string {
   return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, "0")}`;
 }
 
+/** Data de hoje no fuso do negócio (America/Sao_Paulo, o mesmo do servidor), não no fuso do navegador. */
+export function todayIso(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now); // en-CA => AAAA-MM-DD
+}
+
 export function currentMonth(now: Date = new Date()): string {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return todayIso(now).slice(0, 7);
 }
 
 /** Altura (0–1) de uma barra dentro do maior valor do gráfico. */

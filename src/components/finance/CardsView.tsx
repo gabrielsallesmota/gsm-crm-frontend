@@ -20,8 +20,8 @@ import { SkeletonRows } from "../common/Skeleton";
 import { useFinanceAccounts, useFinanceCards, useInvoice, useInvoices } from "../../hooks/useFinance";
 import { useToast } from "../../hooks/useToast";
 import { financeService } from "../../services/FinanceService";
-import { barRatio, budgetTone, formatCents, limitUsage, monthTitle } from "../../utils/finance";
-import { fmtDate, toIsoDate } from "../../utils/renewal";
+import { barRatio, budgetTone, formatCents, limitUsage, monthTitle, todayIso } from "../../utils/finance";
+import { fmtDate } from "../../utils/renewal";
 import styles from "./Finance.module.css";
 
 const STATUS_TONE: Record<InvoiceStatus, { color: string; bg: string }> = {
@@ -561,7 +561,7 @@ function PayInvoiceModal({
   );
   const [payerId, setPayerId] = useState(card.account.payerAccountId ?? payers[0]?.id ?? "");
   const [amount, setAmount] = useState(invoice.remaining / 100);
-  const [date, setDate] = useState(toIsoDate(new Date()));
+  const [date, setDate] = useState(todayIso());
   const [busy, setBusy] = useState(false);
   const cents = Math.round(amount * 100);
   const invalid = !payerId || cents <= 0 || cents > invoice.remaining;
@@ -631,7 +631,7 @@ function RefundModal({ entry, onClose, onDone }: { entry: FinEntry; onClose: () 
   const { toast, toastError } = useToast();
   const uid = useId();
   const [amount, setAmount] = useState(entry.amountCents / 100);
-  const [date, setDate] = useState(toIsoDate(new Date()));
+  const [date, setDate] = useState(todayIso());
   const [busy, setBusy] = useState(false);
   const cents = Math.round(amount * 100);
 

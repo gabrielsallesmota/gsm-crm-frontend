@@ -7,9 +7,8 @@ import { CurrencyInput } from "../common/CurrencyInput";
 import { Modal } from "../common/Modal";
 import { useToast } from "../../hooks/useToast";
 import { financeService } from "../../services/FinanceService";
-import { formatCents } from "../../utils/finance";
+import { formatCents, todayIso } from "../../utils/finance";
 import { fmtDate } from "../../utils/renewal";
-import { toIsoDate } from "../../utils/renewal";
 import form from "../common/Form.module.css";
 import styles from "./Finance.module.css";
 
@@ -180,7 +179,7 @@ function TransferModal({
   const [from, setFrom] = useState(accounts[0]?.id ?? "");
   const [to, setTo] = useState(accounts[1]?.id ?? "");
   const [amount, setAmount] = useState(0);
-  const [date, setDate] = useState(toIsoDate(new Date()));
+  const [date, setDate] = useState(todayIso());
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const names = new Map(profiles.map((p) => [p.id, p.name]));
@@ -274,7 +273,7 @@ function ReconcileModal({
 }) {
   const { toast, toastError } = useToast();
   const uid = useId();
-  const [date, setDate] = useState(toIsoDate(new Date()));
+  const [date, setDate] = useState(todayIso());
   const [statement, setStatement] = useState((account.balanceCents ?? 0) / 100);
   const [difference, setDifference] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);

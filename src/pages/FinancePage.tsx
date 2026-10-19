@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { EmptyState } from "../components/common/EmptyState";
@@ -49,6 +49,19 @@ export function FinancePage() {
   // Perfil escolhido no topo; vazio = consolidado. Vale para TODAS as abas.
   const [profileId, setProfileId] = useState<string | undefined>(undefined);
   const [creating, setCreating] = useState(false);
+
+  /** Padrão WAI-ARIA das abas: setas, Home e End movem a seleção e o foco. */
+  function onTabKey(e: KeyboardEvent<HTMLButtonElement>, id: Tab) {
+    const keys = ["ArrowRight", "ArrowLeft", "Home", "End"];
+    if (!keys.includes(e.key)) return;
+    e.preventDefault();
+    const index = TABS.findIndex(([t]) => t === id);
+    const next =
+      e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : (index + (e.key === "ArrowRight" ? 1 : -1) + TABS.length) % TABS.length;
+    const target = TABS[next]![0];
+    selectTab(target);
+    document.getElementById(`fin-tab-${target}`)?.focus();
+  }
   const [cardForPurchase, setCardForPurchase] = useState<string | undefined>(undefined);
   const [version, setVersion] = useState(0);
 
@@ -111,6 +124,8 @@ export function FinancePage() {
             id={`fin-tab-${id}`}
             aria-selected={tab === id}
             aria-controls="fin-panel"
+            tabIndex={tab === id ? 0 : -1}
+            onKeyDown={(e) => onTabKey(e, id)}
             className={tab === id ? `${styles.tab} ${styles.tabActive}` : styles.tab}
             onClick={() => selectTab(id)}
           >

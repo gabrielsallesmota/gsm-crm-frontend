@@ -45,6 +45,7 @@ import type {
   InvoiceDetail,
   InvoiceSummary,
 } from "../../src/types/finance";
+import { currentMonth, todayIso } from "../../src/utils/finance";
 import { STAFF, renderApp } from "./support/harness";
 
 const api = vi.mocked(financeService);
@@ -634,6 +635,29 @@ describe("Lançamento fixo e edição de série", () => {
     fireEvent.click(screen.getByRole("button", { name: "Excluir Ferramentas" }));
     const dialog = await screen.findByRole("dialog", { name: "Excluir lançamento?" });
     expect(within(dialog).getByText(/é assim que se encerra um lançamento fixo/)).toBeTruthy();
+  });
+});
+
+describe("Abas e fuso", () => {
+  it("setas, Home e End movem a seleção das abas (padrão WAI-ARIA)", async () => {
+    open("/financeiro");
+    const painel = await screen.findByRole("tab", { name: "Painel" });
+    expect(painel.getAttribute("tabindex")).toBe("0");
+    fireEvent.keyDown(painel, { key: "ArrowRight" });
+    const lanc = screen.getByRole("tab", { name: "Lançamentos" });
+    await waitFor(() => expect(lanc.getAttribute("aria-selected")).toBe("true"));
+    expect(document.activeElement).toBe(lanc);
+    fireEvent.keyDown(lanc, { key: "End" });
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Categorias e contas" }).getAttribute("aria-selected")).toBe("true"));
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Categorias e contas" }), { key: "ArrowRight" });
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Painel" }).getAttribute("aria-selected")).toBe("true"));
+  });
+
+  it("'hoje' usa o fuso de São Paulo, não o do navegador", () => {
+    // 01:30 UTC do dia 1º ainda é 22:30 do dia anterior em São Paulo
+    expect(todayIso(new Date("2031-03-01T01:30:00Z"))).toBe("2031-02-28");
+    expect(currentMonth(new Date("2031-03-01T01:30:00Z"))).toBe("2031-02");
+    expect(todayIso(new Date("2031-03-01T12:00:00Z"))).toBe("2031-03-01");
   });
 });
 

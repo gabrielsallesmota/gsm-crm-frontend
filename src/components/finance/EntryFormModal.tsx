@@ -14,9 +14,8 @@ import { Modal } from "../common/Modal";
 import { SeriesApplyDialog } from "./SeriesApplyDialog";
 import { useToast } from "../../hooks/useToast";
 import { financeService } from "../../services/FinanceService";
-import { categoryFits, purchaseDueDate, validateEntryDraft } from "../../utils/finance";
+import { categoryFits, purchaseDueDate, validateEntryDraft, todayIso } from "../../utils/finance";
 import { fmtDate } from "../../utils/renewal";
-import { toIsoDate } from "../../utils/renewal";
 import form from "../common/Form.module.css";
 
 const METHODS = ["", "PIX", "Cartão de crédito", "Cartão de débito", "Boleto", "Transferência", "Dinheiro"];
@@ -56,11 +55,11 @@ export function EntryFormModal({
   );
   const [description, setDescription] = useState(entry?.description ?? "");
   const [amount, setAmount] = useState(entry ? entry.amountCents / 100 : 0);
-  const [entryDate, setEntryDate] = useState(entry?.entryDate ?? toIsoDate(new Date()));
+  const [entryDate, setEntryDate] = useState(entry?.entryDate ?? todayIso());
   const [dueDate, setDueDate] = useState(entry?.dueDate ?? "");
   // Compra no cartão nasce "a pagar": quem paga é a fatura.
   const [paid, setPaid] = useState(entry ? entry.paidAt !== null : !preset);
-  const [paidAt, setPaidAt] = useState(entry?.paidAt ?? toIsoDate(new Date()));
+  const [paidAt, setPaidAt] = useState(entry?.paidAt ?? todayIso());
   const [categoryId, setCategoryId] = useState(entry?.categoryId ?? "");
   const [accountId, setAccountId] = useState(entry?.accountId ?? preset?.id ?? "");
   const [method, setMethod] = useState(entry?.paymentMethod ?? "");
