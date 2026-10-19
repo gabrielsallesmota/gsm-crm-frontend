@@ -5,13 +5,34 @@ import type {
   EntryFilter,
   FinAccount,
   FinCategory,
+  BudgetLine,
   FinEntry,
+  FinGoal,
   FinProfile,
+  FinRecurrence,
   FinanceDashboard,
   InvoiceDetail,
   InvoiceSummary,
 } from "../types/finance";
 import { useAsyncResource, type AsyncResourceState } from "./useAsyncResource";
+
+export function useFinanceRecurrences(): AsyncResourceState<FinRecurrence[]> {
+  return useAsyncResource(() => financeService.listRecurrences("active"), []);
+}
+
+export function useFinanceBudgets(
+  profileId: string | undefined,
+  month: string,
+): AsyncResourceState<BudgetLine[]> {
+  return useAsyncResource(
+    () => (profileId ? financeService.listBudgets(profileId, month) : Promise.resolve([])),
+    [profileId, month],
+  );
+}
+
+export function useFinanceGoals(profileId: string | undefined): AsyncResourceState<FinGoal[]> {
+  return useAsyncResource(() => financeService.listGoals(profileId), [profileId]);
+}
 
 export function useFinanceProfiles(): AsyncResourceState<FinProfile[]> {
   return useAsyncResource(() => financeService.listProfiles(true), []);

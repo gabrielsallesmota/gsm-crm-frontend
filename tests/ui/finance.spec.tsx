@@ -53,14 +53,14 @@ afterEach(cleanup);
 const PF_ID = "p-pf";
 const PJ_ID = "p-pj";
 const PROFILES: FinProfile[] = [
-  { id: PF_ID, name: "Pessoa Física", kind: "pf", archived: false },
-  { id: PJ_ID, name: "GSM Automação — Pessoa Jurídica", kind: "pj", archived: false },
+  { id: PF_ID, name: "Pessoa Física", kind: "pf", archived: false, taxProvisionBps: null },
+  { id: PJ_ID, name: "GSM Automação — Pessoa Jurídica", kind: "pj", archived: false, taxProvisionBps: null },
 ];
 
 const CATEGORIES: FinCategory[] = [
-  { id: "c-soft", profileId: PJ_ID, name: "Ferramentas e software", kind: "expense", scope: "pj", color: "#4aa3ff", monthlyBudgetCents: 20000, archived: false },
-  { id: "c-home", profileId: PF_ID, name: "Moradia", kind: "expense", scope: "pf", color: "#f5b13d", monthlyBudgetCents: null, archived: false },
-  { id: "c-cli", profileId: PJ_ID, name: "Clientes (serviços)", kind: "income", scope: "pj", color: "#2ee66e", monthlyBudgetCents: null, archived: false },
+  { id: "c-soft", profileId: PJ_ID, name: "Ferramentas e software", kind: "expense", scope: "pj", color: "#4aa3ff", monthlyBudgetCents: 20000, archived: false, budgetRollover: false, costBehavior: null },
+  { id: "c-home", profileId: PF_ID, name: "Moradia", kind: "expense", scope: "pf", color: "#f5b13d", monthlyBudgetCents: null, archived: false, budgetRollover: false, costBehavior: null },
+  { id: "c-cli", profileId: PJ_ID, name: "Clientes (serviços)", kind: "income", scope: "pj", color: "#2ee66e", monthlyBudgetCents: null, archived: false, budgetRollover: false, costBehavior: null },
 ];
 
 function dashboard(overrides: Partial<FinanceDashboard> = {}): FinanceDashboard {
@@ -130,6 +130,9 @@ function entry(overrides: Partial<FinEntry> = {}): FinEntry {
     installmentTotal: null,
     isFixed: false,
     tags: [],
+    client: null,
+    project: null,
+    confirmed: true,
     invoiceRef: null,
     isRefund: false,
     paymentState: null,
@@ -531,17 +534,21 @@ describe("Lançamento fixo e edição de série", () => {
     return await screen.findByRole("dialog", { name: "Novo lançamento" });
   }
 
-  it("repetição 'fixo' envia fixed=true (sem número de meses) e explica como parar", async () => {
+  it("repetição 'recorrente' envia a regra (sem número de meses) e explica como parar", async () => {
     api.createEntries.mockResolvedValue([entry()]);
     const dialog = await openForm();
     fireEvent.change(within(dialog).getByLabelText("Descrição"), { target: { value: "Aluguel do escritório" } });
     fireEvent.change(within(dialog).getByLabelText("Valor"), { target: { value: "250000" } });
-    fireEvent.change(within(dialog).getByLabelText("Repetição"), { target: { value: "fixed" } });
+    fireEvent.change(within(dialog).getByLabelText("Repetição"), { target: { value: "recurring" } });
     expect(within(dialog).queryByLabelText("Repetir por (meses)")).toBeNull();
-    expect(within(dialog).getByText(/Para parar, exclua/)).toBeTruthy();
+    expect(within(dialog).getByText(/Para parar, encerre em Planejamento/)).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Criar lançamento" }));
     await waitFor(() => expect(api.createEntries).toHaveBeenCalledTimes(1));
-    expect(api.createEntries.mock.calls[0]![0]).toMatchObject({ fixed: true, repeatMonths: 1, amountCents: 250000 });
+    expect(api.createEntries.mock.calls[0]![0]).toMatchObject({
+      recurrence: { frequency: "monthly", mode: "auto" },
+      repeatMonths: 1,
+      amountCents: 250000,
+    });
   });
 
   it("por padrão cria lançamento único", async () => {
@@ -551,7 +558,8 @@ describe("Lançamento fixo e edição de série", () => {
     fireEvent.change(within(dialog).getByLabelText("Valor"), { target: { value: "1000" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Criar lançamento" }));
     await waitFor(() => expect(api.createEntries).toHaveBeenCalledTimes(1));
-    expect(api.createEntries.mock.calls[0]![0]).toMatchObject({ fixed: false, repeatMonths: 1 });
+    expect(api.createEntries.mock.calls[0]![0]).toMatchObject({ repeatMonths: 1 });
+    expect(api.createEntries.mock.calls[0]![0]).not.toHaveProperty("recurrence");
   });
 
   async function editSeriesEntry() {
@@ -620,7 +628,7 @@ describe("Lançamento fixo e edição de série", () => {
 
 describe("Perfis", () => {
   it("cria um perfil novo, renomeia e arquiva", async () => {
-    api.createProfile.mockResolvedValue({ id: "p-3", name: "Loja", kind: "pj", archived: false });
+    api.createProfile.mockResolvedValue({ id: "p-3", name: "Loja", kind: "pj", archived: false, taxProvisionBps: null });
     api.updateProfile.mockResolvedValue(PROFILES[0]!);
     open("/financeiro?aba=categorias");
     const section = await screen.findByRole("region", { name: "Perfis" });
@@ -671,6 +679,8 @@ describe("Cadastros: editar e desarquivar", () => {
     color: "#a78bfa",
     monthlyBudgetCents: null,
     archived: true,
+    budgetRollover: false,
+    costBehavior: null,
   };
 
   beforeEach(() => {
@@ -689,7 +699,7 @@ describe("Cadastros: editar e desarquivar", () => {
     await waitFor(() => expect(api.updateCategory).toHaveBeenCalledTimes(1));
     expect(api.updateCategory.mock.calls[0]).toEqual([
       "c-soft",
-      { name: "Software e apps", color: "#4aa3ff", monthlyBudgetCents: 35000 },
+      { name: "Software e apps", color: "#4aa3ff", monthlyBudgetCents: 35000, budgetRollover: false },
     ]);
   });
 

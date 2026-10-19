@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import type {
   ApplyScope,
+  Frequency,
   EntryKind,
   FinAccount,
   FinCategory,
@@ -66,7 +67,12 @@ export function EntryFormModal({
   const [notes, setNotes] = useState(entry?.notes ?? "");
   const [tagsText, setTagsText] = useState((entry?.tags ?? []).join(", "));
   // Só ao criar: único, mensal por N meses ou fixo (todo mês, sem fim).
-  const [repeatMode, setRepeatMode] = useState<"once" | "months" | "fixed">("once");
+  const [repeatMode, setRepeatMode] = useState<"once" | "months" | "recurring">("once");
+  const [frequency, setFrequency] = useState<Frequency>("monthly");
+  const [recurrenceEnd, setRecurrenceEnd] = useState("");
+  const [needsApproval, setNeedsApproval] = useState(false);
+  const [client, setClient] = useState(entry?.client ?? "");
+  const [project, setProject] = useState(entry?.project ?? "");
   const [repeat, setRepeat] = useState(3);
   const [askApply, setAskApply] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -118,6 +124,8 @@ export function EntryFormModal({
         paymentMethod: method,
         notes,
         tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
+        client: client.trim(),
+        project: project.trim(),
       };
       if (entry) {
         const updated = await financeService.updateEntry(entry.id, base, apply);
@@ -130,11 +138,19 @@ export function EntryFormModal({
         const created = await financeService.createEntries({
           ...base,
           repeatMonths: repeatMode === "months" ? repeat : 1,
-          fixed: repeatMode === "fixed",
+          ...(repeatMode === "recurring"
+            ? {
+                recurrence: {
+                  frequency,
+                  ...(recurrenceEnd ? { endDate: recurrenceEnd } : {}),
+                  mode: needsApproval ? ("manual" as const) : ("auto" as const),
+                },
+              }
+            : {}),
         });
         toast(
-          repeatMode === "fixed"
-            ? "Lançamento fixo criado (12 meses à frente; ele se estende sozinho)"
+          repeatMode === "recurring"
+            ? "Recorrência criada — as próximas ocorrências são geradas sozinhas"
             : created.length > 1
               ? `${created.length} lançamentos criados`
               : "Lançamento criado",
@@ -269,12 +285,29 @@ export function EntryFormModal({
                 id={`${uid}-mode`}
                 className={form.select}
                 value={repeatMode}
-                onChange={(e) => setRepeatMode(e.target.value as "once" | "months" | "fixed")}
+                onChange={(e) => setRepeatMode(e.target.value as "once" | "months" | "recurring")}
               >
                 <option value="once">{card ? "À vista" : "Só uma vez"}</option>
                 <option value="months">{card ? "Parcelado" : "Mensal, por alguns meses"}</option>
-                <option value="fixed">{card ? "Fixo (assinatura no cartão)" : "Fixo (todo mês, sem fim)"}</option>
+                <option value="recurring">{card ? "Recorrente (assinatura no cartão)" : "Recorrente (sem fim ou até uma data)"}</option>
               </select>
+              {repeatMode === "recurring" && (
+                <>
+                  <label className={form.label} htmlFor={`${uid}-freq`}>Frequência</label>
+                  <select id={`${uid}-freq`} className={form.select} value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)}>
+                    <option value="weekly">Toda semana</option>
+                    <option value="biweekly">A cada 15 dias</option>
+                    <option value="monthly">Todo mês</option>
+                    <option value="yearly">Todo ano</option>
+                  </select>
+                  <label className={form.label} htmlFor={`${uid}-rend`}>Até (opcional)</label>
+                  <input id={`${uid}-rend`} className={form.input} type="date" value={recurrenceEnd} min={entryDate} onChange={(e) => setRecurrenceEnd(e.target.value)} />
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+                    <input type="checkbox" checked={needsApproval} onChange={(e) => setNeedsApproval(e.target.checked)} />
+                    Pedir aprovação a cada ocorrência
+                  </label>
+                </>
+              )}
               {repeatMode === "months" && (
                 <input
                   className={form.input}
@@ -287,8 +320,8 @@ export function EntryFormModal({
                 />
               )}
               <span className={form.hint}>
-                {repeatMode === "fixed"
-                  ? "Repete todo mês, sem data final. Para parar, exclua “este e os próximos”."
+                {repeatMode === "recurring"
+                  ? "As ocorrências nascem sozinhas (gerar não é pagar). Para parar, encerre em Planejamento ou exclua “este e os próximos”."
                   : repeatMode === "months"
                     ? card
                       ? "Cada parcela cai numa fatura."
@@ -304,6 +337,19 @@ export function EntryFormModal({
             </p>
           )}
         </div>
+
+        {profiles.find((p) => p.id === profileId)?.kind === "pj" && (
+          <div className={form.row}>
+            <div className={form.field}>
+              <label className={form.label} htmlFor={`${uid}-client`}>Cliente (opcional)</label>
+              <input id={`${uid}-client`} className={form.input} maxLength={80} value={client} onChange={(e) => setClient(e.target.value)} />
+            </div>
+            <div className={form.field}>
+              <label className={form.label} htmlFor={`${uid}-project`}>Projeto (opcional)</label>
+              <input id={`${uid}-project`} className={form.input} maxLength={80} value={project} onChange={(e) => setProject(e.target.value)} />
+            </div>
+          </div>
+        )}
 
         <div className={form.field}>
           <label className={form.label} htmlFor={`${uid}-tags`}>Tags</label>

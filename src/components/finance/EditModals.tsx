@@ -22,6 +22,8 @@ export function CategoryEditModal({
   const uid = useId();
   const [name, setName] = useState(category.name);
   const [color, setColor] = useState(category.color);
+  const [rollover, setRollover] = useState(category.budgetRollover);
+  const [cost, setCost] = useState<string>(category.costBehavior ?? "");
   const [budget, setBudget] = useState((category.monthlyBudgetCents ?? 0) / 100);
   const [busy, setBusy] = useState(false);
 
@@ -32,7 +34,13 @@ export function CategoryEditModal({
         name: name.trim(),
         color,
         ...(category.kind === "expense"
-          ? { monthlyBudgetCents: budget > 0 ? Math.round(budget * 100) : null }
+          ? {
+              monthlyBudgetCents: budget > 0 ? Math.round(budget * 100) : null,
+              budgetRollover: rollover,
+              ...(cost !== (category.costBehavior ?? "")
+                ? { costBehavior: cost ? (cost as "fixed" | "variable") : null }
+                : {}),
+            }
           : {}),
       });
       toast("Categoria atualizada");
@@ -62,8 +70,24 @@ export function CategoryEditModal({
           <div className={form.field}>
             <label className={form.label} htmlFor={`${uid}-budget`}>Orçamento mensal</label>
             <CurrencyInput id={`${uid}-budget`} className={form.input} value={budget} onChange={setBudget} />
-            <span className={form.hint}>Zero remove o orçamento.</span>
+            <span className={form.hint}>Zero remove o orçamento padrão (valores por mês ficam em Planejamento).</span>
           </div>
+        )}
+        {category.kind === "expense" && (
+          <>
+            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="checkbox" checked={rollover} onChange={(e) => setRollover(e.target.checked)} />
+              A sobra do orçamento passa para o mês seguinte
+            </label>
+            <div className={form.field}>
+              <label className={form.label} htmlFor={`${uid}-cost`}>Tipo de custo (gerencial PJ)</label>
+              <select id={`${uid}-cost`} className={form.select} value={cost} onChange={(e) => setCost(e.target.value)}>
+                <option value="">Não classificado</option>
+                <option value="fixed">Custo fixo</option>
+                <option value="variable">Custo variável</option>
+              </select>
+            </div>
+          </>
         )}
         <p className={form.hint}>A categoria pertence ao perfil em que foi criada e não muda de perfil.</p>
         <div className={form.actions}>

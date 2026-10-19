@@ -7,6 +7,10 @@ import type {
   CreateProfileInput,
   CreateTransferInput,
   BalanceHistoryItem,
+  BudgetLine,
+  CreateGoalInput,
+  FinGoal,
+  FinRecurrence,
   FinTransfer,
   ReconcileResult,
   EntryFilter,
@@ -27,7 +31,10 @@ import type { Page } from "../types/common";
 export interface FinanceRepository {
   listProfiles(includeArchived?: boolean): Promise<FinProfile[]>;
   createProfile(input: CreateProfileInput): Promise<FinProfile>;
-  updateProfile(id: string, input: { name?: string; archived?: boolean }): Promise<FinProfile>;
+  updateProfile(
+    id: string,
+    input: { name?: string; archived?: boolean; taxProvisionBps?: number | null },
+  ): Promise<FinProfile>;
 
   /** Sem `profileId` = consolidado (todos os perfis). */
   dashboard(month: string, profileId?: string): Promise<FinanceDashboard>;
@@ -70,6 +77,27 @@ export interface FinanceRepository {
   deleteTransfer(id: string): Promise<void>;
   restoreTransfer(id: string): Promise<FinTransfer>;
   listTags(profileId?: string): Promise<string[]>;
+
+  listRecurrences(status?: "active" | "ended"): Promise<FinRecurrence[]>;
+  endRecurrence(id: string): Promise<void>;
+  /** Aprova (ou desfaz a aprovação de) uma ocorrência de recorrência manual. Não dá baixa. */
+  confirmEntry(entryId: string, confirmed?: boolean): Promise<FinEntry>;
+
+  listBudgets(profileId: string, month: string): Promise<BudgetLine[]>;
+  /** `amountCents: null` remove o valor do mês (volta ao padrão da categoria). */
+  setBudget(categoryId: string, month: string, amountCents: number | null): Promise<void>;
+  /** Copia os valores definidos de um mês para outro; devolve quantas categorias foram copiadas. */
+  copyBudgets(
+    profileId: string,
+    fromMonth: string,
+    toMonth: string,
+    overwrite?: boolean,
+  ): Promise<number>;
+
+  listGoals(profileId?: string): Promise<FinGoal[]>;
+  createGoal(input: CreateGoalInput): Promise<FinGoal>;
+  updateGoal(id: string, input: { name?: string; archived?: boolean }): Promise<FinGoal>;
+  contributeGoal(id: string, deltaCents: number): Promise<FinGoal>;
   createAccount(input: CreateAccountInput): Promise<FinAccount>;
   updateAccount(id: string, input: UpdateAccountInput): Promise<FinAccount>;
 

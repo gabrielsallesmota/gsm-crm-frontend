@@ -28,8 +28,8 @@ const api = vi.mocked(financeService);
 afterEach(cleanup);
 
 const PROFILES: FinProfile[] = [
-  { id: "p-pf", name: "Pessoa Física", kind: "pf", archived: false },
-  { id: "p-pj", name: "GSM Automação — Pessoa Jurídica", kind: "pj", archived: false },
+  { id: "p-pf", name: "Pessoa Física", kind: "pf", archived: false, taxProvisionBps: null },
+  { id: "p-pj", name: "GSM Automação — Pessoa Jurídica", kind: "pj", archived: false, taxProvisionBps: null },
 ];
 
 function account(over: Partial<FinAccount>): FinAccount {
@@ -84,6 +84,8 @@ const CATEGORY: FinCategory = {
   color: "#4aa3ff",
   monthlyBudgetCents: null,
   archived: false,
+  budgetRollover: false,
+  costBehavior: null,
 };
 
 beforeEach(() => {
@@ -205,6 +207,9 @@ describe("Tags e baixa agendada", () => {
     installmentTotal: null,
     isFixed: false,
     tags: ["infra", "anual"],
+    client: null,
+    project: null,
+    confirmed: true,
     invoiceRef: null,
     isRefund: false,
     paymentState: "scheduled",

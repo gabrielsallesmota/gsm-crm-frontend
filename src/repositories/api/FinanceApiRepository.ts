@@ -10,6 +10,13 @@ import type {
   CreateProfileInput,
   CreateTransferInput,
   BalanceHistoryItem,
+  BudgetLine,
+  CreateGoalInput,
+  FinGoal,
+  FinRecurrence,
+  Frequency,
+  GoalKind,
+  RecurrenceMode,
   FinTransfer,
   InvoicePayment,
   PayInvoiceInput,
@@ -41,6 +48,57 @@ interface ProfileDto {
   name: string;
   kind: FinScope;
   archived: boolean;
+  tax_provision_bps?: number | null;
+}
+
+interface RecurrenceDto {
+  id: string;
+  profile_id: string;
+  frequency: Frequency;
+  start_date: string;
+  end_date: string | null;
+  mode: RecurrenceMode;
+  status: "active" | "ended";
+  kind: EntryKind;
+  description: string;
+  amount_cents: number;
+  category_id: string | null;
+  account_id: string | null;
+  next_date: string | null;
+  pending_approvals: number;
+}
+
+interface BudgetLineDto {
+  category_id: string;
+  name: string;
+  color: string;
+  rollover: boolean;
+  source: "month" | "default" | "none";
+  budget_cents: number | null;
+  carry_cents: number;
+  available_cents: number | null;
+  spent_cents: number;
+  remaining_cents: number | null;
+  used_ratio: number | null;
+}
+
+interface GoalDto {
+  id: string;
+  profile_id: string;
+  name: string;
+  kind: GoalKind;
+  target_cents: number | null;
+  target_months: number | null;
+  account_id: string | null;
+  deadline: string | null;
+  archived: boolean;
+  row_version: number;
+  saved_cents: number;
+  effective_target_cents: number;
+  remaining_cents: number;
+  progress: number | null;
+  average_monthly_expense_cents: number;
+  months_covered: number | null;
 }
 
 interface CategoryDto {
@@ -52,6 +110,8 @@ interface CategoryDto {
   color: string;
   monthly_budget_cents: number | null;
   archived: boolean;
+  budget_rollover?: boolean;
+  cost_behavior?: "fixed" | "variable" | null;
 }
 
 interface AccountDto {
@@ -121,6 +181,9 @@ interface EntryDto {
   installment_total: number | null;
   plan_id?: string | null;
   tags?: string[];
+  client?: string | null;
+  project?: string | null;
+  confirmed?: boolean;
   invoice_ref?: string | null;
   is_refund?: boolean;
   payment_state?: "effective" | "scheduled" | null;
@@ -196,6 +259,8 @@ const toCategory = (d: CategoryDto): FinCategory => ({
   color: d.color,
   monthlyBudgetCents: d.monthly_budget_cents,
   archived: d.archived,
+  budgetRollover: d.budget_rollover === true,
+  costBehavior: d.cost_behavior ?? null,
 });
 
 const toProfile = (d: ProfileDto): FinProfile => ({
@@ -203,6 +268,57 @@ const toProfile = (d: ProfileDto): FinProfile => ({
   name: d.name,
   kind: d.kind,
   archived: d.archived,
+  taxProvisionBps: d.tax_provision_bps ?? null,
+});
+
+const toRecurrence = (d: RecurrenceDto): FinRecurrence => ({
+  id: d.id,
+  profileId: d.profile_id,
+  frequency: d.frequency,
+  startDate: d.start_date,
+  endDate: d.end_date,
+  mode: d.mode,
+  status: d.status,
+  kind: d.kind,
+  description: d.description,
+  amountCents: d.amount_cents,
+  categoryId: d.category_id,
+  accountId: d.account_id,
+  nextDate: d.next_date,
+  pendingApprovals: d.pending_approvals,
+});
+
+const toBudgetLine = (d: BudgetLineDto): BudgetLine => ({
+  categoryId: d.category_id,
+  name: d.name,
+  color: d.color,
+  rollover: d.rollover,
+  source: d.source,
+  budgetCents: d.budget_cents,
+  carryCents: d.carry_cents,
+  availableCents: d.available_cents,
+  spentCents: d.spent_cents,
+  remainingCents: d.remaining_cents,
+  usedRatio: d.used_ratio,
+});
+
+const toGoal = (d: GoalDto): FinGoal => ({
+  id: d.id,
+  profileId: d.profile_id,
+  name: d.name,
+  kind: d.kind,
+  targetCents: d.target_cents,
+  targetMonths: d.target_months,
+  accountId: d.account_id,
+  deadline: d.deadline,
+  archived: d.archived,
+  rowVersion: d.row_version,
+  savedCents: d.saved_cents,
+  effectiveTargetCents: d.effective_target_cents,
+  remainingCents: d.remaining_cents,
+  progress: d.progress,
+  averageMonthlyExpenseCents: d.average_monthly_expense_cents,
+  monthsCovered: d.months_covered,
 });
 
 const toAccount = (d: AccountDto): FinAccount => ({
@@ -272,6 +388,9 @@ const toEntry = (d: EntryDto): FinEntry => ({
   installmentTotal: d.installment_total,
   isFixed: d.recurrence_id != null,
   tags: d.tags ?? [],
+  client: d.client ?? null,
+  project: d.project ?? null,
+  confirmed: d.confirmed !== false,
   invoiceRef: d.invoice_ref ?? null,
   isRefund: d.is_refund === true,
   paymentState: d.payment_state ?? null,
@@ -356,6 +475,8 @@ function entryBody(input: CreateEntryInput | UpdateEntryInput) {
     payment_method: input.paymentMethod || undefined,
     notes: input.notes,
     tags: input.tags,
+    client: input.client,
+    project: input.project,
   };
 }
 
@@ -383,11 +504,18 @@ export class FinanceApiRepository implements FinanceRepository {
     );
   }
 
-  async updateProfile(id: string, input: { name?: string; archived?: boolean }): Promise<FinProfile> {
+  async updateProfile(
+    id: string,
+    input: { name?: string; archived?: boolean; taxProvisionBps?: number | null },
+  ): Promise<FinProfile> {
     return toProfile(
       await apiRequest<ProfileDto>(`/api/v1/finance/profiles/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(input),
+        body: JSON.stringify({
+          name: input.name,
+          archived: input.archived,
+          tax_provision_bps: input.taxProvisionBps,
+        }),
       }),
     );
   }
@@ -409,6 +537,9 @@ export class FinanceApiRepository implements FinanceRepository {
         category_id: filter.categoryId,
         account_id: filter.accountId,
         tag: filter.tag,
+        client: filter.client,
+        project: filter.project,
+        unconfirmed: filter.unconfirmed ? "true" : undefined,
         status: filter.status,
         date_from: filter.dateFrom,
         date_to: filter.dateTo,
@@ -426,7 +557,13 @@ export class FinanceApiRepository implements FinanceRepository {
       body: JSON.stringify({
         ...entryBody(input),
         repeat_months: input.repeatMonths ?? 1,
-        fixed: input.fixed === true,
+        recurrence: input.recurrence
+          ? {
+              frequency: input.recurrence.frequency,
+              end_date: input.recurrence.endDate,
+              mode: input.recurrence.mode,
+            }
+          : undefined,
       }),
     });
     return dto.map(toEntry);
@@ -503,6 +640,8 @@ export class FinanceApiRepository implements FinanceRepository {
           kind: input.kind,
           profile_id: input.profileId,
           color: input.color,
+          budget_rollover: input.budgetRollover,
+          cost_behavior: input.costBehavior,
           monthly_budget_cents: input.monthlyBudgetCents ?? null,
         }),
       }),
@@ -516,6 +655,8 @@ export class FinanceApiRepository implements FinanceRepository {
         body: JSON.stringify({
           name: input.name,
           color: input.color,
+          budget_rollover: input.budgetRollover,
+          cost_behavior: input.costBehavior,
           monthly_budget_cents: input.monthlyBudgetCents,
           archived: input.archived,
         }),
@@ -653,6 +794,99 @@ export class FinanceApiRepository implements FinanceRepository {
   async restoreTransfer(id: string): Promise<FinTransfer> {
     return toTransfer(
       await apiRequest<TransferDto>(`/api/v1/finance/transfers/${id}/restore`, { method: "POST" }),
+    );
+  }
+
+  async listRecurrences(status?: "active" | "ended"): Promise<FinRecurrence[]> {
+    const dto = await apiRequest<RecurrenceDto[]>(`/api/v1/finance/recurrences${query({ status })}`);
+    return dto.map(toRecurrence);
+  }
+
+  async endRecurrence(id: string): Promise<void> {
+    await apiRequest(`/api/v1/finance/recurrences/${id}/end`, { method: "POST", body: "{}" });
+  }
+
+  async confirmEntry(entryId: string, confirmed = true): Promise<FinEntry> {
+    return toEntry(
+      await apiRequest<EntryDto>(`/api/v1/finance/entries/${entryId}/confirm`, {
+        method: "POST",
+        body: JSON.stringify({ confirmed }),
+      }),
+    );
+  }
+
+  async listBudgets(profileId: string, month: string): Promise<BudgetLine[]> {
+    const dto = await apiRequest<BudgetLineDto[]>(
+      `/api/v1/finance/budgets${query({ profile_id: profileId, month })}`,
+    );
+    return dto.map(toBudgetLine);
+  }
+
+  async setBudget(categoryId: string, month: string, amountCents: number | null): Promise<void> {
+    await apiRequest(`/api/v1/finance/budgets/${categoryId}/${month}`, {
+      method: "PUT",
+      body: JSON.stringify({ amount_cents: amountCents }),
+    });
+  }
+
+  async copyBudgets(
+    profileId: string,
+    fromMonth: string,
+    toMonth: string,
+    overwrite = false,
+  ): Promise<number> {
+    const dto = await apiRequest<{ copied: number }>("/api/v1/finance/budgets/copy", {
+      method: "POST",
+      body: JSON.stringify({
+        profile_id: profileId,
+        from_month: fromMonth,
+        to_month: toMonth,
+        overwrite,
+      }),
+    });
+    return dto.copied;
+  }
+
+  async listGoals(profileId?: string): Promise<FinGoal[]> {
+    const dto = await apiRequest<GoalDto[]>(
+      `/api/v1/finance/goals${query({ profile_id: profileId })}`,
+    );
+    return dto.map(toGoal);
+  }
+
+  async createGoal(input: CreateGoalInput): Promise<FinGoal> {
+    return toGoal(
+      await apiRequest<GoalDto>("/api/v1/finance/goals", {
+        method: "POST",
+        body: JSON.stringify({
+          profile_id: input.profileId,
+          name: input.name,
+          kind: input.kind,
+          target_cents: input.targetCents,
+          target_months: input.targetMonths,
+          account_id: input.accountId,
+          saved_cents: input.savedCents,
+          deadline: input.deadline,
+        }),
+      }),
+    );
+  }
+
+  async updateGoal(id: string, input: { name?: string; archived?: boolean }): Promise<FinGoal> {
+    return toGoal(
+      await apiRequest<GoalDto>(`/api/v1/finance/goals/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    );
+  }
+
+  async contributeGoal(id: string, deltaCents: number): Promise<FinGoal> {
+    return toGoal(
+      await apiRequest<GoalDto>(`/api/v1/finance/goals/${id}/contribute`, {
+        method: "POST",
+        body: JSON.stringify({ delta_cents: deltaCents }),
+      }),
     );
   }
 

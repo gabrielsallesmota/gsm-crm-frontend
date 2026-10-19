@@ -79,7 +79,26 @@ function ProfilesSection({ profiles, onChanged }: { profiles: FinProfile[]; onCh
     }
   }
 
-  async function update(p: FinProfile, changes: { name?: string; archived?: boolean }, ok: string) {
+  async function setTax(p: FinProfile) {
+    const current = p.taxProvisionBps === null ? "" : String(p.taxProvisionBps / 100);
+    const typed = window.prompt(
+      "Provisão GERENCIAL de impostos sobre a receita (%). Não é apuração fiscal. Deixe vazio para desligar.",
+      current,
+    );
+    if (typed === null) return;
+    const percent = typed.trim() === "" ? null : Number(typed.replace(",", "."));
+    if (percent !== null && (!Number.isFinite(percent) || percent < 0 || percent > 100)) {
+      toastError(new Error("Use um valor entre 0 e 100"), "Percentual inválido");
+      return;
+    }
+    await update(p, { taxProvisionBps: percent === null ? null : Math.round(percent * 100) }, "Provisão atualizada");
+  }
+
+  async function update(
+    p: FinProfile,
+    changes: { name?: string; archived?: boolean; taxProvisionBps?: number | null },
+    ok: string,
+  ) {
     try {
       await financeService.updateProfile(p.id, changes);
       toast(ok);
@@ -129,6 +148,11 @@ function ProfilesSection({ profiles, onChanged }: { profiles: FinProfile[]; onCh
               )}{" "}
               <Badge label={p.kind.toUpperCase()} color="var(--tone-blue-text)" bg="var(--tone-blue-bg)" />
               {p.archived && <span className={styles.listMeta}> · arquivado</span>}
+              {p.kind === "pj" && p.taxProvisionBps !== null && (
+                <span className={styles.listMeta}>
+                  {" "}· provisão gerencial de impostos {(p.taxProvisionBps / 100).toLocaleString("pt-BR")}%
+                </span>
+              )}
             </span>
             <span className={styles.rowActions}>
               {renaming === p.id ? (
@@ -141,6 +165,11 @@ function ProfilesSection({ profiles, onChanged }: { profiles: FinProfile[]; onCh
               ) : (
                 <>
                   <Button onClick={() => { setRenaming(p.id); setDraft(p.name); }} aria-label={`Renomear ${p.name}`}>Renomear</Button>
+                  {p.kind === "pj" && (
+                    <Button onClick={() => void setTax(p)} aria-label={`Definir provisão de impostos de ${p.name}`}>
+                      Provisão de impostos
+                    </Button>
+                  )}
                   <Button onClick={() => void update(p, { archived: !p.archived }, p.archived ? "Perfil reativado" : "Perfil arquivado")} aria-label={`${p.archived ? "Desarquivar" : "Arquivar"} ${p.name}`}>
                     {p.archived ? "Desarquivar" : "Arquivar"}
                   </Button>

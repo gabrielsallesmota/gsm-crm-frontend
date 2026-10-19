@@ -12,6 +12,8 @@ export interface FinProfile {
   name: string;
   kind: FinScope;
   archived: boolean;
+  /** Provisão GERENCIAL de impostos em pontos-base (600 = 6%); só PJ. Não é apuração fiscal. */
+  taxProvisionBps: number | null;
 }
 
 export interface CreateProfileInput {
@@ -28,6 +30,10 @@ export interface FinCategory {
   color: string;
   monthlyBudgetCents: number | null;
   archived: boolean;
+  /** A sobra do orçamento do mês passa para o seguinte? */
+  budgetRollover: boolean;
+  /** PJ gerencial: custo fixo ou variável. */
+  costBehavior: "fixed" | "variable" | null;
 }
 
 export interface FinAccount {
@@ -150,6 +156,11 @@ export interface FinEntry {
   /** Recorrência sem fim (o servidor mantém 12 meses à frente). */
   isFixed: boolean;
   tags: string[];
+  /** PJ gerencial (opcionais). */
+  client: string | null;
+  project: string | null;
+  /** Ocorrência de recorrência manual aguardando aprovação = false. */
+  confirmed: boolean;
   /** Cartão: fatura (AAAA-MM) gravada na compra. */
   invoiceRef: string | null;
   /** Estorno de compra no cartão: crédito na fatura (nunca receita). */
@@ -172,6 +183,10 @@ export interface EntryFilter {
   categoryId?: string;
   accountId?: string;
   tag?: string;
+  client?: string;
+  project?: string;
+  /** Só ocorrências de recorrência manual aguardando aprovação. */
+  unconfirmed?: boolean;
   status?: EntryStatus;
   dateFrom?: string;
   dateTo?: string;
@@ -194,9 +209,85 @@ export interface CreateEntryInput {
   notes?: string;
   /** 1 = único; N = série mensal de N meses (mesmo valor). */
   repeatMonths?: number;
-  /** Todo mês, sem data final (ignora `repeatMonths`). */
-  fixed?: boolean;
+  /** Recorrência (semanal/quinzenal/mensal/anual, com ou sem fim; automática ou com aprovação). */
+  recurrence?: RecurrenceInput;
   tags?: string[];
+  client?: string;
+  project?: string;
+}
+
+export type Frequency = "weekly" | "biweekly" | "monthly" | "yearly";
+export type RecurrenceMode = "auto" | "manual";
+
+export interface RecurrenceInput {
+  frequency: Frequency;
+  endDate?: string;
+  /** `manual`: cada ocorrência nasce aguardando aprovação. Gerar nunca é pagar. */
+  mode?: RecurrenceMode;
+}
+
+export interface FinRecurrence {
+  id: string;
+  profileId: string;
+  frequency: Frequency;
+  startDate: string;
+  endDate: string | null;
+  mode: RecurrenceMode;
+  status: "active" | "ended";
+  kind: EntryKind;
+  description: string;
+  amountCents: number;
+  categoryId: string | null;
+  accountId: string | null;
+  nextDate: string | null;
+  pendingApprovals: number;
+}
+
+export interface BudgetLine {
+  categoryId: string;
+  name: string;
+  color: string;
+  rollover: boolean;
+  /** month = valor definido para o mês · default = padrão da categoria · none */
+  source: "month" | "default" | "none";
+  budgetCents: number | null;
+  carryCents: number;
+  availableCents: number | null;
+  spentCents: number;
+  remainingCents: number | null;
+  usedRatio: number | null;
+}
+
+export type GoalKind = "goal" | "emergency";
+
+export interface FinGoal {
+  id: string;
+  profileId: string;
+  name: string;
+  kind: GoalKind;
+  targetCents: number | null;
+  targetMonths: number | null;
+  accountId: string | null;
+  deadline: string | null;
+  archived: boolean;
+  rowVersion: number;
+  savedCents: number;
+  effectiveTargetCents: number;
+  remainingCents: number;
+  progress: number | null;
+  averageMonthlyExpenseCents: number;
+  monthsCovered: number | null;
+}
+
+export interface CreateGoalInput {
+  profileId: string;
+  name: string;
+  kind: GoalKind;
+  targetCents?: number;
+  targetMonths?: number;
+  accountId?: string;
+  savedCents?: number;
+  deadline?: string;
 }
 
 /** Só o que for informado muda; `null` limpa categoria, conta, vencimento e baixa. */
@@ -208,12 +299,16 @@ export interface CreateCategoryInput {
   name: string;
   kind: EntryKind;
   profileId: string;
+  budgetRollover?: boolean;
+  costBehavior?: "fixed" | "variable";
   color: string;
   monthlyBudgetCents?: number | null;
 }
 
 export interface UpdateCategoryInput {
   name?: string;
+  budgetRollover?: boolean;
+  costBehavior?: "fixed" | "variable" | null;
   color?: string;
   monthlyBudgetCents?: number | null;
   archived?: boolean;

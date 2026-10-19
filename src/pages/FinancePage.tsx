@@ -8,6 +8,7 @@ import { CardsView } from "../components/finance/CardsView";
 import { CategoriesView } from "../components/finance/CategoriesView";
 import { EntriesView } from "../components/finance/EntriesView";
 import { EntryFormModal } from "../components/finance/EntryFormModal";
+import { PlanningView } from "../components/finance/PlanningView";
 import { FinanceDashboardView } from "../components/finance/FinanceDashboardView";
 import {
   useFinanceAccounts,
@@ -20,12 +21,13 @@ import { usePageTitle } from "../hooks/usePageTitle";
 import { currentMonth, monthTitle, shiftMonth } from "../utils/finance";
 import styles from "../components/finance/Finance.module.css";
 
-type Tab = "painel" | "lancamentos" | "contas" | "cartoes" | "categorias";
+type Tab = "painel" | "lancamentos" | "contas" | "cartoes" | "planejamento" | "categorias";
 const TABS: [Tab, string][] = [
   ["painel", "Painel"],
   ["lancamentos", "Lançamentos"],
   ["contas", "Contas"],
   ["cartoes", "Cartões"],
+  ["planejamento", "Planejamento"],
   ["categorias", "Categorias e contas"],
 ];
 
@@ -110,7 +112,7 @@ export function FinancePage() {
         ))}
       </div>
 
-      {tab !== "categorias" && tab !== "contas" && (
+      {tab !== "categorias" && tab !== "contas" && tab !== "planejamento" && (
         <div className={styles.toolbar}>
           <div className={styles.monthNav}>
             <button type="button" className={styles.iconBtn} aria-label="Mês anterior" onClick={() => setMonth(shiftMonth(month, -1))}>
@@ -167,6 +169,19 @@ export function FinancePage() {
             onChanged={() => {
               accounts.reload();
               dashboard.reload();
+            }}
+          />
+        )}
+
+        {tab === "planejamento" && (
+          <PlanningView
+            profiles={profileList}
+            profileId={profileId}
+            accounts={accList}
+            month={month}
+            onChanged={() => {
+              dashboard.reload();
+              setVersion((v) => v + 1);
             }}
           />
         )}
