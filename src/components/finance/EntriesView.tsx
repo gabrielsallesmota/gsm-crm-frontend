@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type {
   EntryFilter,
   EntryKind,
@@ -61,6 +62,7 @@ export function EntriesView({
   const [tag, setTag] = useState("");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<FinEntry | null>(null);
+  const navigate = useNavigate();
   const [deleting, setDeleting] = useState<FinEntry | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportPassword, setExportPassword] = useState("");
@@ -233,6 +235,7 @@ export function EntriesView({
                     <div className={styles.listMeta}>
                       {e.accountId ? accountNames.get(e.accountId) : ""}
                       {e.installmentNo ? ` · ${e.installmentNo}/${e.installmentTotal}` : ""}
+                      {e.invoiceRef ? ` · fatura ${e.invoiceRef.slice(5)}/${e.invoiceRef.slice(0, 4)}` : ""}
                       {e.isFixed ? " · fixo" : ""}
                       {e.paymentState === "scheduled" ? " · baixa agendada" : ""}
                       {e.tags.length > 0 ? ` · ${e.tags.map((t) => `#${t}`).join(" ")}` : ""}
@@ -252,9 +255,15 @@ export function EntriesView({
                   </td>
                   <td>
                     <div className={styles.rowActions}>
-                      <Button onClick={() => void togglePaid(e)}>
-                        {e.paidAt ? "Estornar" : e.kind === "income" ? "Receber" : "Pagar"}
-                      </Button>
+                      {e.invoiceRef ? (
+                        <Button onClick={() => navigate("/financeiro?aba=cartoes")} aria-label={`Ver fatura de ${e.description}`}>
+                          Ver fatura
+                        </Button>
+                      ) : (
+                        <Button onClick={() => void togglePaid(e)}>
+                          {e.paidAt ? "Estornar" : e.kind === "income" ? "Receber" : "Pagar"}
+                        </Button>
+                      )}
                       <Button onClick={() => setEditing(e)} aria-label={`Editar ${e.description}`}>Editar</Button>
                       <Button variant="danger" onClick={() => setDeleting(e)} aria-label={`Excluir ${e.description}`}>
                         Excluir

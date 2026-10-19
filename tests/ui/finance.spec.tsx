@@ -625,6 +625,20 @@ describe("Lançamento fixo e edição de série", () => {
     expect(await screen.findByText("4 lançamentos atualizados")).toBeTruthy();
   });
 
+  it("compra de cartão mostra a fatura e leva para ela em vez de 'Pagar'", async () => {
+    api.listEntries.mockResolvedValue({
+      items: [entry({ id: "k1", description: "Mercado cartão", accountId: "card1", invoiceRef: "2031-04" })],
+      total: 1,
+      page: 1,
+      pageSize: 50,
+    });
+    open("/financeiro?aba=lancamentos");
+    await screen.findByText("Mercado cartão");
+    expect(screen.getByText(/fatura 04\/2031/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ver fatura de Mercado cartão" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Pagar" })).toBeNull();
+  });
+
   it("lançamento avulso edita direto, sem perguntar", async () => {
     api.updateEntry.mockResolvedValue(entry());
     open("/financeiro?aba=lancamentos");
