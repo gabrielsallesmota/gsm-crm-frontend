@@ -41,11 +41,22 @@ export interface FinAccount {
   closingDay: number | null;
   dueDay: number | null;
   creditLimitCents: number | null;
+  institution: string | null;
+  initialBalanceCents: number;
+  initialBalanceDate: string | null;
+  lastReconciledOn: string | null;
+  lastReconciledBalanceCents: number | null;
+  /** Só na listagem de contas (cartão não tem saldo): o já efetivado até hoje e o previsto. */
+  balanceCents: number | null;
+  projectedCents: number | null;
 }
 
 export interface CreateAccountInput {
   name: string;
   profileId: string;
+  institution?: string;
+  initialBalanceCents?: number;
+  initialBalanceDate?: string | null;
   kind: AccountKind;
   closingDay?: number;
   dueDay?: number;
@@ -54,6 +65,9 @@ export interface CreateAccountInput {
 
 export interface UpdateAccountInput {
   name?: string;
+  institution?: string | null;
+  initialBalanceCents?: number;
+  initialBalanceDate?: string | null;
   archived?: boolean;
   closingDay?: number;
   dueDay?: number;
@@ -111,6 +125,9 @@ export interface FinEntry {
   installmentTotal: number | null;
   /** Recorrência sem fim (o servidor mantém 12 meses à frente). */
   isFixed: boolean;
+  tags: string[];
+  /** Baixa efetiva (já aconteceu) × agendada (data futura); sem baixa = null. */
+  paymentState: "effective" | "scheduled" | null;
   status: EntryStatus;
   /** Só após editar com `apply` ≠ "this": quantos itens da série mudaram. */
   affected?: number;
@@ -126,6 +143,7 @@ export interface EntryFilter {
   kind?: EntryKind;
   categoryId?: string;
   accountId?: string;
+  tag?: string;
   status?: EntryStatus;
   dateFrom?: string;
   dateTo?: string;
@@ -150,6 +168,7 @@ export interface CreateEntryInput {
   repeatMonths?: number;
   /** Todo mês, sem data final (ignora `repeatMonths`). */
   fixed?: boolean;
+  tags?: string[];
 }
 
 /** Só o que for informado muda; `null` limpa categoria, conta, vencimento e baixa. */
@@ -171,6 +190,59 @@ export interface UpdateCategoryInput {
   monthlyBudgetCents?: number | null;
   archived?: boolean;
 }
+
+export type TransferKind =
+  | "common"
+  | "pro_labore"
+  | "profit_distribution"
+  | "capital_contribution"
+  | "reimbursement";
+
+export interface FinTransfer {
+  id: string;
+  kind: TransferKind;
+  fromAccountId: string;
+  fromProfileId: string;
+  toAccountId: string;
+  toProfileId: string;
+  amountCents: number;
+  transferDate: string;
+  description: string;
+  notes: string | null;
+  rowVersion: number;
+}
+
+export interface CreateTransferInput {
+  kind: TransferKind;
+  fromAccountId: string;
+  toAccountId: string;
+  amountCents: number;
+  transferDate: string;
+  description: string;
+  notes?: string;
+}
+
+export interface ReconcileResult {
+  systemCents: number;
+  statementCents: number;
+  differenceCents: number;
+  reconciled: boolean;
+  adjustmentCents: number | null;
+}
+
+export interface BalanceHistoryItem {
+  month: string;
+  netCents: number;
+  balanceCents: number;
+}
+
+export const TRANSFER_KIND_LABEL: Record<TransferKind, string> = {
+  common: "Transferência",
+  pro_labore: "Pró-labore (PJ → PF)",
+  profit_distribution: "Distribuição de lucros (PJ → PF)",
+  capital_contribution: "Aporte (PF → PJ)",
+  reimbursement: "Reembolso",
+};
 
 export interface Totals {
   income: number;

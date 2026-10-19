@@ -8,6 +8,11 @@ import type {
   CreateAccountInput,
   CreateCategoryInput,
   CreateProfileInput,
+  CreateTransferInput,
+  BalanceHistoryItem,
+  FinTransfer,
+  ReconcileResult,
+  TransferKind,
   FinProfile,
   CreateEntryInput,
   EntryFilter,
@@ -57,6 +62,27 @@ interface AccountDto {
   closing_day: number | null;
   due_day: number | null;
   credit_limit_cents: number | null;
+  institution?: string | null;
+  initial_balance_cents?: number;
+  initial_balance_date?: string | null;
+  last_reconciled_on?: string | null;
+  last_reconciled_balance_cents?: number | null;
+  balance_cents?: number | null;
+  projected_cents?: number | null;
+}
+
+interface TransferDto {
+  id: string;
+  kind: TransferKind;
+  from_account_id: string;
+  from_profile_id: string;
+  to_account_id: string;
+  to_profile_id: string;
+  amount_cents: number;
+  transfer_date: string;
+  description: string;
+  notes: string | null;
+  row_version: number;
 }
 
 interface InvoiceDto {
@@ -90,6 +116,8 @@ interface EntryDto {
   installment_no: number | null;
   installment_total: number | null;
   plan_id?: string | null;
+  tags?: string[];
+  payment_state?: "effective" | "scheduled" | null;
   affected?: number | null;
   status: EntryStatus;
 }
@@ -181,6 +209,27 @@ const toAccount = (d: AccountDto): FinAccount => ({
   closingDay: d.closing_day ?? null,
   dueDay: d.due_day ?? null,
   creditLimitCents: d.credit_limit_cents ?? null,
+  institution: d.institution ?? null,
+  initialBalanceCents: d.initial_balance_cents ?? 0,
+  initialBalanceDate: d.initial_balance_date ?? null,
+  lastReconciledOn: d.last_reconciled_on ?? null,
+  lastReconciledBalanceCents: d.last_reconciled_balance_cents ?? null,
+  balanceCents: d.balance_cents ?? null,
+  projectedCents: d.projected_cents ?? null,
+});
+
+const toTransfer = (d: TransferDto): FinTransfer => ({
+  id: d.id,
+  kind: d.kind,
+  fromAccountId: d.from_account_id,
+  fromProfileId: d.from_profile_id,
+  toAccountId: d.to_account_id,
+  toProfileId: d.to_profile_id,
+  amountCents: d.amount_cents,
+  transferDate: d.transfer_date,
+  description: d.description,
+  notes: d.notes,
+  rowVersion: d.row_version,
 });
 
 const toInvoice = (d: InvoiceDto): InvoiceSummary => ({
@@ -214,6 +263,8 @@ const toEntry = (d: EntryDto): FinEntry => ({
   installmentNo: d.installment_no,
   installmentTotal: d.installment_total,
   isFixed: d.recurrence_id != null,
+  tags: d.tags ?? [],
+  paymentState: d.payment_state ?? null,
   status: d.status,
   ...(d.affected != null ? { affected: d.affected } : {}),
 });
@@ -294,6 +345,7 @@ function entryBody(input: CreateEntryInput | UpdateEntryInput) {
     paid_at: input.paidAt,
     payment_method: input.paymentMethod || undefined,
     notes: input.notes,
+    tags: input.tags,
   };
 }
 
@@ -346,6 +398,7 @@ export class FinanceApiRepository implements FinanceRepository {
         kind: filter.kind,
         category_id: filter.categoryId,
         account_id: filter.accountId,
+        tag: filter.tag,
         status: filter.status,
         date_from: filter.dateFrom,
         date_to: filter.dateTo,
@@ -475,6 +528,9 @@ export class FinanceApiRepository implements FinanceRepository {
           name: input.name,
           profile_id: input.profileId,
           kind: input.kind,
+          institution: input.institution,
+          initial_balance_cents: input.initialBalanceCents,
+          initial_balance_date: input.initialBalanceDate,
           closing_day: input.closingDay,
           due_day: input.dueDay,
           credit_limit_cents: input.creditLimitCents,
@@ -490,12 +546,106 @@ export class FinanceApiRepository implements FinanceRepository {
         body: JSON.stringify({
           name: input.name,
           archived: input.archived,
+          institution: input.institution,
+          initial_balance_cents: input.initialBalanceCents,
+          initial_balance_date: input.initialBalanceDate,
           closing_day: input.closingDay,
           due_day: input.dueDay,
           credit_limit_cents: input.creditLimitCents,
         }),
       }),
     );
+  }
+
+  async accountHistory(accountId: string, months = 12): Promise<BalanceHistoryItem[]> {
+    const dto = await apiRequest<{ month: string; net_cents: number; balance_cents: number }[]>(
+      `/api/v1/finance/accounts/${accountId}/history${query({ months })}`,
+    );
+    return dto.map((i) => ({ month: i.month, netCents: i.net_cents, balanceCents: i.balance_cents }));
+  }
+
+  async reconcile(
+    accountId: string,
+    input: { on: string; statementBalanceCents: number; adjust: boolean },
+  ): Promise<ReconcileResult> {
+    const dto = await apiRequest<{
+      system_cents: number;
+      statement_cents: number;
+      difference_cents: number;
+      reconciled: boolean;
+      adjustment: { amount_cents: number } | null;
+    }>(`/api/v1/finance/accounts/${accountId}/reconcile`, {
+      method: "POST",
+      body: JSON.stringify({
+        on: input.on,
+        statement_balance_cents: input.statementBalanceCents,
+        adjust: input.adjust,
+      }),
+    });
+    return {
+      systemCents: dto.system_cents,
+      statementCents: dto.statement_cents,
+      differenceCents: dto.difference_cents,
+      reconciled: dto.reconciled,
+      adjustmentCents: dto.adjustment?.amount_cents ?? null,
+    };
+  }
+
+  async adjustBalance(
+    accountId: string,
+    input: { amountCents: number; date: string; reason: string },
+  ): Promise<void> {
+    await apiRequest(`/api/v1/finance/accounts/${accountId}/adjustments`, {
+      method: "POST",
+      body: JSON.stringify({
+        amount_cents: input.amountCents,
+        adjustment_date: input.date,
+        reason: input.reason,
+      }),
+    });
+  }
+
+  async listTransfers(filter: { profileId?: string; trash?: boolean } = {}): Promise<FinTransfer[]> {
+    const dto = await apiRequest<{ items: TransferDto[] }>(
+      `/api/v1/finance/transfers${query({
+        profile_id: filter.profileId,
+        trash: filter.trash ? "true" : undefined,
+        page_size: 100,
+      })}`,
+    );
+    return dto.items.map(toTransfer);
+  }
+
+  async createTransfer(input: CreateTransferInput): Promise<FinTransfer> {
+    return toTransfer(
+      await apiRequest<TransferDto>("/api/v1/finance/transfers", {
+        method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({
+          kind: input.kind,
+          from_account_id: input.fromAccountId,
+          to_account_id: input.toAccountId,
+          amount_cents: input.amountCents,
+          transfer_date: input.transferDate,
+          description: input.description,
+          notes: input.notes,
+        }),
+      }),
+    );
+  }
+
+  async deleteTransfer(id: string): Promise<void> {
+    await apiRequest(`/api/v1/finance/transfers/${id}`, { method: "DELETE" });
+  }
+
+  async restoreTransfer(id: string): Promise<FinTransfer> {
+    return toTransfer(
+      await apiRequest<TransferDto>(`/api/v1/finance/transfers/${id}/restore`, { method: "POST" }),
+    );
+  }
+
+  async listTags(profileId?: string): Promise<string[]> {
+    return apiRequest<string[]>(`/api/v1/finance/tags${query({ profile_id: profileId })}`);
   }
 
   async listCards(): Promise<CardOverview[]> {

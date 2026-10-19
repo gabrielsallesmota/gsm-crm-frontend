@@ -5,6 +5,10 @@ import type {
   CreateCategoryInput,
   CreateEntryInput,
   CreateProfileInput,
+  CreateTransferInput,
+  BalanceHistoryItem,
+  FinTransfer,
+  ReconcileResult,
   EntryFilter,
   FinAccount,
   FinCategory,
@@ -49,6 +53,22 @@ export interface FinanceRepository {
   updateCategory(id: string, input: UpdateCategoryInput): Promise<FinCategory>;
 
   listAccounts(includeArchived?: boolean): Promise<FinAccount[]>;
+  accountHistory(accountId: string, months?: number): Promise<BalanceHistoryItem[]>;
+  /** Compara o saldo do sistema com o do extrato; com `adjust`, registra a diferença como ajuste. */
+  reconcile(
+    accountId: string,
+    input: { on: string; statementBalanceCents: number; adjust: boolean },
+  ): Promise<ReconcileResult>;
+  adjustBalance(
+    accountId: string,
+    input: { amountCents: number; date: string; reason: string },
+  ): Promise<void>;
+
+  listTransfers(filter?: { profileId?: string; trash?: boolean }): Promise<FinTransfer[]>;
+  createTransfer(input: CreateTransferInput): Promise<FinTransfer>;
+  deleteTransfer(id: string): Promise<void>;
+  restoreTransfer(id: string): Promise<FinTransfer>;
+  listTags(profileId?: string): Promise<string[]>;
   createAccount(input: CreateAccountInput): Promise<FinAccount>;
   updateAccount(id: string, input: UpdateAccountInput): Promise<FinAccount>;
 

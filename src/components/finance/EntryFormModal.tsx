@@ -64,6 +64,7 @@ export function EntryFormModal({
   const [accountId, setAccountId] = useState(entry?.accountId ?? preset?.id ?? "");
   const [method, setMethod] = useState(entry?.paymentMethod ?? "");
   const [notes, setNotes] = useState(entry?.notes ?? "");
+  const [tagsText, setTagsText] = useState((entry?.tags ?? []).join(", "));
   // Só ao criar: único, mensal por N meses ou fixo (todo mês, sem fim).
   const [repeatMode, setRepeatMode] = useState<"once" | "months" | "fixed">("once");
   const [repeat, setRepeat] = useState(3);
@@ -116,6 +117,7 @@ export function EntryFormModal({
         paidAt: paid ? paidAt : null,
         paymentMethod: method,
         notes,
+        tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
       };
       if (entry) {
         const updated = await financeService.updateEntry(entry.id, base, apply);
@@ -301,6 +303,11 @@ export function EntryFormModal({
               os seguintes ou para todos.
             </p>
           )}
+        </div>
+
+        <div className={form.field}>
+          <label className={form.label} htmlFor={`${uid}-tags`}>Tags</label>
+          <input id={`${uid}-tags`} className={form.input} maxLength={200} value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Ex.: viagem, reembolsável (separe por vírgula)" />
         </div>
 
         <div className={form.field}>

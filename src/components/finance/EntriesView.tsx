@@ -58,6 +58,7 @@ export function EntriesView({
   const [categoryId, setCategoryId] = useState("");
   const [allMonths, setAllMonths] = useState(false);
   const [search, setSearch] = useState("");
+  const [tag, setTag] = useState("");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<FinEntry | null>(null);
   const [deleting, setDeleting] = useState<FinEntry | null>(null);
@@ -73,6 +74,7 @@ export function EntriesView({
     ...(kind ? { kind } : {}),
     ...(status ? { status } : {}),
     ...(categoryId ? { categoryId } : {}),
+    ...(tag.trim() ? { tag: tag.trim() } : {}),
     ...(allMonths ? {} : { dateFrom: range.from, dateTo: range.to }),
     ...(debounced.trim() ? { search: debounced.trim() } : {}),
     page,
@@ -179,6 +181,10 @@ export function EntriesView({
           </select>
         </label>
         <label className={styles.filterField}>
+          Tag
+          <input className={styles.control} value={tag} maxLength={30} onChange={(e) => reset(setTag)(e.target.value)} />
+        </label>
+        <label className={styles.filterField}>
           Categoria
           <select className={styles.control} value={categoryId} onChange={(e) => reset(setCategoryId)(e.target.value)}>
             <option value="">Todas</option>
@@ -228,6 +234,8 @@ export function EntriesView({
                       {e.accountId ? accountNames.get(e.accountId) : ""}
                       {e.installmentNo ? ` · ${e.installmentNo}/${e.installmentTotal}` : ""}
                       {e.isFixed ? " · fixo" : ""}
+                      {e.paymentState === "scheduled" ? " · baixa agendada" : ""}
+                      {e.tags.length > 0 ? ` · ${e.tags.map((t) => `#${t}`).join(" ")}` : ""}
                     </div>
                   </td>
                   <td>{e.categoryId ? (names.get(e.categoryId) ?? "—") : "—"}</td>

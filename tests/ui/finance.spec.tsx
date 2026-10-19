@@ -128,6 +128,8 @@ function entry(overrides: Partial<FinEntry> = {}): FinEntry {
     installmentNo: null,
     installmentTotal: null,
     isFixed: false,
+    tags: [],
+    paymentState: null,
     status: "pending",
     ...overrides,
   };
@@ -326,6 +328,13 @@ const CARD: FinAccount = {
   closingDay: 10,
   dueDay: 20,
   creditLimitCents: 500_000,
+  institution: null,
+  initialBalanceCents: 0,
+  initialBalanceDate: null,
+  lastReconciledOn: null,
+  lastReconciledBalanceCents: null,
+  balanceCents: null,
+  projectedCents: null,
 };
 
 function invoice(overrides: Partial<InvoiceSummary> = {}): InvoiceSummary {

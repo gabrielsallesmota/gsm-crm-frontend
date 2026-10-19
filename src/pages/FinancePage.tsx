@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Button } from "../components/common/Button";
 import { EmptyState } from "../components/common/EmptyState";
 import { SkeletonRows } from "../components/common/Skeleton";
+import { AccountsView } from "../components/finance/AccountsView";
 import { CardsView } from "../components/finance/CardsView";
 import { CategoriesView } from "../components/finance/CategoriesView";
 import { EntriesView } from "../components/finance/EntriesView";
@@ -19,10 +20,11 @@ import { usePageTitle } from "../hooks/usePageTitle";
 import { currentMonth, monthTitle, shiftMonth } from "../utils/finance";
 import styles from "../components/finance/Finance.module.css";
 
-type Tab = "painel" | "lancamentos" | "cartoes" | "categorias";
+type Tab = "painel" | "lancamentos" | "contas" | "cartoes" | "categorias";
 const TABS: [Tab, string][] = [
   ["painel", "Painel"],
   ["lancamentos", "Lançamentos"],
+  ["contas", "Contas"],
   ["cartoes", "Cartões"],
   ["categorias", "Categorias e contas"],
 ];
@@ -108,7 +110,7 @@ export function FinancePage() {
         ))}
       </div>
 
-      {tab !== "categorias" && (
+      {tab !== "categorias" && tab !== "contas" && (
         <div className={styles.toolbar}>
           <div className={styles.monthNav}>
             <button type="button" className={styles.iconBtn} aria-label="Mês anterior" onClick={() => setMonth(shiftMonth(month, -1))}>
@@ -154,6 +156,18 @@ export function FinancePage() {
             month={month}
             refreshToken={version}
             onChanged={changed}
+          />
+        )}
+
+        {tab === "contas" && (
+          <AccountsView
+            accounts={accList}
+            profiles={profileList}
+            profileId={profileId}
+            onChanged={() => {
+              accounts.reload();
+              dashboard.reload();
+            }}
           />
         )}
 

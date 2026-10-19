@@ -25,6 +25,14 @@ export class FinanceMockRepository implements FinanceRepository {
   createCategory = async () => unavailable();
   updateCategory = async () => unavailable();
   listAccounts = async () => unavailable();
+  accountHistory = async () => unavailable();
+  reconcile = async () => unavailable();
+  adjustBalance = async () => unavailable();
+  listTransfers = async () => unavailable();
+  createTransfer = async () => unavailable();
+  deleteTransfer = async () => unavailable();
+  restoreTransfer = async () => unavailable();
+  listTags = async () => unavailable();
   createAccount = async () => unavailable();
   updateAccount = async () => unavailable();
   listCards = async () => unavailable();

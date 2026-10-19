@@ -341,6 +341,8 @@ function AccountsSection({
   const [pickedProfile, setPickedProfile] = useState<string | undefined>(undefined);
   const profileId = pickedProfile ?? defaultProfileId ?? activeProfiles[0]?.id ?? "";
   const [kind, setKind] = useState<AccountKind>("conta");
+  const [institution, setInstitution] = useState("");
+  const [initial, setInitial] = useState(0);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<FinAccount | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -349,8 +351,16 @@ function AccountsSection({
     if (!name.trim()) return;
     setBusy(true);
     try {
-      await financeService.createAccount({ name: name.trim(), profileId, kind });
+      await financeService.createAccount({
+        name: name.trim(),
+        profileId,
+        kind,
+        ...(institution.trim() ? { institution: institution.trim() } : {}),
+        initialBalanceCents: Math.round(initial * 100),
+      });
       setName("");
+      setInstitution("");
+      setInitial(0);
       toast("Conta criada");
       onChanged();
     } catch (err) {
@@ -410,6 +420,14 @@ function AccountsSection({
                 <option key={k} value={k}>{ACCOUNT_KIND_LABEL[k]}</option>
               ))}
           </select>
+        </label>
+        <label className={styles.filterField}>
+          Instituição
+          <input className={styles.control} value={institution} maxLength={80} onChange={(e) => setInstitution(e.target.value)} placeholder="Ex.: Nubank" />
+        </label>
+        <label className={styles.filterField}>
+          Saldo inicial
+          <CurrencyInput className={styles.control} value={initial} onChange={setInitial} />
         </label>
         <Button variant="primary" onClick={() => void create()} disabled={busy || !name.trim() || !profileId}>
           Adicionar
