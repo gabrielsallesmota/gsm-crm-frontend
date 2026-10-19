@@ -16,6 +16,7 @@ export class FinanceMockRepository implements FinanceRepository {
   payEntry = async () => unavailable();
   unpayEntry = async () => unavailable();
   deleteEntry = async () => unavailable();
+  reauth = async () => unavailable();
   exportCsv = async () => unavailable();
   listCategories = async () => unavailable();
   createCategory = async () => unavailable();

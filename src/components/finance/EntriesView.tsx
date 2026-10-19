@@ -58,6 +58,9 @@ export function EntriesView({
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<FinEntry | null>(null);
   const [deleting, setDeleting] = useState<FinEntry | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportPassword, setExportPassword] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [busyDelete, setBusyDelete] = useState(false);
   const debounced = useDebouncedValue(search, 300);
 
@@ -120,20 +123,30 @@ export function EntriesView({
   }
 
   async function exportCsv() {
+    setExporting(true);
     try {
-      const blob = await financeService.exportCsv({
-        ...(scope ? { scope } : {}),
-        ...(kind ? { kind } : {}),
-        ...(allMonths ? {} : { dateFrom: range.from, dateTo: range.to }),
-      });
+      // Exportar dados exige confirmar a senha (token curto, não fica guardado).
+      const reauthToken = await financeService.reauth(exportPassword);
+      const blob = await financeService.exportCsv(
+        {
+          ...(scope ? { scope } : {}),
+          ...(kind ? { kind } : {}),
+          ...(allMonths ? {} : { dateFrom: range.from, dateTo: range.to }),
+        },
+        reauthToken,
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = "financeiro.csv";
       a.click();
       URL.revokeObjectURL(url);
+      setExportOpen(false);
     } catch (err) {
       toastError(err, "Não foi possível exportar");
+    } finally {
+      setExportPassword("");
+      setExporting(false);
     }
   }
 
@@ -177,7 +190,7 @@ export function EntriesView({
             <option value="all">Tudo</option>
           </select>
         </label>
-        <Button onClick={() => void exportCsv()}>Exportar CSV</Button>
+        <Button onClick={() => setExportOpen(true)}>Exportar CSV</Button>
       </div>
 
       {error && <EmptyState title="Não foi possível carregar os lançamentos" message={error.message} />}
@@ -265,6 +278,39 @@ export function EntriesView({
           onClose={() => setEditing(null)}
           onSaved={changed}
         />
+      )}
+
+      {exportOpen && (
+        <Modal
+          title="Exportar CSV"
+          subtitle="Confirme sua senha para exportar seus dados financeiros."
+          onClose={() => (exporting ? undefined : setExportOpen(false))}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void exportCsv();
+            }}
+          >
+            <div className={form.field}>
+              <label className={form.label} htmlFor="fin-export-pwd">Senha</label>
+              <input
+                id="fin-export-pwd"
+                className={form.input}
+                type="password"
+                autoComplete="current-password"
+                value={exportPassword}
+                onChange={(e) => setExportPassword(e.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <div className={form.actions}>
+              <Button type="button" onClick={() => setExportOpen(false)} disabled={exporting}>Cancelar</Button>
+              <Button type="submit" variant="primary" disabled={exporting || exportPassword === ""}>Exportar</Button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {deleting && (

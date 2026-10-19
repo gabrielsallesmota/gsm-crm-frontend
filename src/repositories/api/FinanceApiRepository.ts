@@ -77,7 +77,7 @@ interface EntryDto {
   recurrence_id: string | null;
   installment_no: number | null;
   installment_total: number | null;
-  is_fixed?: boolean;
+  plan_id?: string | null;
   affected?: number | null;
   status: EntryStatus;
 }
@@ -191,7 +191,7 @@ const toEntry = (d: EntryDto): FinEntry => ({
   recurrenceId: d.recurrence_id,
   installmentNo: d.installment_no,
   installmentTotal: d.installment_total,
-  isFixed: d.is_fixed === true,
+  isFixed: d.recurrence_id != null,
   status: d.status,
   ...(d.affected != null ? { affected: d.affected } : {}),
 });
@@ -351,7 +351,18 @@ export class FinanceApiRepository implements FinanceRepository {
     return dto.deleted;
   }
 
-  async exportCsv(filter: Pick<EntryFilter, "scope" | "kind" | "dateFrom" | "dateTo">): Promise<Blob> {
+  async reauth(password: string): Promise<string> {
+    const dto = await apiRequest<{ token: string }>("/api/v1/finance/reauth", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    });
+    return dto.token;
+  }
+
+  async exportCsv(
+    filter: Pick<EntryFilter, "scope" | "kind" | "dateFrom" | "dateTo">,
+    reauthToken: string,
+  ): Promise<Blob> {
     return apiRequestBlob(
       `/api/v1/finance/export.csv${query({
         scope: filter.scope,
@@ -359,6 +370,7 @@ export class FinanceApiRepository implements FinanceRepository {
         date_from: filter.dateFrom,
         date_to: filter.dateTo,
       })}`,
+      { headers: { "X-Finance-Reauth": reauthToken } },
     );
   }
 

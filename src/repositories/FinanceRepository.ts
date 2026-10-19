@@ -31,7 +31,12 @@ export interface FinanceRepository {
   unpayEntry(id: string): Promise<FinEntry>;
   /** `series` apaga também as próximas ocorrências NÃO pagas da recorrência. */
   deleteEntry(id: string, series?: boolean): Promise<number>;
-  exportCsv(filter: Pick<EntryFilter, "scope" | "kind" | "dateFrom" | "dateTo">): Promise<Blob>;
+  /** Confere a senha do proprietário e devolve um token curto exigido para exportar dados. */
+  reauth(password: string): Promise<string>;
+  exportCsv(
+    filter: Pick<EntryFilter, "scope" | "kind" | "dateFrom" | "dateTo">,
+    reauthToken: string,
+  ): Promise<Blob>;
 
   listCategories(includeArchived?: boolean): Promise<FinCategory[]>;
   createCategory(input: CreateCategoryInput): Promise<FinCategory>;
