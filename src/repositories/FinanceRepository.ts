@@ -12,6 +12,10 @@ import type {
   FinGoal,
   FinRecurrence,
   FinTransfer,
+  ImportCommitResult,
+  ImportFile,
+  ImportHistoryItem,
+  ImportPreview,
   ReconcileResult,
   EntryFilter,
   FinAccount,
@@ -77,6 +81,17 @@ export interface FinanceRepository {
   deleteTransfer(id: string): Promise<void>;
   restoreTransfer(id: string): Promise<FinTransfer>;
   listTags(profileId?: string): Promise<string[]>;
+
+  /** Lê o arquivo e classifica as linhas. NÃO grava nada. */
+  previewImport(accountId: string, file: ImportFile): Promise<ImportPreview>;
+  /** Confirma: `decisions` = linha → "import" | "skip" | "link:<id do lançamento>". */
+  commitImport(
+    accountId: string,
+    file: ImportFile,
+    options?: { decisions?: Record<number, string>; defaultCategoryId?: string },
+  ): Promise<ImportCommitResult>;
+  listImports(accountId?: string): Promise<ImportHistoryItem[]>;
+  undoImport(importId: string): Promise<{ removed: number; restored: number }>;
 
   listRecurrences(status?: "active" | "ended"): Promise<FinRecurrence[]>;
   endRecurrence(id: string): Promise<void>;

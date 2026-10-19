@@ -258,6 +258,66 @@ export interface BudgetLine {
   usedRatio: number | null;
 }
 
+export type ImportRowStatus = "new" | "duplicate" | "match" | "error";
+
+export interface ImportRow {
+  line: number;
+  posted: string | null;
+  amountCents: number | null;
+  description: string;
+  externalId: string | null;
+  status: ImportRowStatus;
+  error: string | null;
+  /** Lançamento manual parecido (mesma conta, valor e data próxima): dá para vincular. */
+  match: { entryId: string; description: string; entryDate: string; amountCents: number } | null;
+  /** O que a confirmação faz se você não mudar nada. */
+  defaultDecision: "import" | "skip";
+}
+
+export interface ImportPreview {
+  accountId: string;
+  source: "csv" | "ofx" | "qfx";
+  total: number;
+  new: number;
+  duplicate: number;
+  match: number;
+  error: number;
+  incomeCents: number;
+  expenseCents: number;
+  ledgerBalanceCents: number | null;
+  ledgerDate: string | null;
+  warnings: string[];
+  alreadyImportedAt: string | null;
+  rows: ImportRow[];
+}
+
+export interface ImportFile {
+  name: string;
+  /** Conteúdo em base64 (o arquivo bruto não é guardado no servidor). */
+  contentBase64: string;
+}
+
+export interface ImportCommitResult {
+  id: string;
+  rowsTotal: number;
+  rowsImported: number;
+  rowsLinked: number;
+  rowsSkipped: number;
+}
+
+export interface ImportHistoryItem {
+  id: string;
+  accountId: string;
+  source: string;
+  fileName: string;
+  status: "committed" | "undone";
+  rowsTotal: number;
+  rowsImported: number;
+  rowsLinked: number;
+  rowsSkipped: number;
+  createdAt: string | null;
+}
+
 export type GoalKind = "goal" | "emergency";
 
 export interface FinGoal {

@@ -18,6 +18,11 @@ import type {
   GoalKind,
   RecurrenceMode,
   FinTransfer,
+  ImportCommitResult,
+  ImportFile,
+  ImportHistoryItem,
+  ImportPreview,
+  ImportRow,
   InvoicePayment,
   PayInvoiceInput,
   ReconcileResult,
@@ -794,6 +799,143 @@ export class FinanceApiRepository implements FinanceRepository {
   async restoreTransfer(id: string): Promise<FinTransfer> {
     return toTransfer(
       await apiRequest<TransferDto>(`/api/v1/finance/transfers/${id}/restore`, { method: "POST" }),
+    );
+  }
+
+  async previewImport(accountId: string, file: ImportFile): Promise<ImportPreview> {
+    const dto = await apiRequest<{
+      account_id: string;
+      source: ImportPreview["source"];
+      total: number;
+      new: number;
+      duplicate: number;
+      match: number;
+      error: number;
+      income_cents: number;
+      expense_cents: number;
+      ledger_balance_cents: number | null;
+      ledger_date: string | null;
+      warnings: string[];
+      already_imported_at: string | null;
+      rows: {
+        line: number;
+        posted: string | null;
+        amount_cents: number | null;
+        description: string;
+        external_id: string | null;
+        status: ImportRow["status"];
+        error: string | null;
+        match: { entry_id: string; description: string; entry_date: string; amount_cents: number } | null;
+        default_decision: "import" | "skip";
+      }[];
+    }>("/api/v1/finance/imports/preview", {
+      method: "POST",
+      body: JSON.stringify({
+        account_id: accountId,
+        file_name: file.name,
+        content_base64: file.contentBase64,
+      }),
+    });
+    return {
+      accountId: dto.account_id,
+      source: dto.source,
+      total: dto.total,
+      new: dto.new,
+      duplicate: dto.duplicate,
+      match: dto.match,
+      error: dto.error,
+      incomeCents: dto.income_cents,
+      expenseCents: dto.expense_cents,
+      ledgerBalanceCents: dto.ledger_balance_cents,
+      ledgerDate: dto.ledger_date,
+      warnings: dto.warnings,
+      alreadyImportedAt: dto.already_imported_at,
+      rows: dto.rows.map(
+        (r): ImportRow => ({
+          line: r.line,
+          posted: r.posted,
+          amountCents: r.amount_cents,
+          description: r.description,
+          externalId: r.external_id,
+          status: r.status,
+          error: r.error,
+          match: r.match
+            ? {
+                entryId: r.match.entry_id,
+                description: r.match.description,
+                entryDate: r.match.entry_date,
+                amountCents: r.match.amount_cents,
+              }
+            : null,
+          defaultDecision: r.default_decision,
+        }),
+      ),
+    };
+  }
+
+  async commitImport(
+    accountId: string,
+    file: ImportFile,
+    options: { decisions?: Record<number, string>; defaultCategoryId?: string } = {},
+  ): Promise<ImportCommitResult> {
+    const dto = await apiRequest<{
+      id: string;
+      rows_total: number;
+      rows_imported: number;
+      rows_linked: number;
+      rows_skipped: number;
+    }>("/api/v1/finance/imports", {
+      method: "POST",
+      body: JSON.stringify({
+        account_id: accountId,
+        file_name: file.name,
+        content_base64: file.contentBase64,
+        decisions: options.decisions ?? {},
+        default_category_id: options.defaultCategoryId,
+      }),
+    });
+    return {
+      id: dto.id,
+      rowsTotal: dto.rows_total,
+      rowsImported: dto.rows_imported,
+      rowsLinked: dto.rows_linked,
+      rowsSkipped: dto.rows_skipped,
+    };
+  }
+
+  async listImports(accountId?: string): Promise<ImportHistoryItem[]> {
+    const dto = await apiRequest<
+      {
+        id: string;
+        account_id: string;
+        source: string;
+        file_name: string;
+        status: "committed" | "undone";
+        rows_total: number;
+        rows_imported: number;
+        rows_linked: number;
+        rows_skipped: number;
+        created_at: string | null;
+      }[]
+    >(`/api/v1/finance/imports${query({ account_id: accountId })}`);
+    return dto.map((i) => ({
+      id: i.id,
+      accountId: i.account_id,
+      source: i.source,
+      fileName: i.file_name,
+      status: i.status,
+      rowsTotal: i.rows_total,
+      rowsImported: i.rows_imported,
+      rowsLinked: i.rows_linked,
+      rowsSkipped: i.rows_skipped,
+      createdAt: i.created_at,
+    }));
+  }
+
+  async undoImport(importId: string): Promise<{ removed: number; restored: number }> {
+    return apiRequest<{ removed: number; restored: number }>(
+      `/api/v1/finance/imports/${importId}/undo`,
+      { method: "POST" },
     );
   }
 

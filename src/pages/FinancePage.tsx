@@ -8,6 +8,7 @@ import { CardsView } from "../components/finance/CardsView";
 import { CategoriesView } from "../components/finance/CategoriesView";
 import { EntriesView } from "../components/finance/EntriesView";
 import { EntryFormModal } from "../components/finance/EntryFormModal";
+import { ImportView } from "../components/finance/ImportView";
 import { PlanningView } from "../components/finance/PlanningView";
 import { FinanceDashboardView } from "../components/finance/FinanceDashboardView";
 import {
@@ -21,13 +22,14 @@ import { usePageTitle } from "../hooks/usePageTitle";
 import { currentMonth, monthTitle, shiftMonth } from "../utils/finance";
 import styles from "../components/finance/Finance.module.css";
 
-type Tab = "painel" | "lancamentos" | "contas" | "cartoes" | "planejamento" | "categorias";
+type Tab = "painel" | "lancamentos" | "contas" | "cartoes" | "planejamento" | "importar" | "categorias";
 const TABS: [Tab, string][] = [
   ["painel", "Painel"],
   ["lancamentos", "Lançamentos"],
   ["contas", "Contas"],
   ["cartoes", "Cartões"],
   ["planejamento", "Planejamento"],
+  ["importar", "Importar"],
   ["categorias", "Categorias e contas"],
 ];
 
@@ -112,7 +114,7 @@ export function FinancePage() {
         ))}
       </div>
 
-      {tab !== "categorias" && tab !== "contas" && tab !== "planejamento" && (
+      {tab !== "categorias" && tab !== "contas" && tab !== "planejamento" && tab !== "importar" && (
         <div className={styles.toolbar}>
           <div className={styles.monthNav}>
             <button type="button" className={styles.iconBtn} aria-label="Mês anterior" onClick={() => setMonth(shiftMonth(month, -1))}>
@@ -180,6 +182,20 @@ export function FinancePage() {
             accounts={accList}
             month={month}
             onChanged={() => {
+              dashboard.reload();
+              setVersion((v) => v + 1);
+            }}
+          />
+        )}
+
+        {tab === "importar" && (
+          <ImportView
+            accounts={accList}
+            categories={catList}
+            profiles={profileList}
+            profileId={profileId}
+            onChanged={() => {
+              accounts.reload();
               dashboard.reload();
               setVersion((v) => v + 1);
             }}
