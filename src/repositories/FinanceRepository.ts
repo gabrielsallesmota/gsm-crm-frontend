@@ -4,12 +4,13 @@ import type {
   CreateAccountInput,
   CreateCategoryInput,
   CreateEntryInput,
+  CreateProfileInput,
   EntryFilter,
   FinAccount,
   FinCategory,
   FinEntry,
   FinanceDashboard,
-  FinScope,
+  FinProfile,
   InvoiceDetail,
   InvoiceSummary,
   UpdateAccountInput,
@@ -19,7 +20,12 @@ import type {
 import type { Page } from "../types/common";
 
 export interface FinanceRepository {
-  dashboard(month: string, scope?: FinScope): Promise<FinanceDashboard>;
+  listProfiles(includeArchived?: boolean): Promise<FinProfile[]>;
+  createProfile(input: CreateProfileInput): Promise<FinProfile>;
+  updateProfile(id: string, input: { name?: string; archived?: boolean }): Promise<FinProfile>;
+
+  /** Sem `profileId` = consolidado (todos os perfis). */
+  dashboard(month: string, profileId?: string): Promise<FinanceDashboard>;
 
   listEntries(filter: EntryFilter): Promise<Page<FinEntry>>;
   /** Devolve todas as ocorrências criadas (uma só, ou a série mensal). */
@@ -34,7 +40,7 @@ export interface FinanceRepository {
   /** Confere a senha do proprietário e devolve um token curto exigido para exportar dados. */
   reauth(password: string): Promise<string>;
   exportCsv(
-    filter: Pick<EntryFilter, "scope" | "kind" | "dateFrom" | "dateTo">,
+    filter: Pick<EntryFilter, "profileId" | "kind" | "dateFrom" | "dateTo">,
     reauthToken: string,
   ): Promise<Blob>;
 

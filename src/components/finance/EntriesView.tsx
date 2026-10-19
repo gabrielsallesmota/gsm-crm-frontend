@@ -6,9 +6,9 @@ import type {
   FinAccount,
   FinCategory,
   FinEntry,
-  FinScope,
+  FinProfile,
 } from "../../types/finance";
-import { KIND_LABEL, SCOPE_SHORT, STATUS_LABEL } from "../../types/finance";
+import { KIND_LABEL, STATUS_LABEL } from "../../types/finance";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { Modal } from "../common/Modal";
@@ -35,14 +35,17 @@ const STATUS_TONE: Record<EntryStatus, { color: string; bg: string }> = {
 export function EntriesView({
   categories,
   accounts,
-  scope,
+  profiles,
+  profileId,
   month,
   refreshToken,
   onChanged,
 }: {
   categories: FinCategory[];
   accounts: FinAccount[];
-  scope: FinScope | undefined;
+  profiles: FinProfile[];
+  /** Sem perfil = consolidado. */
+  profileId: string | undefined;
   /** Mês escolhido no painel ("YYYY-MM"); a lista começa filtrada por ele. */
   month: string;
   /** Muda quando um lançamento é criado fora desta aba: recarrega a lista. */
@@ -66,7 +69,7 @@ export function EntriesView({
 
   const range = useMemo(() => monthRange(month), [month]);
   const filter: EntryFilter = {
-    ...(scope ? { scope } : {}),
+    ...(profileId ? { profileId } : {}),
     ...(kind ? { kind } : {}),
     ...(status ? { status } : {}),
     ...(categoryId ? { categoryId } : {}),
@@ -83,6 +86,7 @@ export function EntriesView({
   const items = data?.items ?? [];
   const names = new Map(categories.map((c) => [c.id, c.name]));
   const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
+  const profileNames = new Map(profiles.map((p) => [p.id, p.name]));
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   function changed() {
@@ -129,7 +133,7 @@ export function EntriesView({
       const reauthToken = await financeService.reauth(exportPassword);
       const blob = await financeService.exportCsv(
         {
-          ...(scope ? { scope } : {}),
+          ...(profileId ? { profileId } : {}),
           ...(kind ? { kind } : {}),
           ...(allMonths ? {} : { dateFrom: range.from, dateTo: range.to }),
         },
@@ -227,7 +231,7 @@ export function EntriesView({
                     </div>
                   </td>
                   <td>{e.categoryId ? (names.get(e.categoryId) ?? "—") : "—"}</td>
-                  <td>{SCOPE_SHORT[e.scope]}</td>
+                  <td>{profileNames.get(e.profileId) ?? "—"}</td>
                   <td>
                     <Badge label={STATUS_LABEL[e.status]} color={STATUS_TONE[e.status].color} bg={STATUS_TONE[e.status].bg} />
                   </td>
@@ -274,7 +278,8 @@ export function EntriesView({
           entry={editing}
           categories={categories}
           accounts={accounts}
-          defaults={scope ? { scope } : {}}
+          profiles={profiles}
+          defaults={profileId ? { profileId } : {}}
           onClose={() => setEditing(null)}
           onSaved={changed}
         />

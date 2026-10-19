@@ -5,7 +5,7 @@ import type {
   FinAccount,
   FinCategory,
   FinEntry,
-  FinScope,
+  FinProfile,
 } from "../../types/finance";
 import { Button } from "../common/Button";
 import { CurrencyInput } from "../common/CurrencyInput";
@@ -28,6 +28,7 @@ export function EntryFormModal({
   entry,
   categories,
   accounts,
+  profiles,
   defaults,
   onClose,
   onSaved,
@@ -35,7 +36,8 @@ export function EntryFormModal({
   entry: FinEntry | null;
   categories: FinCategory[];
   accounts: FinAccount[];
-  defaults?: { scope?: FinScope; kind?: EntryKind; accountId?: string };
+  profiles: FinProfile[];
+  defaults?: { profileId?: string; kind?: EntryKind; accountId?: string };
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -43,7 +45,14 @@ export function EntryFormModal({
   const uid = useId();
   const preset = defaults?.accountId ? accounts.find((a) => a.id === defaults.accountId) : undefined;
   const [kind, setKind] = useState<EntryKind>(entry?.kind ?? defaults?.kind ?? "expense");
-  const [scope, setScope] = useState<FinScope>(entry?.scope ?? preset?.scope ?? defaults?.scope ?? "pj");
+  const activeProfiles = profiles.filter((p) => !p.archived);
+  const [profileId, setProfileId] = useState<string>(
+    entry?.profileId ??
+      preset?.profileId ??
+      defaults?.profileId ??
+      (activeProfiles.find((p) => p.kind === "pj") ?? activeProfiles[0])?.id ??
+      "",
+  );
   const [description, setDescription] = useState(entry?.description ?? "");
   const [amount, setAmount] = useState(entry ? entry.amountCents / 100 : 0);
   const [entryDate, setEntryDate] = useState(entry?.entryDate ?? toIsoDate(new Date()));
@@ -61,8 +70,8 @@ export function EntryFormModal({
   const [askApply, setAskApply] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const fitting = categories.filter((c) => categoryFits(c, kind, scope));
-  const accountOptions = accounts.filter((a) => !a.archived && a.scope === scope);
+  const fitting = categories.filter((c) => categoryFits(c, kind, profileId));
+  const accountOptions = accounts.filter((a) => !a.archived && a.profileId === profileId);
   const card = accounts.find((a) => a.id === accountId && a.kind === "cartao");
   const cardDue =
     card && card.closingDay && card.dueDay && entryDate && !dueDate
@@ -85,8 +94,8 @@ export function EntryFormModal({
     }
   }
 
-  function pickScope(next: FinScope) {
-    setScope(next);
+  function pickProfile(next: string) {
+    setProfileId(next);
     setCategoryId("");
     setAccountId("");
   }
@@ -97,7 +106,7 @@ export function EntryFormModal({
     try {
       const base = {
         kind,
-        scope,
+        profileId,
         amountCents: Math.round(amount * 100),
         description: description.trim(),
         entryDate,
@@ -158,15 +167,21 @@ export function EntryFormModal({
             ]}
             onChange={pickKind}
           />
-          <Choice
-            legend="De quem"
-            value={scope}
-            options={[
-              ["pj", "PJ (empresa)"],
-              ["pf", "PF (pessoal)"],
-            ]}
-            onChange={pickScope}
-          />
+          {entry ? (
+            <div className={form.field}>
+              <span className={form.label}>Perfil</span>
+              <span style={{ marginTop: 8, display: "block" }}>
+                {profiles.find((p) => p.id === entry.profileId)?.name ?? "—"}
+              </span>
+            </div>
+          ) : (
+            <Choice
+              legend="Perfil"
+              value={profileId}
+              options={activeProfiles.map((p): [string, string] => [p.id, p.name])}
+              onChange={pickProfile}
+            />
+          )}
         </div>
 
         <div className={form.field}>

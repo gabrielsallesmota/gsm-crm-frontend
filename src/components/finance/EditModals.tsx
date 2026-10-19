@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import type { CategoryScope, FinAccount, FinCategory, FinScope } from "../../types/finance";
+import type { FinAccount, FinCategory } from "../../types/finance";
 import { Button } from "../common/Button";
 import { CurrencyInput } from "../common/CurrencyInput";
 import { Modal } from "../common/Modal";
@@ -7,7 +7,7 @@ import { useToast } from "../../hooks/useToast";
 import { financeService } from "../../services/FinanceService";
 import form from "../common/Form.module.css";
 
-/** Edita nome, escopo, cor e orçamento mensal (despesas). O tipo (receita/despesa) não muda. */
+/** Edita nome, cor e orçamento mensal (despesas). O tipo e o perfil da categoria não mudam. */
 export function CategoryEditModal({
   category,
   onClose,
@@ -20,7 +20,6 @@ export function CategoryEditModal({
   const { toast, toastError } = useToast();
   const uid = useId();
   const [name, setName] = useState(category.name);
-  const [scope, setScope] = useState<CategoryScope>(category.scope);
   const [color, setColor] = useState(category.color);
   const [budget, setBudget] = useState((category.monthlyBudgetCents ?? 0) / 100);
   const [busy, setBusy] = useState(false);
@@ -30,7 +29,6 @@ export function CategoryEditModal({
     try {
       await financeService.updateCategory(category.id, {
         name: name.trim(),
-        scope,
         color,
         ...(category.kind === "expense"
           ? { monthlyBudgetCents: budget > 0 ? Math.round(budget * 100) : null }
@@ -55,14 +53,6 @@ export function CategoryEditModal({
         </div>
         <div className={form.row}>
           <div className={form.field}>
-            <label className={form.label} htmlFor={`${uid}-scope`}>Vale para</label>
-            <select id={`${uid}-scope`} className={form.select} value={scope} onChange={(e) => setScope(e.target.value as CategoryScope)}>
-              <option value="both">PF e PJ</option>
-              <option value="pj">Só PJ</option>
-              <option value="pf">Só PF</option>
-            </select>
-          </div>
-          <div className={form.field}>
             <label className={form.label} htmlFor={`${uid}-color`}>Cor</label>
             <input id={`${uid}-color`} type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ width: 48, height: 36 }} />
           </div>
@@ -74,9 +64,7 @@ export function CategoryEditModal({
             <span className={form.hint}>Zero remove o orçamento.</span>
           </div>
         )}
-        <p className={form.hint}>
-          Uma categoria com lançamentos PJ não pode virar “só PF” (e vice-versa).
-        </p>
+        <p className={form.hint}>A categoria pertence ao perfil em que foi criada e não muda de perfil.</p>
         <div className={form.actions}>
           <Button onClick={onClose} disabled={busy}>Cancelar</Button>
           <Button variant="primary" onClick={() => void save()} disabled={busy || !name.trim()}>
@@ -102,7 +90,6 @@ export function AccountEditModal({
   const uid = useId();
   const isCard = account.kind === "cartao";
   const [name, setName] = useState(account.name);
-  const [scope, setScope] = useState<FinScope>(account.scope);
   const [closingDay, setClosingDay] = useState(account.closingDay ?? 10);
   const [dueDay, setDueDay] = useState(account.dueDay ?? 20);
   const [limit, setLimit] = useState((account.creditLimitCents ?? 0) / 100);
@@ -114,7 +101,6 @@ export function AccountEditModal({
     try {
       await financeService.updateAccount(account.id, {
         name: name.trim(),
-        ...(scope !== account.scope ? { scope } : {}),
         ...(isCard
           ? { closingDay, dueDay, creditLimitCents: limit > 0 ? Math.round(limit * 100) : null }
           : {}),
@@ -136,14 +122,7 @@ export function AccountEditModal({
           <label className={form.label} htmlFor={`${uid}-name`}>Nome</label>
           <input id={`${uid}-name`} className={form.input} maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <div className={form.field}>
-          <label className={form.label} htmlFor={`${uid}-scope`}>De quem</label>
-          <select id={`${uid}-scope`} className={form.select} value={scope} onChange={(e) => setScope(e.target.value as FinScope)}>
-            <option value="pj">PJ (empresa)</option>
-            <option value="pf">PF (pessoal)</option>
-          </select>
-          <span className={form.hint}>Só dá para trocar se a conta ainda não tiver lançamentos.</span>
-        </div>
+        <p className={form.hint}>A conta pertence ao perfil em que foi criada e não muda de perfil.</p>
         {isCard && (
           <>
             <div className={form.row}>

@@ -1,5 +1,5 @@
 // Extensão `.ts` de propósito: roda também no Node (`npm test`), sem Vite.
-import type { EntryKind, FinCategory, FinScope, FinanceDashboard, Totals } from "../types/finance.ts";
+import type { EntryKind, FinCategory, FinanceDashboard, Totals } from "../types/finance.ts";
 
 /** Centavos → "R$ 1.234,56" (negativo: "-R$ 1.234,56"). */
 export function formatCents(cents: number): string {
@@ -94,9 +94,9 @@ export function dashboardIsEmpty(d: FinanceDashboard): boolean {
   return d.kpis.income === 0 && d.kpis.expense === 0 && d.pending.upcoming.length === 0;
 }
 
-/** Categoria vale para o tipo e o escopo escolhidos? (mesma regra do servidor) */
-export function categoryFits(c: FinCategory, kind: EntryKind, scope: FinScope): boolean {
-  return !c.archived && c.kind === kind && (c.scope === "both" || c.scope === scope);
+/** Categoria vale para o tipo e o perfil escolhidos? (mesma regra do servidor) */
+export function categoryFits(c: FinCategory, kind: EntryKind, profileId: string): boolean {
+  return !c.archived && c.kind === kind && c.profileId === profileId;
 }
 
 /** Mesmas regras do servidor, para o erro aparecer antes de enviar. */

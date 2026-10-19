@@ -7,6 +7,8 @@ import type {
   CategoryScope,
   CreateAccountInput,
   CreateCategoryInput,
+  CreateProfileInput,
+  FinProfile,
   CreateEntryInput,
   EntryFilter,
   EntryKind,
@@ -27,8 +29,16 @@ import type {
 } from "../../types/finance";
 import { apiRequest, apiRequestBlob } from "./ApiClient";
 
+interface ProfileDto {
+  id: string;
+  name: string;
+  kind: FinScope;
+  archived: boolean;
+}
+
 interface CategoryDto {
   id: string;
+  profile_id: string;
   name: string;
   kind: EntryKind;
   scope: CategoryScope;
@@ -39,6 +49,7 @@ interface CategoryDto {
 
 interface AccountDto {
   id: string;
+  profile_id: string;
   name: string;
   scope: FinScope;
   kind: FinAccount["kind"];
@@ -63,6 +74,7 @@ interface InvoiceDto {
 
 interface EntryDto {
   id: string;
+  profile_id: string;
   kind: EntryKind;
   scope: FinScope;
   category_id: string | null;
@@ -143,6 +155,7 @@ interface DashboardDto {
 
 const toCategory = (d: CategoryDto): FinCategory => ({
   id: d.id,
+  profileId: d.profile_id,
   name: d.name,
   kind: d.kind,
   scope: d.scope,
@@ -151,8 +164,16 @@ const toCategory = (d: CategoryDto): FinCategory => ({
   archived: d.archived,
 });
 
+const toProfile = (d: ProfileDto): FinProfile => ({
+  id: d.id,
+  name: d.name,
+  kind: d.kind,
+  archived: d.archived,
+});
+
 const toAccount = (d: AccountDto): FinAccount => ({
   id: d.id,
+  profileId: d.profile_id,
   name: d.name,
   scope: d.scope,
   kind: d.kind,
@@ -177,6 +198,7 @@ const toInvoice = (d: InvoiceDto): InvoiceSummary => ({
 
 const toEntry = (d: EntryDto): FinEntry => ({
   id: d.id,
+  profileId: d.profile_id,
   kind: d.kind,
   scope: d.scope,
   categoryId: d.category_id,
@@ -262,7 +284,7 @@ function toDashboard(d: DashboardDto): FinanceDashboard {
 function entryBody(input: CreateEntryInput | UpdateEntryInput) {
   return {
     kind: input.kind,
-    scope: input.scope,
+    profile_id: input.profileId,
     amount_cents: input.amountCents,
     description: input.description,
     entry_date: input.entryDate,
@@ -283,15 +305,43 @@ function query(params: Record<string, string | number | undefined>): string {
 }
 
 export class FinanceApiRepository implements FinanceRepository {
-  async dashboard(month: string, scope?: FinScope): Promise<FinanceDashboard> {
+  async listProfiles(includeArchived = false): Promise<FinProfile[]> {
+    const dto = await apiRequest<ProfileDto[]>(
+      `/api/v1/finance/profiles${includeArchived ? "?include_archived=true" : ""}`,
+    );
+    return dto.map(toProfile);
+  }
+
+  async createProfile(input: CreateProfileInput): Promise<FinProfile> {
+    return toProfile(
+      await apiRequest<ProfileDto>("/api/v1/finance/profiles", {
+        method: "POST",
+        body: JSON.stringify({ name: input.name, kind: input.kind }),
+      }),
+    );
+  }
+
+  async updateProfile(id: string, input: { name?: string; archived?: boolean }): Promise<FinProfile> {
+    return toProfile(
+      await apiRequest<ProfileDto>(`/api/v1/finance/profiles/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    );
+  }
+
+  async dashboard(month: string, profileId?: string): Promise<FinanceDashboard> {
     return toDashboard(
-      await apiRequest<DashboardDto>(`/api/v1/finance/dashboard${query({ month, scope })}`),
+      await apiRequest<DashboardDto>(
+        `/api/v1/finance/dashboard${query({ month, profile_id: profileId })}`,
+      ),
     );
   }
 
   async listEntries(filter: EntryFilter): Promise<Page<FinEntry>> {
     const dto = await apiRequest<{ items: EntryDto[]; total: number; page: number; page_size: number }>(
       `/api/v1/finance/entries${query({
+        profile_id: filter.profileId,
         scope: filter.scope,
         kind: filter.kind,
         category_id: filter.categoryId,
@@ -360,12 +410,12 @@ export class FinanceApiRepository implements FinanceRepository {
   }
 
   async exportCsv(
-    filter: Pick<EntryFilter, "scope" | "kind" | "dateFrom" | "dateTo">,
+    filter: Pick<EntryFilter, "profileId" | "kind" | "dateFrom" | "dateTo">,
     reauthToken: string,
   ): Promise<Blob> {
     return apiRequestBlob(
       `/api/v1/finance/export.csv${query({
-        scope: filter.scope,
+        profile_id: filter.profileId,
         kind: filter.kind,
         date_from: filter.dateFrom,
         date_to: filter.dateTo,
@@ -388,7 +438,7 @@ export class FinanceApiRepository implements FinanceRepository {
         body: JSON.stringify({
           name: input.name,
           kind: input.kind,
-          scope: input.scope,
+          profile_id: input.profileId,
           color: input.color,
           monthly_budget_cents: input.monthlyBudgetCents ?? null,
         }),
@@ -402,7 +452,6 @@ export class FinanceApiRepository implements FinanceRepository {
         method: "PATCH",
         body: JSON.stringify({
           name: input.name,
-          scope: input.scope,
           color: input.color,
           monthly_budget_cents: input.monthlyBudgetCents,
           archived: input.archived,
@@ -424,7 +473,7 @@ export class FinanceApiRepository implements FinanceRepository {
         method: "POST",
         body: JSON.stringify({
           name: input.name,
-          scope: input.scope,
+          profile_id: input.profileId,
           kind: input.kind,
           closing_day: input.closingDay,
           due_day: input.dueDay,
@@ -440,7 +489,6 @@ export class FinanceApiRepository implements FinanceRepository {
         method: "PATCH",
         body: JSON.stringify({
           name: input.name,
-          scope: input.scope,
           archived: input.archived,
           closing_day: input.closingDay,
           due_day: input.dueDay,

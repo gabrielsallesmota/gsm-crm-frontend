@@ -6,18 +6,22 @@ import type {
   FinAccount,
   FinCategory,
   FinEntry,
-  FinScope,
+  FinProfile,
   FinanceDashboard,
   InvoiceDetail,
   InvoiceSummary,
 } from "../types/finance";
 import { useAsyncResource, type AsyncResourceState } from "./useAsyncResource";
 
+export function useFinanceProfiles(): AsyncResourceState<FinProfile[]> {
+  return useAsyncResource(() => financeService.listProfiles(true), []);
+}
+
 export function useFinanceDashboard(
   month: string,
-  scope: FinScope | undefined,
+  profileId: string | undefined,
 ): AsyncResourceState<FinanceDashboard> {
-  return useAsyncResource(() => financeService.dashboard(month, scope), [month, scope]);
+  return useAsyncResource(() => financeService.dashboard(month, profileId), [month, profileId]);
 }
 
 export function useFinanceEntries(filter: EntryFilter): AsyncResourceState<Page<FinEntry>> {

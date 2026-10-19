@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
-import type { AccountKind, CategoryScope, EntryKind, FinAccount, FinCategory, FinScope } from "../../types/finance";
-import { ACCOUNT_KIND_LABEL, CATEGORY_SCOPE_LABEL, SCOPE_SHORT } from "../../types/finance";
+import type { AccountKind, EntryKind, FinAccount, FinCategory, FinProfile, FinScope } from "../../types/finance";
+import { ACCOUNT_KIND_LABEL, SCOPE_LABEL } from "../../types/finance";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { CurrencyInput } from "../common/CurrencyInput";
@@ -18,26 +18,162 @@ import styles from "./Finance.module.css";
 export function CategoriesView({
   categories,
   accounts,
+  profiles,
+  profileId,
   onChanged,
+  onProfilesChanged,
 }: {
   categories: FinCategory[];
   accounts: FinAccount[];
+  profiles: FinProfile[];
+  /** Perfil selecionado no topo; sem perfil = consolidado (mostra tudo). */
+  profileId: string | undefined;
   onChanged: () => void;
+  onProfilesChanged: () => void;
 }) {
+  const names = new Map(profiles.map((p) => [p.id, p.name]));
+  const visibleCategories = categories.filter((c) => !profileId || c.profileId === profileId);
+  const visibleAccounts = accounts.filter((a) => !profileId || a.profileId === profileId);
   return (
     <div>
-      <CategoriesSection categories={categories} onChanged={onChanged} />
-      <AccountsSection accounts={accounts} onChanged={onChanged} />
+      <ProfilesSection profiles={profiles} onChanged={onProfilesChanged} />
+      <CategoriesSection
+        categories={visibleCategories}
+        profiles={profiles}
+        names={names}
+        defaultProfileId={profileId}
+        onChanged={onChanged}
+      />
+      <AccountsSection
+        accounts={visibleAccounts}
+        profiles={profiles}
+        names={names}
+        defaultProfileId={profileId}
+        onChanged={onChanged}
+      />
     </div>
   );
 }
 
-function CategoriesSection({ categories, onChanged }: { categories: FinCategory[]; onChanged: () => void }) {
+/** Perfis: criar (ex.: outra empresa), renomear e arquivar. Arquivar não apaga nenhum dado. */
+function ProfilesSection({ profiles, onChanged }: { profiles: FinProfile[]; onChanged: () => void }) {
+  const { toast, toastError } = useToast();
+  const uid = useId();
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState<FinScope>("pj");
+  const [busy, setBusy] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+
+  async function create() {
+    setBusy(true);
+    try {
+      await financeService.createProfile({ name: name.trim(), kind });
+      setName("");
+      toast("Perfil criado");
+      onChanged();
+    } catch (err) {
+      toastError(err, "Não foi possível criar o perfil");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function update(p: FinProfile, changes: { name?: string; archived?: boolean }, ok: string) {
+    try {
+      await financeService.updateProfile(p.id, changes);
+      toast(ok);
+      setRenaming(null);
+      onChanged();
+    } catch (err) {
+      toastError(err, "Não foi possível atualizar o perfil");
+    }
+  }
+
+  return (
+    <section className={`${styles.card} ${styles.sectionGap}`} aria-labelledby={`${uid}-profiles`}>
+      <h3 id={`${uid}-profiles`} className={styles.cardTitle}>Perfis</h3>
+      <p className={styles.budgetNote}>
+        Cada perfil tem as próprias contas, cartões, categorias e lançamentos. O consolidado soma os perfis.
+      </p>
+      <div className={styles.inlineForm}>
+        <label className={styles.filterField}>
+          Nome
+          <input className={styles.control} value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Outra empresa" />
+        </label>
+        <label className={styles.filterField}>
+          Tipo
+          <select className={styles.control} value={kind} onChange={(e) => setKind(e.target.value as FinScope)}>
+            <option value="pj">{SCOPE_LABEL.pj}</option>
+            <option value="pf">{SCOPE_LABEL.pf}</option>
+          </select>
+        </label>
+        <Button variant="primary" onClick={() => void create()} disabled={busy || !name.trim()}>
+          Adicionar perfil
+        </Button>
+      </div>
+      <ul className={styles.list}>
+        {profiles.map((p) => (
+          <li key={p.id} className={styles.listItem}>
+            <span className={styles.listMain}>
+              {renaming === p.id ? (
+                <input
+                  className={styles.control}
+                  aria-label={`Novo nome de ${p.name}`}
+                  value={draft}
+                  maxLength={80}
+                  onChange={(e) => setDraft(e.target.value)}
+                />
+              ) : (
+                p.name
+              )}{" "}
+              <Badge label={p.kind.toUpperCase()} color="var(--tone-blue-text)" bg="var(--tone-blue-bg)" />
+              {p.archived && <span className={styles.listMeta}> · arquivado</span>}
+            </span>
+            <span className={styles.rowActions}>
+              {renaming === p.id ? (
+                <>
+                  <Button onClick={() => setRenaming(null)}>Cancelar</Button>
+                  <Button variant="primary" disabled={!draft.trim()} onClick={() => void update(p, { name: draft.trim() }, "Perfil renomeado")}>
+                    Salvar
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button onClick={() => { setRenaming(p.id); setDraft(p.name); }} aria-label={`Renomear ${p.name}`}>Renomear</Button>
+                  <Button onClick={() => void update(p, { archived: !p.archived }, p.archived ? "Perfil reativado" : "Perfil arquivado")} aria-label={`${p.archived ? "Desarquivar" : "Arquivar"} ${p.name}`}>
+                    {p.archived ? "Desarquivar" : "Arquivar"}
+                  </Button>
+                </>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function CategoriesSection({
+  categories,
+  profiles,
+  names,
+  defaultProfileId,
+  onChanged,
+}: {
+  categories: FinCategory[];
+  profiles: FinProfile[];
+  names: Map<string, string>;
+  defaultProfileId: string | undefined;
+  onChanged: () => void;
+}) {
   const { toast, toastError } = useToast();
   const uid = useId();
   const [name, setName] = useState("");
   const [kind, setKind] = useState<EntryKind>("expense");
-  const [scope, setScope] = useState<CategoryScope>("both");
+  const activeProfiles = profiles.filter((p) => !p.archived);
+  const [pickedProfile, setPickedProfile] = useState<string | undefined>(undefined);
+  const profileId = pickedProfile ?? defaultProfileId ?? activeProfiles[0]?.id ?? "";
   const [color, setColor] = useState("#4aa3ff");
   const [budget, setBudget] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -51,7 +187,7 @@ function CategoriesSection({ categories, onChanged }: { categories: FinCategory[
       await financeService.createCategory({
         name: name.trim(),
         kind,
-        scope,
+        profileId,
         color,
         monthlyBudgetCents: kind === "expense" && budget > 0 ? Math.round(budget * 100) : null,
       });
@@ -99,11 +235,11 @@ function CategoriesSection({ categories, onChanged }: { categories: FinCategory[
           </select>
         </label>
         <label className={styles.filterField}>
-          Vale para
-          <select className={styles.control} value={scope} onChange={(e) => setScope(e.target.value as CategoryScope)}>
-            <option value="both">PF e PJ</option>
-            <option value="pj">Só PJ</option>
-            <option value="pf">Só PF</option>
+          Perfil
+          <select className={styles.control} value={profileId} onChange={(e) => setPickedProfile(e.target.value)}>
+            {activeProfiles.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
           </select>
         </label>
         {kind === "expense" && (
@@ -116,7 +252,7 @@ function CategoriesSection({ categories, onChanged }: { categories: FinCategory[
           Cor
           <input className={styles.swatch} type="color" value={color} onChange={(e) => setColor(e.target.value)} />
         </label>
-        <Button variant="primary" onClick={() => void create()} disabled={busy || !name.trim()}>
+        <Button variant="primary" onClick={() => void create()} disabled={busy || !name.trim() || !profileId}>
           Adicionar
         </Button>
       </div>
@@ -133,7 +269,7 @@ function CategoriesSection({ categories, onChanged }: { categories: FinCategory[
                   <span className={styles.listMain}>
                     <span className={styles.dot} style={{ background: c.color }} aria-hidden="true" />
                     {c.name}{" "}
-                    <Badge label={CATEGORY_SCOPE_LABEL[c.scope]} color="var(--tone-blue-text)" bg="var(--tone-blue-bg)" />
+                    <Badge label={names.get(c.profileId) ?? "—"} color="var(--tone-blue-text)" bg="var(--tone-blue-bg)" />
                     {c.monthlyBudgetCents !== null && (
                       <span className={styles.listMeta}> · orçamento {formatCents(c.monthlyBudgetCents)}/mês</span>
                     )}
@@ -185,11 +321,25 @@ function CategoriesSection({ categories, onChanged }: { categories: FinCategory[
   );
 }
 
-function AccountsSection({ accounts, onChanged }: { accounts: FinAccount[]; onChanged: () => void }) {
+function AccountsSection({
+  accounts,
+  profiles,
+  names,
+  defaultProfileId,
+  onChanged,
+}: {
+  accounts: FinAccount[];
+  profiles: FinProfile[];
+  names: Map<string, string>;
+  defaultProfileId: string | undefined;
+  onChanged: () => void;
+}) {
   const { toast, toastError } = useToast();
   const uid = useId();
   const [name, setName] = useState("");
-  const [scope, setScope] = useState<FinScope>("pj");
+  const activeProfiles = profiles.filter((p) => !p.archived);
+  const [pickedProfile, setPickedProfile] = useState<string | undefined>(undefined);
+  const profileId = pickedProfile ?? defaultProfileId ?? activeProfiles[0]?.id ?? "";
   const [kind, setKind] = useState<AccountKind>("conta");
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<FinAccount | null>(null);
@@ -199,7 +349,7 @@ function AccountsSection({ accounts, onChanged }: { accounts: FinAccount[]; onCh
     if (!name.trim()) return;
     setBusy(true);
     try {
-      await financeService.createAccount({ name: name.trim(), scope, kind });
+      await financeService.createAccount({ name: name.trim(), profileId, kind });
       setName("");
       toast("Conta criada");
       onChanged();
@@ -226,7 +376,7 @@ function AccountsSection({ accounts, onChanged }: { accounts: FinAccount[]; onCh
   function line(a: FinAccount) {
     return (
       <span className={styles.listMain}>
-        {a.name} <Badge label={SCOPE_SHORT[a.scope]} color="var(--tone-blue-text)" bg="var(--tone-blue-bg)" />
+        {a.name} <Badge label={names.get(a.profileId) ?? "—"} color="var(--tone-blue-text)" bg="var(--tone-blue-bg)" />
         <span className={styles.listMeta}>
           {" "}· {ACCOUNT_KIND_LABEL[a.kind]}
           {a.kind === "cartao" && a.closingDay ? ` · fecha dia ${a.closingDay}, vence dia ${a.dueDay}` : ""}
@@ -244,10 +394,11 @@ function AccountsSection({ accounts, onChanged }: { accounts: FinAccount[]; onCh
           <input className={styles.control} value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Nubank PJ" />
         </label>
         <label className={styles.filterField}>
-          De quem
-          <select className={styles.control} value={scope} onChange={(e) => setScope(e.target.value as FinScope)}>
-            <option value="pj">PJ</option>
-            <option value="pf">PF</option>
+          Perfil
+          <select className={styles.control} value={profileId} onChange={(e) => setPickedProfile(e.target.value)}>
+            {activeProfiles.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
           </select>
         </label>
         <label className={styles.filterField}>
@@ -260,7 +411,7 @@ function AccountsSection({ accounts, onChanged }: { accounts: FinAccount[]; onCh
               ))}
           </select>
         </label>
-        <Button variant="primary" onClick={() => void create()} disabled={busy || !name.trim()}>
+        <Button variant="primary" onClick={() => void create()} disabled={busy || !name.trim() || !profileId}>
           Adicionar
         </Button>
       </div>

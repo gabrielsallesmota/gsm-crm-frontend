@@ -9,6 +9,9 @@ function unavailable(): never {
 
 /** Área interna: sempre "indisponível" na demonstração pública (mesmo padrão de Prospecção). */
 export class FinanceMockRepository implements FinanceRepository {
+  listProfiles = async () => unavailable();
+  createProfile = async () => unavailable();
+  updateProfile = async () => unavailable();
   dashboard = async () => unavailable();
   listEntries = async () => unavailable();
   createEntries = async () => unavailable();

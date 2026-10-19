@@ -6,8 +6,22 @@ export type CategoryScope = FinScope | "both";
 export type EntryStatus = "paid" | "pending" | "overdue";
 export type AccountKind = "conta" | "cartao" | "dinheiro" | "investimento";
 
+/** Perfil financeiro (PF, PJ ou outro): dono de contas, categorias e lançamentos. */
+export interface FinProfile {
+  id: string;
+  name: string;
+  kind: FinScope;
+  archived: boolean;
+}
+
+export interface CreateProfileInput {
+  name: string;
+  kind: FinScope;
+}
+
 export interface FinCategory {
   id: string;
+  profileId: string;
   name: string;
   kind: EntryKind;
   scope: CategoryScope;
@@ -18,6 +32,7 @@ export interface FinCategory {
 
 export interface FinAccount {
   id: string;
+  profileId: string;
   name: string;
   scope: FinScope;
   kind: AccountKind;
@@ -30,7 +45,7 @@ export interface FinAccount {
 
 export interface CreateAccountInput {
   name: string;
-  scope: FinScope;
+  profileId: string;
   kind: AccountKind;
   closingDay?: number;
   dueDay?: number;
@@ -39,7 +54,6 @@ export interface CreateAccountInput {
 
 export interface UpdateAccountInput {
   name?: string;
-  scope?: FinScope;
   archived?: boolean;
   closingDay?: number;
   dueDay?: number;
@@ -80,6 +94,7 @@ export interface InvoiceDetail {
 
 export interface FinEntry {
   id: string;
+  profileId: string;
   kind: EntryKind;
   scope: FinScope;
   categoryId: string | null;
@@ -105,6 +120,8 @@ export interface FinEntry {
 export type ApplyScope = "this" | "future" | "all";
 
 export interface EntryFilter {
+  /** Sem perfil = consolidado. */
+  profileId?: string;
   scope?: FinScope;
   kind?: EntryKind;
   categoryId?: string;
@@ -119,7 +136,7 @@ export interface EntryFilter {
 
 export interface CreateEntryInput {
   kind: EntryKind;
-  scope: FinScope;
+  profileId: string;
   amountCents: number;
   description: string;
   entryDate: string;
@@ -143,14 +160,13 @@ export type UpdateEntryInput = Partial<
 export interface CreateCategoryInput {
   name: string;
   kind: EntryKind;
-  scope: CategoryScope;
+  profileId: string;
   color: string;
   monthlyBudgetCents?: number | null;
 }
 
 export interface UpdateCategoryInput {
   name?: string;
-  scope?: CategoryScope;
   color?: string;
   monthlyBudgetCents?: number | null;
   archived?: boolean;

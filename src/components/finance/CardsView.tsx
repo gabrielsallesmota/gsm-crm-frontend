@@ -1,11 +1,11 @@
 import { useEffect, useId, useState } from "react";
 import type {
   CardOverview,
-  FinScope,
+  FinProfile,
   InvoiceStatus,
   InvoiceSummary,
 } from "../../types/finance";
-import { INVOICE_STATUS_LABEL, SCOPE_SHORT } from "../../types/finance";
+import { INVOICE_STATUS_LABEL } from "../../types/finance";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { ConfirmDialog } from "../common/ConfirmDialog";
@@ -40,12 +40,14 @@ function StatusBadge({ status }: { status: InvoiceStatus }) {
  * da compra, então nada é contado duas vezes.
  */
 export function CardsView({
-  scope,
+  profiles,
+  profileId,
   refreshToken,
   onChanged,
   onNewPurchase,
 }: {
-  scope: FinScope | undefined;
+  profiles: FinProfile[];
+  profileId: string | undefined;
   refreshToken: number;
   onChanged: () => void;
   onNewPurchase: (accountId: string) => void;
@@ -59,7 +61,8 @@ export function CardsView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshToken]);
 
-  const visible = (cards.data ?? []).filter((c) => !scope || c.account.scope === scope);
+  const visible = (cards.data ?? []).filter((c) => !profileId || c.account.profileId === profileId);
+  const profileNames = new Map(profiles.map((p) => [p.id, p.name]));
   const chosen = visible.find((c) => c.account.id === selected) ?? visible[0] ?? null;
 
   function changed() {
@@ -80,10 +83,10 @@ export function CardsView({
 
   return (
     <div>
-      <NewCardForm onCreated={changed} />
+      <NewCardForm profiles={profiles} defaultProfileId={profileId} onCreated={changed} />
       {visible.length === 0 ? (
         <p className={styles.empty} style={{ marginTop: 14 }}>
-          Nenhum cartão {scope ? `${SCOPE_SHORT[scope]} ` : ""}cadastrado. Cadastre o cartão com o dia de
+          Nenhum cartão {profileId ? "neste perfil " : ""}cadastrado. Cadastre o cartão com o dia de
           fechamento e de vencimento para acompanhar fatura, limite e parcelas.
         </p>
       ) : (
@@ -94,6 +97,7 @@ export function CardsView({
                 key={c.account.id}
                 card={c}
                 active={c.account.id === chosen?.account.id}
+                profileName={profileNames.get(c.account.profileId) ?? "—"}
                 onSelect={() => {
                   setSelected(c.account.id);
                   setRef(null);
@@ -120,10 +124,12 @@ export function CardsView({
 function CardTile({
   card,
   active,
+  profileName,
   onSelect,
 }: {
   card: CardOverview;
   active: boolean;
+  profileName: string;
   onSelect: () => void;
 }) {
   const usage = limitUsage(card.usedCents, card.account.creditLimitCents);
@@ -143,7 +149,7 @@ function CardTile({
         }}
       >
         <span className={styles.cardTitle}>
-          {card.account.name} · {SCOPE_SHORT[card.account.scope]}
+          {card.account.name} · {profileName}
         </span>
         <span className={styles.kpiLabel} style={{ display: "block" }}>
           Fatura atual ({monthTitle(card.current.ref)})
@@ -415,12 +421,23 @@ function InvoicePicker({
   );
 }
 
-function NewCardForm({ onCreated }: { onCreated: () => void }) {
+function NewCardForm({
+  profiles,
+  defaultProfileId,
+  onCreated,
+}: {
+  profiles: FinProfile[];
+  defaultProfileId: string | undefined;
+  onCreated: () => void;
+}) {
   const { toast, toastError } = useToast();
   const uid = useId();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [scope, setScope] = useState<FinScope>("pj");
+  const activeProfiles = profiles.filter((p) => !p.archived);
+  const [profileId, setProfileId] = useState(
+    defaultProfileId ?? (activeProfiles.find((p) => p.kind === "pj") ?? activeProfiles[0])?.id ?? "",
+  );
   const [closingDay, setClosingDay] = useState(10);
   const [dueDay, setDueDay] = useState(20);
   const [limit, setLimit] = useState(0);
@@ -432,7 +449,7 @@ function NewCardForm({ onCreated }: { onCreated: () => void }) {
     try {
       await financeService.createAccount({
         name: name.trim(),
-        scope,
+        profileId,
         kind: "cartao",
         closingDay,
         dueDay,
@@ -457,11 +474,12 @@ function NewCardForm({ onCreated }: { onCreated: () => void }) {
         Nome
         <input id={`${uid}-name`} className={styles.control} value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Nubank PJ" />
       </label>
-      <label className={styles.filterField} htmlFor={`${uid}-scope`}>
-        De quem
-        <select id={`${uid}-scope`} className={styles.control} value={scope} onChange={(e) => setScope(e.target.value as FinScope)}>
-          <option value="pj">PJ</option>
-          <option value="pf">PF</option>
+      <label className={styles.filterField} htmlFor={`${uid}-profile`}>
+        Perfil
+        <select id={`${uid}-profile`} className={styles.control} value={profileId} onChange={(e) => setProfileId(e.target.value)}>
+          {activeProfiles.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
         </select>
       </label>
       <label className={styles.filterField} htmlFor={`${uid}-closing`}>
@@ -478,7 +496,7 @@ function NewCardForm({ onCreated }: { onCreated: () => void }) {
       </label>
       <div className={styles.rowActions}>
         <Button onClick={() => setOpen(false)} disabled={busy}>Cancelar</Button>
-        <Button variant="primary" onClick={() => void create()} disabled={busy || !name.trim() || !validDays}>
+        <Button variant="primary" onClick={() => void create()} disabled={busy || !name.trim() || !validDays || !profileId}>
           Cadastrar cartão
         </Button>
       </div>

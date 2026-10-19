@@ -22,9 +22,12 @@ import styles from "./Finance.module.css";
 export function FinanceDashboardView({
   data,
   cards = [],
+  showSplit = true,
   onNewEntry,
 }: {
   data: FinanceDashboard;
+  /** PF × PJ lado a lado: só no consolidado (com um perfil escolhido não faz sentido). */
+  showSplit?: boolean;
   /** Cartões ativos (fatura atual e limite), quando houver. */
   cards?: CardOverview[];
   onNewEntry: () => void;
@@ -89,7 +92,7 @@ export function FinanceDashboardView({
       {cards.length > 0 && <CardsGlance cards={cards} />}
 
       <div className={styles.grid2}>
-        <ScopeSplit data={data} />
+        {showSplit && <ScopeSplit data={data} />}
         <PendingPanel data={data} />
       </div>
 

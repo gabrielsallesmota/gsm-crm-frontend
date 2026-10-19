@@ -13,9 +13,9 @@ import {
   useFinanceCards,
   useFinanceCategories,
   useFinanceDashboard,
+  useFinanceProfiles,
 } from "../hooks/useFinance";
 import { usePageTitle } from "../hooks/usePageTitle";
-import type { FinScope } from "../types/finance";
 import { currentMonth, monthTitle, shiftMonth } from "../utils/finance";
 import styles from "../components/finance/Finance.module.css";
 
@@ -37,12 +37,16 @@ export function FinancePage() {
   const requested = params.get("aba");
   const tab: Tab = TABS.some(([id]) => id === requested) ? (requested as Tab) : "painel";
   const [month, setMonth] = useState(currentMonth());
-  const [scope, setScope] = useState<FinScope | undefined>(undefined);
+  // Perfil escolhido no topo; vazio = consolidado. Vale para TODAS as abas.
+  const [profileId, setProfileId] = useState<string | undefined>(undefined);
   const [creating, setCreating] = useState(false);
   const [cardForPurchase, setCardForPurchase] = useState<string | undefined>(undefined);
   const [version, setVersion] = useState(0);
 
-  const dashboard = useFinanceDashboard(month, scope);
+  const profiles = useFinanceProfiles();
+  const profileList = profiles.data ?? [];
+  const activeProfiles = profileList.filter((p) => !p.archived);
+  const dashboard = useFinanceDashboard(month, profileId);
   // Com as arquivadas: os formulários as ignoram sozinhos e a aba de cadastro permite desarquivar.
   const categories = useFinanceCategories(true);
   const accounts = useFinanceAccounts(true);
@@ -65,12 +69,26 @@ export function FinancePage() {
         <div>
           <h1 className={styles.title}>Financeiro</h1>
           <p className={styles.subtitle}>
-            Uso interno da GSM — receitas, despesas e orçamento, com PF e PJ separados.
+            Uso interno da GSM — receitas, despesas e orçamento por perfil (PF, PJ e outros).
           </p>
         </div>
         <Button variant="primary" onClick={() => setCreating(true)}>
           + Novo lançamento
         </Button>
+      </div>
+
+      <div className={styles.seg} role="group" aria-label="Perfil" style={{ marginBottom: 12 }}>
+        {[{ id: undefined, name: "Consolidado" }, ...activeProfiles].map((p) => (
+          <button
+            key={p.id ?? "all"}
+            type="button"
+            aria-pressed={profileId === p.id}
+            className={profileId === p.id ? `${styles.segBtn} ${styles.segActive}` : styles.segBtn}
+            onClick={() => setProfileId(p.id)}
+          >
+            {p.name}
+          </button>
+        ))}
       </div>
 
       <div className={styles.tabs} role="tablist" aria-label="Seções do financeiro">
@@ -102,19 +120,6 @@ export function FinancePage() {
             </button>
             {month !== currentMonth() && <Button onClick={() => setMonth(currentMonth())}>Hoje</Button>}
           </div>
-          <div className={styles.seg} role="group" aria-label="Filtrar por PF ou PJ">
-            {([undefined, "pj", "pf"] as const).map((value) => (
-              <button
-                key={value ?? "all"}
-                type="button"
-                aria-pressed={scope === value}
-                className={scope === value ? `${styles.segBtn} ${styles.segActive}` : styles.segBtn}
-                onClick={() => setScope(value)}
-              >
-                {value === undefined ? "Tudo" : value.toUpperCase()}
-              </button>
-            ))}
-          </div>
         </div>
       )}
 
@@ -132,7 +137,8 @@ export function FinancePage() {
             {dashboard.data && (
               <FinanceDashboardView
                 data={dashboard.data}
-                cards={(cards.data ?? []).filter((c) => !scope || c.account.scope === scope)}
+                cards={(cards.data ?? []).filter((c) => !profileId || c.account.profileId === profileId)}
+                showSplit={!profileId}
                 onNewEntry={() => setCreating(true)}
               />
             )}
@@ -143,7 +149,8 @@ export function FinancePage() {
           <EntriesView
             categories={catList}
             accounts={accList}
-            scope={scope}
+            profiles={profileList}
+            profileId={profileId}
             month={month}
             refreshToken={version}
             onChanged={changed}
@@ -152,7 +159,8 @@ export function FinancePage() {
 
         {tab === "cartoes" && (
           <CardsView
-            scope={scope}
+            profiles={profileList}
+            profileId={profileId}
             refreshToken={version}
             onChanged={() => {
               accounts.reload();
@@ -169,6 +177,14 @@ export function FinancePage() {
           <CategoriesView
             categories={catList}
             accounts={accList}
+            profiles={profileList}
+            profileId={profileId}
+            onProfilesChanged={() => {
+              profiles.reload();
+              categories.reload();
+              accounts.reload();
+              dashboard.reload();
+            }}
             onChanged={() => {
               categories.reload();
               accounts.reload();
@@ -183,7 +199,8 @@ export function FinancePage() {
           entry={null}
           categories={catList}
           accounts={accList}
-          defaults={{ ...(scope ? { scope } : {}), ...(cardForPurchase ? { accountId: cardForPurchase } : {}) }}
+          profiles={profileList}
+          defaults={{ ...(profileId ? { profileId } : {}), ...(cardForPurchase ? { accountId: cardForPurchase } : {}) }}
           onClose={() => {
             setCreating(false);
             setCardForPurchase(undefined);

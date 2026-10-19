@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/services/FinanceService", () => ({
   financeService: {
+    listProfiles: vi.fn(),
+    createProfile: vi.fn(),
+    updateProfile: vi.fn(),
     dashboard: vi.fn(),
     listEntries: vi.fn(),
     createEntries: vi.fn(),
@@ -12,6 +15,7 @@ vi.mock("../../src/services/FinanceService", () => ({
     payEntry: vi.fn(),
     unpayEntry: vi.fn(),
     deleteEntry: vi.fn(),
+    reauth: vi.fn(),
     exportCsv: vi.fn(),
     listCategories: vi.fn(),
     createCategory: vi.fn(),
@@ -34,6 +38,7 @@ import type {
   FinAccount,
   FinCategory,
   FinEntry,
+  FinProfile,
   FinanceDashboard,
   InvoiceDetail,
   InvoiceSummary,
@@ -44,10 +49,17 @@ const api = vi.mocked(financeService);
 
 afterEach(cleanup);
 
+const PF_ID = "p-pf";
+const PJ_ID = "p-pj";
+const PROFILES: FinProfile[] = [
+  { id: PF_ID, name: "Pessoa Física", kind: "pf", archived: false },
+  { id: PJ_ID, name: "GSM Automação — Pessoa Jurídica", kind: "pj", archived: false },
+];
+
 const CATEGORIES: FinCategory[] = [
-  { id: "c-soft", name: "Ferramentas e software", kind: "expense", scope: "pj", color: "#4aa3ff", monthlyBudgetCents: 20000, archived: false },
-  { id: "c-home", name: "Moradia", kind: "expense", scope: "pf", color: "#f5b13d", monthlyBudgetCents: null, archived: false },
-  { id: "c-cli", name: "Clientes (serviços)", kind: "income", scope: "pj", color: "#2ee66e", monthlyBudgetCents: null, archived: false },
+  { id: "c-soft", profileId: PJ_ID, name: "Ferramentas e software", kind: "expense", scope: "pj", color: "#4aa3ff", monthlyBudgetCents: 20000, archived: false },
+  { id: "c-home", profileId: PF_ID, name: "Moradia", kind: "expense", scope: "pf", color: "#f5b13d", monthlyBudgetCents: null, archived: false },
+  { id: "c-cli", profileId: PJ_ID, name: "Clientes (serviços)", kind: "income", scope: "pj", color: "#2ee66e", monthlyBudgetCents: null, archived: false },
 ];
 
 function dashboard(overrides: Partial<FinanceDashboard> = {}): FinanceDashboard {
@@ -100,6 +112,7 @@ function dashboard(overrides: Partial<FinanceDashboard> = {}): FinanceDashboard 
 function entry(overrides: Partial<FinEntry> = {}): FinEntry {
   return {
     id: "e1",
+    profileId: PJ_ID,
     kind: "expense",
     scope: "pj",
     categoryId: "c-soft",
@@ -122,6 +135,7 @@ function entry(overrides: Partial<FinEntry> = {}): FinEntry {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  api.listProfiles.mockResolvedValue(PROFILES);
   api.dashboard.mockResolvedValue(dashboard());
   api.listCategories.mockResolvedValue(CATEGORIES);
   api.listAccounts.mockResolvedValue([]);
@@ -167,13 +181,19 @@ describe("Painel", () => {
     expect(screen.getAllByRole("button", { name: "+ Novo lançamento" })).toHaveLength(2); // cabeçalho + estado vazio
   });
 
-  it("troca de mês e de PF/PJ refaz a consulta com os parâmetros certos", async () => {
+  it("troca de mês e de perfil refaz a consulta com os parâmetros certos", async () => {
     open();
     await screen.findByRole("heading", { name: "Receitas" });
     fireEvent.click(screen.getByRole("button", { name: "Mês anterior" }));
     await waitFor(() => expect(api.dashboard).toHaveBeenCalledTimes(2));
-    fireEvent.click(screen.getByRole("button", { name: "PF" }));
-    await waitFor(() => expect(api.dashboard).toHaveBeenLastCalledWith(expect.stringMatching(/^\d{4}-\d{2}$/), "pf"));
+    fireEvent.click(screen.getByRole("button", { name: "Pessoa Física" }));
+    await waitFor(() =>
+      expect(api.dashboard).toHaveBeenLastCalledWith(expect.stringMatching(/^\d{4}-\d{2}$/), PF_ID),
+    );
+    // com um perfil escolhido o comparativo PF × PJ some; o consolidado o mostra
+    expect(screen.queryByRole("heading", { name: "PF × PJ" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Consolidado" }));
+    await waitFor(() => expect(api.dashboard).toHaveBeenLastCalledWith(expect.any(String), undefined));
   });
 
   it("erro do servidor vira mensagem com 'Tentar de novo'", async () => {
@@ -193,12 +213,12 @@ describe("Novo lançamento", () => {
     return await screen.findByRole("dialog", { name: "Novo lançamento" });
   }
 
-  it("só oferece categorias do tipo e do PF/PJ escolhidos", async () => {
+  it("só oferece categorias do tipo e do perfil escolhidos", async () => {
     const dialog = await openForm();
     const select = within(dialog).getByLabelText("Categoria") as HTMLSelectElement;
     const options = () => Array.from(select.options).map((o) => o.textContent);
     expect(options()).toEqual(["Sem categoria", "Ferramentas e software"]); // despesa PJ
-    fireEvent.click(within(dialog).getByLabelText("PF (pessoal)"));
+    fireEvent.click(within(dialog).getByLabelText("Pessoa Física"));
     expect(options()).toEqual(["Sem categoria", "Moradia"]);
     fireEvent.click(within(dialog).getByLabelText("Receita"));
     expect(options()).toEqual(["Sem categoria"]); // nenhuma receita PF cadastrada
@@ -225,7 +245,7 @@ describe("Novo lançamento", () => {
     await waitFor(() => expect(api.createEntries).toHaveBeenCalledTimes(1));
     expect(api.createEntries.mock.calls[0]![0]).toMatchObject({
       kind: "expense",
-      scope: "pj",
+      profileId: PJ_ID,
       description: "Hospedagem",
       amountCents: 9900,
       categoryId: "c-soft",
@@ -284,7 +304,7 @@ describe("Categorias e contas", () => {
     expect(api.createCategory.mock.calls[0]![0]).toMatchObject({
       name: "Cursos",
       kind: "expense",
-      scope: "both",
+      profileId: PF_ID,
       monthlyBudgetCents: 50000,
     });
     fireEvent.click(within(cats).getByRole("button", { name: "Arquivar Moradia" }));
@@ -298,6 +318,7 @@ describe("Categorias e contas", () => {
 
 const CARD: FinAccount = {
   id: "card1",
+  profileId: PJ_ID,
   name: "Nubank PJ",
   scope: "pj",
   kind: "cartao",
@@ -402,7 +423,7 @@ describe("Cartões", () => {
     fireEvent.click(await screen.findByRole("button", { name: "+ Novo cartão" }));
     const form = screen.getByRole("group", { name: "Novo cartão" });
     fireEvent.change(within(form).getByLabelText("Nome"), { target: { value: "Inter PF" } });
-    fireEvent.change(within(form).getByLabelText("De quem"), { target: { value: "pf" } });
+    fireEvent.change(within(form).getByLabelText("Perfil"), { target: { value: PF_ID } });
     fireEvent.change(within(form).getByLabelText("Dia do fechamento"), { target: { value: "30" } });
     expect((within(form).getByRole("button", { name: "Cadastrar cartão" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(within(form).getByLabelText("Dia do fechamento"), { target: { value: "25" } });
@@ -412,7 +433,7 @@ describe("Cartões", () => {
     await waitFor(() => expect(api.createAccount).toHaveBeenCalledTimes(1));
     expect(api.createAccount.mock.calls[0]![0]).toEqual({
       name: "Inter PF",
-      scope: "pf",
+      profileId: PF_ID,
       kind: "cartao",
       closingDay: 25,
       dueDay: 5,
@@ -542,9 +563,53 @@ describe("Lançamento fixo e edição de série", () => {
   });
 });
 
+describe("Perfis", () => {
+  it("cria um perfil novo, renomeia e arquiva", async () => {
+    api.createProfile.mockResolvedValue({ id: "p-3", name: "Loja", kind: "pj", archived: false });
+    api.updateProfile.mockResolvedValue(PROFILES[0]!);
+    open("/financeiro?aba=categorias");
+    const section = await screen.findByRole("region", { name: "Perfis" });
+    fireEvent.change(within(section).getByLabelText("Nome"), { target: { value: "Loja" } });
+    fireEvent.click(within(section).getByRole("button", { name: "Adicionar perfil" }));
+    await waitFor(() => expect(api.createProfile).toHaveBeenCalledWith({ name: "Loja", kind: "pj" }));
+    fireEvent.click(within(section).getByRole("button", { name: "Arquivar Pessoa Física" }));
+    await waitFor(() => expect(api.updateProfile).toHaveBeenCalledWith(PF_ID, { archived: true }));
+    fireEvent.click(within(section).getByRole("button", { name: "Renomear Pessoa Física" }));
+    fireEvent.change(within(section).getByLabelText("Novo nome de Pessoa Física"), { target: { value: "Pessoal" } });
+    fireEvent.click(within(section).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(api.updateProfile).toHaveBeenCalledWith(PF_ID, { name: "Pessoal" }));
+  });
+
+  it("com um perfil escolhido, categorias e contas mostram só as dele", async () => {
+    open("/financeiro?aba=categorias");
+    await screen.findByRole("region", { name: "Categorias" });
+    expect(screen.getByText("Moradia")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "GSM Automação — Pessoa Jurídica" }));
+    await waitFor(() => expect(screen.queryByText("Moradia")).toBeNull());
+    expect(screen.getByText("Ferramentas e software")).toBeTruthy();
+  });
+
+  it("a exportação pede a senha antes de baixar", async () => {
+    api.reauth.mockResolvedValue("tok");
+    api.exportCsv.mockResolvedValue(new Blob(["x"]));
+    URL.createObjectURL = vi.fn(() => "blob:x");
+    URL.revokeObjectURL = vi.fn();
+    open("/financeiro?aba=lancamentos");
+    await screen.findByText("Ferramentas");
+    fireEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+    const dialog = await screen.findByRole("dialog", { name: "Exportar CSV" });
+    fireEvent.change(within(dialog).getByLabelText("Senha"), { target: { value: "segredo" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Exportar" }));
+    await waitFor(() => expect(api.reauth).toHaveBeenCalledWith("segredo"));
+    await waitFor(() => expect(api.exportCsv).toHaveBeenCalledTimes(1));
+    expect(api.exportCsv.mock.calls[0]![1]).toBe("tok");
+  });
+});
+
 describe("Cadastros: editar e desarquivar", () => {
   const ARCHIVED: FinCategory = {
     id: "c-old",
+    profileId: PF_ID,
     name: "Cursos antigos",
     kind: "expense",
     scope: "pf",
@@ -557,19 +622,19 @@ describe("Cadastros: editar e desarquivar", () => {
     api.listCategories.mockResolvedValue([...CATEGORIES, ARCHIVED]);
   });
 
-  it("edita nome, escopo e orçamento da categoria", async () => {
+  it("edita nome e orçamento da categoria (o perfil não muda)", async () => {
     api.updateCategory.mockResolvedValue(CATEGORIES[0]!);
     open("/financeiro?aba=categorias");
     fireEvent.click(await screen.findByRole("button", { name: "Editar Ferramentas e software" }));
     const dialog = await screen.findByRole("dialog", { name: "Editar categoria" });
     fireEvent.change(within(dialog).getByLabelText("Nome"), { target: { value: "Software e apps" } });
-    fireEvent.change(within(dialog).getByLabelText("Vale para"), { target: { value: "both" } });
+    expect(within(dialog).queryByLabelText("Vale para")).toBeNull();
     fireEvent.change(within(dialog).getByLabelText("Orçamento mensal"), { target: { value: "35000" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(api.updateCategory).toHaveBeenCalledTimes(1));
     expect(api.updateCategory.mock.calls[0]).toEqual([
       "c-soft",
-      { name: "Software e apps", scope: "both", color: "#4aa3ff", monthlyBudgetCents: 35000 },
+      { name: "Software e apps", color: "#4aa3ff", monthlyBudgetCents: 35000 },
     ]);
   });
 
