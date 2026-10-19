@@ -37,6 +37,11 @@ export class FinanceMockRepository implements FinanceRepository {
   commitImport = async () => unavailable();
   listImports = async () => unavailable();
   undoImport = async () => unavailable();
+  report = async () => unavailable();
+  overview = async () => unavailable();
+  listPeriods = async () => unavailable();
+  closePeriod = async () => unavailable();
+  reopenPeriod = async () => unavailable();
   listRecurrences = async () => unavailable();
   endRecurrence = async () => unavailable();
   confirmEntry = async () => unavailable();

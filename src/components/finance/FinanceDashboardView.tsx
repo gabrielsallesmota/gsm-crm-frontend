@@ -1,4 +1,5 @@
 import type { CardOverview, CategoryBreakdown, FinanceDashboard } from "../../types/finance";
+import type { FinanceOverview } from "../../types/financeReports";
 import { INVOICE_STATUS_LABEL, SCOPE_SHORT } from "../../types/finance";
 import {
   barRatio,
@@ -23,9 +24,12 @@ export function FinanceDashboardView({
   data,
   cards = [],
   showSplit = true,
+  overview,
   onNewEntry,
 }: {
   data: FinanceDashboard;
+  /** Perfis lado a lado e posições (saldos e dívida de cartão). */
+  overview?: FinanceOverview | undefined;
   /** PF × PJ lado a lado: só no consolidado (com um perfil escolhido não faz sentido). */
   showSplit?: boolean;
   /** Cartões ativos (fatura atual e limite), quando houver. */
@@ -88,6 +92,8 @@ export function FinanceDashboardView({
           <p className={styles.kpiNote}>Só o que já foi recebido menos o que já foi pago.</p>
         </section>
       </div>
+
+      {overview && <OverviewPanel overview={overview} />}
 
       {cards.length > 0 && <CardsGlance cards={cards} />}
 
@@ -427,6 +433,53 @@ function CardsGlance({ cards }: { cards: CardOverview[] }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+/** Posições (saldos das contas e dívida de cartão) e cada perfil ao lado do outro. No consolidado o
+ * lucro da PJ e a sobra da PF NÃO viram um resultado único: ficam separados. */
+function OverviewPanel({ overview }: { overview: FinanceOverview }) {
+  return (
+    <section className={styles.card} style={{ marginBottom: 14 }} aria-label="Perfis e posições">
+      <h3 className={styles.cardTitle}>
+        {overview.consolidated ? "Consolidado: perfis lado a lado" : "Posição do perfil"}
+      </h3>
+      <p className={styles.kpiNote}>
+        Saldos das contas {formatCents(overview.positions.liquidCents)} · dívida de cartões{" "}
+        {formatCents(overview.positions.cardDebtCents)} · posição líquida {formatCents(overview.positions.netCents)}
+      </p>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <caption className="sr-only">Resultado do mês por perfil</caption>
+          <thead>
+            <tr>
+              <th>Perfil</th>
+              <th className={styles.num}>Receitas</th>
+              <th className={styles.num}>Despesas</th>
+              <th className={styles.num}>Resultado</th>
+              <th className={styles.num}>Saldo das contas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {overview.profiles.map((p) => (
+              <tr key={p.profileId}>
+                <td>{p.name}</td>
+                <td className={styles.num}>{formatCents(p.incomeCents)}</td>
+                <td className={styles.num}>{formatCents(p.expenseCents)}</td>
+                <td className={styles.num}>{formatCents(p.resultCents)}</td>
+                <td className={styles.num}>{formatCents(p.liquidCents)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {overview.consolidated && (
+        <p className={styles.budgetNote}>
+          Os totais acima do painel somam só o fluxo externo (transferências entre contas ficam de fora). O resultado da
+          empresa e a sobra pessoal não se somam: são coisas diferentes.
+        </p>
+      )}
     </section>
   );
 }

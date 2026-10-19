@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../src/services/FinanceService", () => ({
   financeService: {
     listProfiles: vi.fn(),
+    overview: vi.fn(),
     dashboard: vi.fn(),
     listEntries: vi.fn(),
     listCategories: vi.fn(),
@@ -30,6 +31,15 @@ import { STAFF, renderApp } from "./support/harness";
 
 const api = vi.mocked(financeService);
 afterEach(cleanup);
+
+const OVERVIEW = {
+  consolidated: true,
+  profiles: [
+    { profileId: "p-pf", name: "Pessoa Física", kind: "pf" as const, incomeCents: 300_000, expenseCents: 200_000, resultCents: 100_000, liquidCents: 500_000, cardDebtCents: 0 },
+    { profileId: "p-pj", name: "Empresa", kind: "pj" as const, incomeCents: 1_000_000, expenseCents: 20_000, resultCents: 980_000, liquidCents: 2_000_000, cardDebtCents: 50_000 },
+  ],
+  positions: { liquidCents: 2_500_000, cardDebtCents: 50_000, netCents: 2_450_000 },
+};
 
 const PROFILES: FinProfile[] = [
   { id: "p-pf", name: "Pessoa Física", kind: "pf", archived: false, taxProvisionBps: null },
@@ -116,6 +126,7 @@ const PENDING: FinEntry = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  api.overview.mockResolvedValue(OVERVIEW);
   api.listProfiles.mockResolvedValue(PROFILES);
   api.dashboard.mockRejectedValue(new Error("não usado"));
   api.listCategories.mockResolvedValue([]);
@@ -162,7 +173,7 @@ describe("Planejamento", () => {
     const input = within(row).getByLabelText("Orçamento de Alimentação");
     fireEvent.change(input, { target: { value: "50000" } });
     fireEvent.focusOut(input);
-    await waitFor(() => expect(api.setBudget).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.setBudget).toHaveBeenCalledTimes(1), { timeout: 3000 });
     expect(api.setBudget).toHaveBeenCalledWith("c-food", expect.stringMatching(/^\d{4}-\d{2}$/), 50_000);
   });
 

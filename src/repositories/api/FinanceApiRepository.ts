@@ -46,6 +46,7 @@ import type {
   UpdateCategoryInput,
   UpdateEntryInput,
 } from "../../types/finance";
+import type { FinanceOverview, PeriodState, ReportKind } from "../../types/financeReports";
 import { apiRequest, apiRequestBlob } from "./ApiClient";
 
 interface ProfileDto {
@@ -483,6 +484,20 @@ function entryBody(input: CreateEntryInput | UpdateEntryInput) {
     client: input.client,
     project: input.project,
   };
+}
+
+/** snake_case → camelCase, recursivamente (as chaves de objetos; valores intactos). */
+function camelize<T>(value: unknown): T {
+  if (Array.isArray(value)) return value.map((v) => camelize(v)) as T;
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+        k.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase()),
+        camelize(v),
+      ]),
+    ) as T;
+  }
+  return value as T;
 }
 
 function query(params: Record<string, string | number | undefined>): string {
@@ -937,6 +952,47 @@ export class FinanceApiRepository implements FinanceRepository {
       `/api/v1/finance/imports/${importId}/undo`,
       { method: "POST" },
     );
+  }
+
+  async report<T>(
+    kind: ReportKind,
+    params: Record<string, string | number | undefined> = {},
+  ): Promise<T> {
+    return camelize<T>(await apiRequest<unknown>(`/api/v1/finance/reports/${kind}${query(params)}`));
+  }
+
+  async overview(month: string, profileId?: string): Promise<FinanceOverview> {
+    return camelize<FinanceOverview>(
+      await apiRequest<unknown>(
+        `/api/v1/finance/reports/overview${query({ month, profile_id: profileId })}`,
+      ),
+    );
+  }
+
+  async listPeriods(profileId?: string): Promise<PeriodState[]> {
+    return camelize<PeriodState[]>(
+      await apiRequest<unknown>(`/api/v1/finance/periods${query({ profile_id: profileId })}`),
+    );
+  }
+
+  async closePeriod(profileId: string, month: string): Promise<void> {
+    await apiRequest("/api/v1/finance/periods/close", {
+      method: "POST",
+      body: JSON.stringify({ profile_id: profileId, month }),
+    });
+  }
+
+  async reopenPeriod(
+    profileId: string,
+    month: string,
+    reason: string,
+    reauthToken: string,
+  ): Promise<void> {
+    await apiRequest("/api/v1/finance/periods/reopen", {
+      method: "POST",
+      headers: { "X-Finance-Reauth": reauthToken },
+      body: JSON.stringify({ profile_id: profileId, month, reason }),
+    });
   }
 
   async listRecurrences(status?: "active" | "ended"): Promise<FinRecurrence[]> {

@@ -9,6 +9,7 @@ import { CategoriesView } from "../components/finance/CategoriesView";
 import { EntriesView } from "../components/finance/EntriesView";
 import { EntryFormModal } from "../components/finance/EntryFormModal";
 import { ImportView } from "../components/finance/ImportView";
+import { ReportsView } from "../components/finance/ReportsView";
 import { PlanningView } from "../components/finance/PlanningView";
 import { FinanceDashboardView } from "../components/finance/FinanceDashboardView";
 import {
@@ -16,13 +17,14 @@ import {
   useFinanceCards,
   useFinanceCategories,
   useFinanceDashboard,
+  useFinanceOverview,
   useFinanceProfiles,
 } from "../hooks/useFinance";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { currentMonth, monthTitle, shiftMonth } from "../utils/finance";
 import styles from "../components/finance/Finance.module.css";
 
-type Tab = "painel" | "lancamentos" | "contas" | "cartoes" | "planejamento" | "importar" | "categorias";
+type Tab = "painel" | "lancamentos" | "contas" | "cartoes" | "planejamento" | "importar" | "relatorios" | "categorias";
 const TABS: [Tab, string][] = [
   ["painel", "Painel"],
   ["lancamentos", "Lançamentos"],
@@ -30,6 +32,7 @@ const TABS: [Tab, string][] = [
   ["cartoes", "Cartões"],
   ["planejamento", "Planejamento"],
   ["importar", "Importar"],
+  ["relatorios", "Relatórios"],
   ["categorias", "Categorias e contas"],
 ];
 
@@ -53,6 +56,7 @@ export function FinancePage() {
   const profileList = profiles.data ?? [];
   const activeProfiles = profileList.filter((p) => !p.archived);
   const dashboard = useFinanceDashboard(month, profileId);
+  const overview = useFinanceOverview(month, profileId);
   // Com as arquivadas: os formulários as ignoram sozinhos e a aba de cadastro permite desarquivar.
   const categories = useFinanceCategories(true);
   const accounts = useFinanceAccounts(true);
@@ -60,6 +64,7 @@ export function FinancePage() {
 
   function changed() {
     dashboard.reload();
+    overview.reload();
   }
 
   function selectTab(next: Tab) {
@@ -114,7 +119,7 @@ export function FinancePage() {
         ))}
       </div>
 
-      {tab !== "categorias" && tab !== "contas" && tab !== "planejamento" && tab !== "importar" && (
+      {tab !== "categorias" && tab !== "contas" && tab !== "planejamento" && tab !== "importar" && tab !== "relatorios" && (
         <div className={styles.toolbar}>
           <div className={styles.monthNav}>
             <button type="button" className={styles.iconBtn} aria-label="Mês anterior" onClick={() => setMonth(shiftMonth(month, -1))}>
@@ -145,6 +150,7 @@ export function FinancePage() {
                 data={dashboard.data}
                 cards={(cards.data ?? []).filter((c) => !profileId || c.account.profileId === profileId)}
                 showSplit={!profileId}
+                overview={overview.data ?? undefined}
                 onNewEntry={() => setCreating(true)}
               />
             )}
@@ -186,6 +192,10 @@ export function FinancePage() {
               setVersion((v) => v + 1);
             }}
           />
+        )}
+
+        {tab === "relatorios" && (
+          <ReportsView profiles={profileList} profileId={profileId} accounts={accList} />
         )}
 
         {tab === "importar" && (

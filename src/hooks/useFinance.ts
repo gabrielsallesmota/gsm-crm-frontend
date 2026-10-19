@@ -14,6 +14,7 @@ import type {
   InvoiceDetail,
   InvoiceSummary,
 } from "../types/finance";
+import type { FinanceOverview, PeriodState } from "../types/financeReports";
 import { useAsyncResource, type AsyncResourceState } from "./useAsyncResource";
 
 export function useFinanceRecurrences(): AsyncResourceState<FinRecurrence[]> {
@@ -32,6 +33,17 @@ export function useFinanceBudgets(
 
 export function useFinanceGoals(profileId: string | undefined): AsyncResourceState<FinGoal[]> {
   return useAsyncResource(() => financeService.listGoals(profileId), [profileId]);
+}
+
+export function useFinanceOverview(
+  month: string,
+  profileId: string | undefined,
+): AsyncResourceState<FinanceOverview> {
+  return useAsyncResource(() => financeService.overview(month, profileId), [month, profileId]);
+}
+
+export function useFinancePeriods(profileId: string | undefined): AsyncResourceState<PeriodState[]> {
+  return useAsyncResource(() => financeService.listPeriods(profileId), [profileId]);
 }
 
 export function useFinanceProfiles(): AsyncResourceState<FinProfile[]> {

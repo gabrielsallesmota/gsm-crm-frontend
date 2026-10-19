@@ -31,6 +31,7 @@ import type {
   UpdateEntryInput,
 } from "../types/finance";
 import type { Page } from "../types/common";
+import type { FinanceOverview, PeriodState, ReportKind } from "../types/financeReports";
 
 export interface FinanceRepository {
   listProfiles(includeArchived?: boolean): Promise<FinProfile[]>;
@@ -92,6 +93,15 @@ export interface FinanceRepository {
   ): Promise<ImportCommitResult>;
   listImports(accountId?: string): Promise<ImportHistoryItem[]>;
   undoImport(importId: string): Promise<{ removed: number; restored: number }>;
+
+  /** Relatório (somente leitura). A resposta vem com chaves em camelCase. */
+  report<T>(kind: ReportKind, params?: Record<string, string | number | undefined>): Promise<T>;
+  overview(month: string, profileId?: string): Promise<FinanceOverview>;
+
+  listPeriods(profileId?: string): Promise<PeriodState[]>;
+  closePeriod(profileId: string, month: string): Promise<void>;
+  /** Exige a senha (reautenticação) e um motivo; fica auditado. */
+  reopenPeriod(profileId: string, month: string, reason: string, reauthToken: string): Promise<void>;
 
   listRecurrences(status?: "active" | "ended"): Promise<FinRecurrence[]>;
   endRecurrence(id: string): Promise<void>;
