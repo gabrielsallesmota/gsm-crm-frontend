@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import type {
+  ApplyScope,
   EntryKind,
   FinAccount,
   FinCategory,
@@ -9,6 +10,7 @@ import type {
 import { Button } from "../common/Button";
 import { CurrencyInput } from "../common/CurrencyInput";
 import { Modal } from "../common/Modal";
+import { SeriesApplyDialog } from "./SeriesApplyDialog";
 import { useToast } from "../../hooks/useToast";
 import { financeService } from "../../services/FinanceService";
 import { categoryFits, purchaseDueDate, validateEntryDraft } from "../../utils/finance";
@@ -53,7 +55,10 @@ export function EntryFormModal({
   const [accountId, setAccountId] = useState(entry?.accountId ?? preset?.id ?? "");
   const [method, setMethod] = useState(entry?.paymentMethod ?? "");
   const [notes, setNotes] = useState(entry?.notes ?? "");
-  const [repeat, setRepeat] = useState(1);
+  // Só ao criar: único, mensal por N meses ou fixo (todo mês, sem fim).
+  const [repeatMode, setRepeatMode] = useState<"once" | "months" | "fixed">("once");
+  const [repeat, setRepeat] = useState(3);
+  const [askApply, setAskApply] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const fitting = categories.filter((c) => categoryFits(c, kind, scope));
@@ -86,7 +91,7 @@ export function EntryFormModal({
     setAccountId("");
   }
 
-  async function submit() {
+  async function submit(apply: ApplyScope = "this") {
     if (problem) return;
     setSaving(true);
     try {
@@ -104,11 +109,25 @@ export function EntryFormModal({
         notes,
       };
       if (entry) {
-        await financeService.updateEntry(entry.id, base);
-        toast("Lançamento atualizado");
+        const updated = await financeService.updateEntry(entry.id, base, apply);
+        toast(
+          updated.affected && updated.affected > 1
+            ? `${updated.affected} lançamentos atualizados`
+            : "Lançamento atualizado",
+        );
       } else {
-        const created = await financeService.createEntries({ ...base, repeatMonths: repeat });
-        toast(created.length > 1 ? `${created.length} lançamentos criados` : "Lançamento criado");
+        const created = await financeService.createEntries({
+          ...base,
+          repeatMonths: repeatMode === "months" ? repeat : 1,
+          fixed: repeatMode === "fixed",
+        });
+        toast(
+          repeatMode === "fixed"
+            ? "Lançamento fixo criado (12 meses à frente; ele se estende sozinho)"
+            : created.length > 1
+              ? `${created.length} lançamentos criados`
+              : "Lançamento criado",
+        );
       }
       onSaved();
       onClose();
@@ -116,10 +135,17 @@ export function EntryFormModal({
       toastError(err, "Não foi possível salvar o lançamento");
     } finally {
       setSaving(false);
+      setAskApply(false);
     }
   }
 
+  function save() {
+    if (entry?.recurrenceId) setAskApply(true); // série: pergunta onde aplicar
+    else void submit();
+  }
+
   return (
+    <>
     <Modal title={entry ? "Editar lançamento" : "Novo lançamento"} onClose={onClose}>
       <div className={form.form}>
         <div className={form.row}>
@@ -156,7 +182,7 @@ export function EntryFormModal({
 
         <div className={form.row}>
           <div className={form.field}>
-            <label className={form.label} htmlFor={`${uid}-amount`}>{card && repeat > 1 ? "Valor de cada parcela" : "Valor"}</label>
+            <label className={form.label} htmlFor={`${uid}-amount`}>{card && repeatMode === "months" ? "Valor de cada parcela" : "Valor"}</label>
             <CurrencyInput id={`${uid}-amount`} className={form.input} value={amount} onChange={setAmount} />
           </div>
           <div className={form.field}>
@@ -221,20 +247,44 @@ export function EntryFormModal({
           )}
           {!entry && (
             <div className={form.field}>
-              <label className={form.label} htmlFor={`${uid}-repeat`}>{card ? "Parcelado em (vezes)" : "Repetir por (meses)"}</label>
-              <input
-                id={`${uid}-repeat`}
-                className={form.input}
-                type="number"
-                min={1}
-                max={60}
-                value={repeat}
-                onChange={(e) => setRepeat(Math.min(60, Math.max(1, Number(e.target.value) || 1)))}
-              />
+              <label className={form.label} htmlFor={`${uid}-mode`}>Repetição</label>
+              <select
+                id={`${uid}-mode`}
+                className={form.select}
+                value={repeatMode}
+                onChange={(e) => setRepeatMode(e.target.value as "once" | "months" | "fixed")}
+              >
+                <option value="once">{card ? "À vista" : "Só uma vez"}</option>
+                <option value="months">{card ? "Parcelado" : "Mensal, por alguns meses"}</option>
+                <option value="fixed">{card ? "Fixo (assinatura no cartão)" : "Fixo (todo mês, sem fim)"}</option>
+              </select>
+              {repeatMode === "months" && (
+                <input
+                  className={form.input}
+                  type="number"
+                  min={2}
+                  max={60}
+                  aria-label={card ? "Parcelado em (vezes)" : "Repetir por (meses)"}
+                  value={repeat}
+                  onChange={(e) => setRepeat(Math.min(60, Math.max(2, Number(e.target.value) || 2)))}
+                />
+              )}
               <span className={form.hint}>
-                {card ? "1 = à vista. Cada parcela cai numa fatura." : "1 = único. Mais de 1 cria um lançamento por mês."}
+                {repeatMode === "fixed"
+                  ? "Repete todo mês, sem data final. Para parar, exclua “este e os próximos”."
+                  : repeatMode === "months"
+                    ? card
+                      ? "Cada parcela cai numa fatura."
+                      : "Cria um lançamento por mês."
+                    : ""}
               </span>
             </div>
+          )}
+          {entry?.recurrenceId && (
+            <p className={form.hint}>
+              Faz parte de uma série{entry.isFixed ? " fixa" : ""}. Ao salvar, você escolhe se vale só para este, para
+              os seguintes ou para todos.
+            </p>
           )}
         </div>
 
@@ -251,12 +301,21 @@ export function EntryFormModal({
         {problem && <p className={form.error} role="alert">{problem}</p>}
         <div className={form.actions}>
           <Button onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button variant="primary" onClick={() => void submit()} disabled={saving || Boolean(problem)}>
+          <Button variant="primary" onClick={save} disabled={saving || Boolean(problem)}>
             {saving ? "Salvando…" : entry ? "Salvar" : "Criar lançamento"}
           </Button>
         </div>
       </div>
     </Modal>
+      {askApply && entry && (
+        <SeriesApplyDialog
+          description={entry.description}
+          busy={saving}
+          onConfirm={(apply) => void submit(apply)}
+          onClose={() => setAskApply(false)}
+        />
+      )}
+    </>
   );
 }
 

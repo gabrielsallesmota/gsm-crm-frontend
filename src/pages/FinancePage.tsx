@@ -43,8 +43,9 @@ export function FinancePage() {
   const [version, setVersion] = useState(0);
 
   const dashboard = useFinanceDashboard(month, scope);
-  const categories = useFinanceCategories();
-  const accounts = useFinanceAccounts();
+  // Com as arquivadas: os formulários as ignoram sozinhos e a aba de cadastro permite desarquivar.
+  const categories = useFinanceCategories(true);
+  const accounts = useFinanceAccounts(true);
   const cards = useFinanceCards();
 
   function changed() {

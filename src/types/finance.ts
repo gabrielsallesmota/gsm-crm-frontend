@@ -39,6 +39,7 @@ export interface CreateAccountInput {
 
 export interface UpdateAccountInput {
   name?: string;
+  scope?: FinScope;
   archived?: boolean;
   closingDay?: number;
   dueDay?: number;
@@ -93,8 +94,15 @@ export interface FinEntry {
   recurrenceId: string | null;
   installmentNo: number | null;
   installmentTotal: number | null;
+  /** Recorrência sem fim (o servidor mantém 12 meses à frente). */
+  isFixed: boolean;
   status: EntryStatus;
+  /** Só após editar com `apply` ≠ "this": quantos itens da série mudaram. */
+  affected?: number;
 }
+
+/** Em quais itens de uma série a edição vale. */
+export type ApplyScope = "this" | "future" | "all";
 
 export interface EntryFilter {
   scope?: FinScope;
@@ -123,6 +131,8 @@ export interface CreateEntryInput {
   notes?: string;
   /** 1 = único; N = série mensal de N meses (mesmo valor). */
   repeatMonths?: number;
+  /** Todo mês, sem data final (ignora `repeatMonths`). */
+  fixed?: boolean;
 }
 
 /** Só o que for informado muda; `null` limpa categoria, conta, vencimento e baixa. */

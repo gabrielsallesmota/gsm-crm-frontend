@@ -1,6 +1,7 @@
 import type { FinanceRepository } from "../FinanceRepository";
 import type { Page } from "../../types/common";
 import type {
+  ApplyScope,
   CardOverview,
   CategoryBreakdown,
   CategoryScope,
@@ -76,6 +77,8 @@ interface EntryDto {
   recurrence_id: string | null;
   installment_no: number | null;
   installment_total: number | null;
+  is_fixed?: boolean;
+  affected?: number | null;
   status: EntryStatus;
 }
 
@@ -188,7 +191,9 @@ const toEntry = (d: EntryDto): FinEntry => ({
   recurrenceId: d.recurrence_id,
   installmentNo: d.installment_no,
   installmentTotal: d.installment_total,
+  isFixed: d.is_fixed === true,
   status: d.status,
+  ...(d.affected != null ? { affected: d.affected } : {}),
 });
 
 const toBreakdown = (d: BreakdownDto): CategoryBreakdown => ({
@@ -305,14 +310,18 @@ export class FinanceApiRepository implements FinanceRepository {
   async createEntries(input: CreateEntryInput): Promise<FinEntry[]> {
     const dto = await apiRequest<EntryDto[]>("/api/v1/finance/entries", {
       method: "POST",
-      body: JSON.stringify({ ...entryBody(input), repeat_months: input.repeatMonths ?? 1 }),
+      body: JSON.stringify({
+        ...entryBody(input),
+        repeat_months: input.repeatMonths ?? 1,
+        fixed: input.fixed === true,
+      }),
     });
     return dto.map(toEntry);
   }
 
-  async updateEntry(id: string, input: UpdateEntryInput): Promise<FinEntry> {
+  async updateEntry(id: string, input: UpdateEntryInput, apply: ApplyScope = "this"): Promise<FinEntry> {
     return toEntry(
-      await apiRequest<EntryDto>(`/api/v1/finance/entries/${id}`, {
+      await apiRequest<EntryDto>(`/api/v1/finance/entries/${id}${apply === "this" ? "" : `?apply=${apply}`}`, {
         method: "PATCH",
         body: JSON.stringify(entryBody(input)),
       }),
@@ -419,6 +428,7 @@ export class FinanceApiRepository implements FinanceRepository {
         method: "PATCH",
         body: JSON.stringify({
           name: input.name,
+          scope: input.scope,
           archived: input.archived,
           closing_day: input.closingDay,
           due_day: input.dueDay,

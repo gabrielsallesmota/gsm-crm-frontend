@@ -11,6 +11,7 @@ import { Button } from "../common/Button";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { CurrencyInput } from "../common/CurrencyInput";
 import { EmptyState } from "../common/EmptyState";
+import { AccountEditModal } from "./EditModals";
 import { SkeletonRows } from "../common/Skeleton";
 import { useFinanceCards, useInvoice, useInvoices } from "../../hooks/useFinance";
 import { useToast } from "../../hooks/useToast";
@@ -207,6 +208,7 @@ function CardDetail({
   const detail = useInvoice(card.account.id, ref);
   const [confirmPay, setConfirmPay] = useState(false);
   const [confirmUndo, setConfirmUndo] = useState(false);
+  const [editingCard, setEditingCard] = useState(false);
   const [payDate, setPayDate] = useState("");
   const history = invoices.data ?? [];
 
@@ -248,7 +250,10 @@ function CardDetail({
         <h3 className={styles.cardTitle} style={{ margin: 0 }}>
           Faturas — {card.account.name}
         </h3>
-        <Button onClick={onNewPurchase}>+ Compra no cartão</Button>
+        <span className={styles.rowActions}>
+          <Button onClick={() => setEditingCard(true)}>Editar cartão</Button>
+          <Button onClick={onNewPurchase}>+ Compra no cartão</Button>
+        </span>
       </div>
 
       <InvoicePicker history={history} current={ref} fallback={card.current} onPick={onRef} />
@@ -356,6 +361,9 @@ function CardDetail({
         </div>
       )}
 
+      {editingCard && (
+        <AccountEditModal account={card.account} onClose={() => setEditingCard(false)} onSaved={changed} />
+      )}
       {confirmPay && inv && (
         <ConfirmDialog
           title="Pagar a fatura?"

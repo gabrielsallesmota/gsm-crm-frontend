@@ -114,6 +114,7 @@ function entry(overrides: Partial<FinEntry> = {}): FinEntry {
     recurrenceId: null,
     installmentNo: null,
     installmentTotal: null,
+    isFixed: false,
     status: "pending",
     ...overrides,
   };
@@ -218,6 +219,7 @@ describe("Novo lançamento", () => {
     fireEvent.change(within(dialog).getByLabelText("Descrição"), { target: { value: "Hospedagem" } });
     fireEvent.change(within(dialog).getByLabelText("Valor"), { target: { value: "9900" } }); // R$ 99,00
     fireEvent.change(within(dialog).getByLabelText("Categoria"), { target: { value: "c-soft" } });
+    fireEvent.change(within(dialog).getByLabelText("Repetição"), { target: { value: "months" } });
     fireEvent.change(within(dialog).getByLabelText("Repetir por (meses)"), { target: { value: "12" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Criar lançamento" }));
     await waitFor(() => expect(api.createEntries).toHaveBeenCalledTimes(1));
@@ -428,7 +430,9 @@ describe("Cartões", () => {
     expect(within(dialog).getByText(/entra na fatura que vence em 20\/04\/2031/)).toBeTruthy();
     fireEvent.change(within(dialog).getByLabelText("Data do lançamento"), { target: { value: "2031-03-10" } });
     expect(within(dialog).getByText(/vence em 20\/03\/2031/)).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText("Repetição"), { target: { value: "months" } });
     expect(within(dialog).getByLabelText("Parcelado em (vezes)")).toBeTruthy();
+    expect(within(dialog).getByText("Valor de cada parcela")).toBeTruthy();
   });
 
   it("o painel resume a fatura atual dos cartões", async () => {
@@ -436,5 +440,183 @@ describe("Cartões", () => {
     const list = await screen.findByRole("list", { name: "Faturas dos cartões" });
     expect(within(list).getByText(/Nubank PJ/)).toBeTruthy();
     expect(within(list).getAllByText(/R\$\s500,00/).length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Fixo, edição de série e cadastros editáveis / desarquivar
+// ---------------------------------------------------------------------------------------------
+
+describe("Lançamento fixo e edição de série", () => {
+  async function openForm() {
+    open();
+    await screen.findByRole("heading", { name: "Receitas" });
+    fireEvent.click(screen.getByRole("button", { name: "+ Novo lançamento" }));
+    return await screen.findByRole("dialog", { name: "Novo lançamento" });
+  }
+
+  it("repetição 'fixo' envia fixed=true (sem número de meses) e explica como parar", async () => {
+    api.createEntries.mockResolvedValue([entry()]);
+    const dialog = await openForm();
+    fireEvent.change(within(dialog).getByLabelText("Descrição"), { target: { value: "Aluguel do escritório" } });
+    fireEvent.change(within(dialog).getByLabelText("Valor"), { target: { value: "250000" } });
+    fireEvent.change(within(dialog).getByLabelText("Repetição"), { target: { value: "fixed" } });
+    expect(within(dialog).queryByLabelText("Repetir por (meses)")).toBeNull();
+    expect(within(dialog).getByText(/Para parar, exclua/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Criar lançamento" }));
+    await waitFor(() => expect(api.createEntries).toHaveBeenCalledTimes(1));
+    expect(api.createEntries.mock.calls[0]![0]).toMatchObject({ fixed: true, repeatMonths: 1, amountCents: 250000 });
+  });
+
+  it("por padrão cria lançamento único", async () => {
+    api.createEntries.mockResolvedValue([entry()]);
+    const dialog = await openForm();
+    fireEvent.change(within(dialog).getByLabelText("Descrição"), { target: { value: "Café" } });
+    fireEvent.change(within(dialog).getByLabelText("Valor"), { target: { value: "1000" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Criar lançamento" }));
+    await waitFor(() => expect(api.createEntries).toHaveBeenCalledTimes(1));
+    expect(api.createEntries.mock.calls[0]![0]).toMatchObject({ fixed: false, repeatMonths: 1 });
+  });
+
+  async function editSeriesEntry() {
+    api.listEntries.mockResolvedValue({
+      items: [entry({ recurrenceId: "r1", installmentNo: 2, installmentTotal: 6 })],
+      total: 1,
+      page: 1,
+      pageSize: 50,
+    });
+    open("/financeiro?aba=lancamentos");
+    await screen.findByText("Ferramentas");
+    fireEvent.click(screen.getByRole("button", { name: "Editar Ferramentas" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar lançamento" });
+    fireEvent.change(within(dialog).getByLabelText("Valor"), { target: { value: "20000" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    return await screen.findByRole("dialog", { name: "Aplicar a quais lançamentos?" });
+  }
+
+  it("editar item de série pergunta onde aplicar e usa 'somente este' por padrão", async () => {
+    api.updateEntry.mockResolvedValue(entry());
+    const ask = await editSeriesEntry();
+    expect((within(ask).getByLabelText(/Somente este lançamento/) as HTMLInputElement).checked).toBe(true);
+    expect(api.updateEntry).not.toHaveBeenCalled(); // nada foi enviado antes da escolha
+    fireEvent.click(within(ask).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(api.updateEntry).toHaveBeenCalledTimes(1));
+    expect(api.updateEntry.mock.calls[0]![2]).toBe("this");
+  });
+
+  it.each([
+    ["Este e os seguintes", "future"],
+    ["Todos da série", "all"],
+  ])("escolhendo '%s' envia apply=%s e avisa quantos mudaram", async (label, apply) => {
+    api.updateEntry.mockResolvedValue(entry({ affected: 4 }));
+    const ask = await editSeriesEntry();
+    fireEvent.click(within(ask).getByLabelText(new RegExp(label)));
+    fireEvent.click(within(ask).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(api.updateEntry.mock.calls[0]?.[2]).toBe(apply));
+    expect(await screen.findByText("4 lançamentos atualizados")).toBeTruthy();
+  });
+
+  it("lançamento avulso edita direto, sem perguntar", async () => {
+    api.updateEntry.mockResolvedValue(entry());
+    open("/financeiro?aba=lancamentos");
+    await screen.findByText("Ferramentas");
+    fireEvent.click(screen.getByRole("button", { name: "Editar Ferramentas" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar lançamento" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(api.updateEntry).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("dialog", { name: "Aplicar a quais lançamentos?" })).toBeNull();
+  });
+
+  it("excluir item de série fixa explica como encerrar", async () => {
+    api.listEntries.mockResolvedValue({
+      items: [entry({ recurrenceId: "r1", isFixed: true })],
+      total: 1,
+      page: 1,
+      pageSize: 50,
+    });
+    open("/financeiro?aba=lancamentos");
+    await screen.findByText("Ferramentas");
+    fireEvent.click(screen.getByRole("button", { name: "Excluir Ferramentas" }));
+    const dialog = await screen.findByRole("dialog", { name: "Excluir lançamento?" });
+    expect(within(dialog).getByText(/é assim que se encerra um lançamento fixo/)).toBeTruthy();
+  });
+});
+
+describe("Cadastros: editar e desarquivar", () => {
+  const ARCHIVED: FinCategory = {
+    id: "c-old",
+    name: "Cursos antigos",
+    kind: "expense",
+    scope: "pf",
+    color: "#a78bfa",
+    monthlyBudgetCents: null,
+    archived: true,
+  };
+
+  beforeEach(() => {
+    api.listCategories.mockResolvedValue([...CATEGORIES, ARCHIVED]);
+  });
+
+  it("edita nome, escopo e orçamento da categoria", async () => {
+    api.updateCategory.mockResolvedValue(CATEGORIES[0]!);
+    open("/financeiro?aba=categorias");
+    fireEvent.click(await screen.findByRole("button", { name: "Editar Ferramentas e software" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar categoria" });
+    fireEvent.change(within(dialog).getByLabelText("Nome"), { target: { value: "Software e apps" } });
+    fireEvent.change(within(dialog).getByLabelText("Vale para"), { target: { value: "both" } });
+    fireEvent.change(within(dialog).getByLabelText("Orçamento mensal"), { target: { value: "35000" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(api.updateCategory).toHaveBeenCalledTimes(1));
+    expect(api.updateCategory.mock.calls[0]).toEqual([
+      "c-soft",
+      { name: "Software e apps", scope: "both", color: "#4aa3ff", monthlyBudgetCents: 35000 },
+    ]);
+  });
+
+  it("categoria arquivada fica numa seção própria e pode ser desarquivada", async () => {
+    api.updateCategory.mockResolvedValue(ARCHIVED);
+    open("/financeiro?aba=categorias");
+    expect(await screen.findByRole("button", { name: "Editar Moradia" })).toBeTruthy();
+    expect(screen.queryByText("Cursos antigos")).toBeNull(); // escondida até abrir "Arquivadas"
+    fireEvent.click(screen.getByRole("button", { name: "Arquivadas (1)" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Desarquivar Cursos antigos" }));
+    await waitFor(() => expect(api.updateCategory).toHaveBeenCalledWith("c-old", { archived: false }));
+  });
+
+  it("edita conta e desarquiva conta", async () => {
+    const acc = { ...CARD, id: "a1", name: "Banco PJ", kind: "conta" as const, closingDay: null, dueDay: null, creditLimitCents: null };
+    const old = { ...acc, id: "a2", name: "Conta velha", archived: true };
+    api.listAccounts.mockResolvedValue([acc, old]);
+    api.updateAccount.mockResolvedValue(acc);
+    open("/financeiro?aba=categorias");
+    fireEvent.click(await screen.findByRole("button", { name: "Editar Banco PJ" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar conta" });
+    fireEvent.change(within(dialog).getByLabelText("Nome"), { target: { value: "Banco Inter PJ" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(api.updateAccount).toHaveBeenCalledWith("a1", { name: "Banco Inter PJ" }));
+    const sections = screen.getAllByRole("button", { name: "Arquivadas (1)" }); // categorias, contas
+    fireEvent.click(sections[sections.length - 1]!);
+    fireEvent.click(await screen.findByRole("button", { name: "Desarquivar Conta velha" }));
+    await waitFor(() => expect(api.updateAccount).toHaveBeenCalledWith("a2", { archived: false }));
+  });
+
+  it("edita fechamento, vencimento e limite do cartão", async () => {
+    api.listCards.mockResolvedValue([overview()]);
+    api.listAccounts.mockResolvedValue([CARD]);
+    api.listInvoices.mockResolvedValue([invoice()]);
+    api.getInvoice.mockResolvedValue(detail());
+    api.updateAccount.mockResolvedValue(CARD);
+    open("/financeiro?aba=cartoes");
+    fireEvent.click(await screen.findByRole("button", { name: "Editar cartão" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar cartão" });
+    fireEvent.change(within(dialog).getByLabelText("Dia do fechamento"), { target: { value: "5" } });
+    fireEvent.change(within(dialog).getByLabelText("Dia do vencimento"), { target: { value: "15" } });
+    fireEvent.change(within(dialog).getByLabelText("Limite"), { target: { value: "900000" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(api.updateAccount).toHaveBeenCalledTimes(1));
+    expect(api.updateAccount.mock.calls[0]).toEqual([
+      "card1",
+      { name: "Nubank PJ", closingDay: 5, dueDay: 15, creditLimitCents: 900000 },
+    ]);
   });
 });

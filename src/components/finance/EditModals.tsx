@@ -1,0 +1,179 @@
+import { useId, useState } from "react";
+import type { CategoryScope, FinAccount, FinCategory, FinScope } from "../../types/finance";
+import { Button } from "../common/Button";
+import { CurrencyInput } from "../common/CurrencyInput";
+import { Modal } from "../common/Modal";
+import { useToast } from "../../hooks/useToast";
+import { financeService } from "../../services/FinanceService";
+import form from "../common/Form.module.css";
+
+/** Edita nome, escopo, cor e orçamento mensal (despesas). O tipo (receita/despesa) não muda. */
+export function CategoryEditModal({
+  category,
+  onClose,
+  onSaved,
+}: {
+  category: FinCategory;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { toast, toastError } = useToast();
+  const uid = useId();
+  const [name, setName] = useState(category.name);
+  const [scope, setScope] = useState<CategoryScope>(category.scope);
+  const [color, setColor] = useState(category.color);
+  const [budget, setBudget] = useState((category.monthlyBudgetCents ?? 0) / 100);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await financeService.updateCategory(category.id, {
+        name: name.trim(),
+        scope,
+        color,
+        ...(category.kind === "expense"
+          ? { monthlyBudgetCents: budget > 0 ? Math.round(budget * 100) : null }
+          : {}),
+      });
+      toast("Categoria atualizada");
+      onSaved();
+      onClose();
+    } catch (err) {
+      toastError(err, "Não foi possível atualizar a categoria");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Editar categoria" onClose={onClose}>
+      <div className={form.form}>
+        <div className={form.field}>
+          <label className={form.label} htmlFor={`${uid}-name`}>Nome</label>
+          <input id={`${uid}-name`} className={form.input} maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className={form.row}>
+          <div className={form.field}>
+            <label className={form.label} htmlFor={`${uid}-scope`}>Vale para</label>
+            <select id={`${uid}-scope`} className={form.select} value={scope} onChange={(e) => setScope(e.target.value as CategoryScope)}>
+              <option value="both">PF e PJ</option>
+              <option value="pj">Só PJ</option>
+              <option value="pf">Só PF</option>
+            </select>
+          </div>
+          <div className={form.field}>
+            <label className={form.label} htmlFor={`${uid}-color`}>Cor</label>
+            <input id={`${uid}-color`} type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ width: 48, height: 36 }} />
+          </div>
+        </div>
+        {category.kind === "expense" && (
+          <div className={form.field}>
+            <label className={form.label} htmlFor={`${uid}-budget`}>Orçamento mensal</label>
+            <CurrencyInput id={`${uid}-budget`} className={form.input} value={budget} onChange={setBudget} />
+            <span className={form.hint}>Zero remove o orçamento.</span>
+          </div>
+        )}
+        <p className={form.hint}>
+          Uma categoria com lançamentos PJ não pode virar “só PF” (e vice-versa).
+        </p>
+        <div className={form.actions}>
+          <Button onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="primary" onClick={() => void save()} disabled={busy || !name.trim()}>
+            {busy ? "Salvando…" : "Salvar"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** Edita nome e PF/PJ; no cartão, também fechamento, vencimento e limite. */
+export function AccountEditModal({
+  account,
+  onClose,
+  onSaved,
+}: {
+  account: FinAccount;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { toast, toastError } = useToast();
+  const uid = useId();
+  const isCard = account.kind === "cartao";
+  const [name, setName] = useState(account.name);
+  const [scope, setScope] = useState<FinScope>(account.scope);
+  const [closingDay, setClosingDay] = useState(account.closingDay ?? 10);
+  const [dueDay, setDueDay] = useState(account.dueDay ?? 20);
+  const [limit, setLimit] = useState((account.creditLimitCents ?? 0) / 100);
+  const [busy, setBusy] = useState(false);
+  const daysOk = !isCard || [closingDay, dueDay].every((d) => Number.isInteger(d) && d >= 1 && d <= 28);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await financeService.updateAccount(account.id, {
+        name: name.trim(),
+        ...(scope !== account.scope ? { scope } : {}),
+        ...(isCard
+          ? { closingDay, dueDay, creditLimitCents: limit > 0 ? Math.round(limit * 100) : null }
+          : {}),
+      });
+      toast(isCard ? "Cartão atualizado" : "Conta atualizada");
+      onSaved();
+      onClose();
+    } catch (err) {
+      toastError(err, "Não foi possível atualizar");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title={isCard ? "Editar cartão" : "Editar conta"} onClose={onClose}>
+      <div className={form.form}>
+        <div className={form.field}>
+          <label className={form.label} htmlFor={`${uid}-name`}>Nome</label>
+          <input id={`${uid}-name`} className={form.input} maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className={form.field}>
+          <label className={form.label} htmlFor={`${uid}-scope`}>De quem</label>
+          <select id={`${uid}-scope`} className={form.select} value={scope} onChange={(e) => setScope(e.target.value as FinScope)}>
+            <option value="pj">PJ (empresa)</option>
+            <option value="pf">PF (pessoal)</option>
+          </select>
+          <span className={form.hint}>Só dá para trocar se a conta ainda não tiver lançamentos.</span>
+        </div>
+        {isCard && (
+          <>
+            <div className={form.row}>
+              <div className={form.field}>
+                <label className={form.label} htmlFor={`${uid}-closing`}>Dia do fechamento</label>
+                <input id={`${uid}-closing`} className={form.input} type="number" min={1} max={28} value={closingDay} onChange={(e) => setClosingDay(Number(e.target.value))} />
+              </div>
+              <div className={form.field}>
+                <label className={form.label} htmlFor={`${uid}-due`}>Dia do vencimento</label>
+                <input id={`${uid}-due`} className={form.input} type="number" min={1} max={28} value={dueDay} onChange={(e) => setDueDay(Number(e.target.value))} />
+              </div>
+            </div>
+            <div className={form.field}>
+              <label className={form.label} htmlFor={`${uid}-limit`}>Limite</label>
+              <CurrencyInput id={`${uid}-limit`} className={form.input} value={limit} onChange={setLimit} />
+            </div>
+            <p className={form.hint}>
+              Mudar fechamento ou vencimento vale para as próximas compras; as faturas de compras antigas passam a
+              ser calculadas pelos novos dias.
+            </p>
+            {!daysOk && <p className={form.error} role="alert">Fechamento e vencimento ficam entre 1 e 28.</p>}
+          </>
+        )}
+        <div className={form.actions}>
+          <Button onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="primary" onClick={() => void save()} disabled={busy || !name.trim() || !daysOk}>
+            {busy ? "Salvando…" : "Salvar"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}

@@ -210,6 +210,7 @@ export function EntriesView({
                     <div className={styles.listMeta}>
                       {e.accountId ? accountNames.get(e.accountId) : ""}
                       {e.installmentNo ? ` · ${e.installmentNo}/${e.installmentTotal}` : ""}
+                      {e.isFixed ? " · fixo" : ""}
                     </div>
                   </td>
                   <td>{e.categoryId ? (names.get(e.categoryId) ?? "—") : "—"}</td>
@@ -270,7 +271,7 @@ export function EntriesView({
         <Modal title="Excluir lançamento?" onClose={() => (busyDelete ? undefined : setDeleting(null))}>
           <p style={{ margin: "8px 0 0", fontSize: 13.5, lineHeight: 1.5 }}>
             {deleting.recurrenceId
-              ? `"${deleting.description}" faz parte de uma série mensal. Você pode excluir só este lançamento ou este e os próximos que ainda não foram pagos.`
+              ? `"${deleting.description}" faz parte de uma série${deleting.isFixed ? " fixa" : " mensal"}. Você pode excluir só este lançamento ou este e os próximos que ainda não foram pagos${deleting.isFixed ? " — é assim que se encerra um lançamento fixo" : ""}.`
               : `"${deleting.description}" será excluído. Esta ação não pode ser desfeita.`}
           </p>
           <div className={form.actions}>

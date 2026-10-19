@@ -1,4 +1,5 @@
 import type {
+  ApplyScope,
   CardOverview,
   CreateAccountInput,
   CreateCategoryInput,
@@ -23,7 +24,8 @@ export interface FinanceRepository {
   listEntries(filter: EntryFilter): Promise<Page<FinEntry>>;
   /** Devolve todas as ocorrências criadas (uma só, ou a série mensal). */
   createEntries(input: CreateEntryInput): Promise<FinEntry[]>;
-  updateEntry(id: string, input: UpdateEntryInput): Promise<FinEntry>;
+  /** `apply`: só este (padrão), este e os seguintes, ou a série toda (itens não pagos). */
+  updateEntry(id: string, input: UpdateEntryInput, apply?: ApplyScope): Promise<FinEntry>;
   /** Baixa (data omitida = hoje). */
   payEntry(id: string, paidAt?: string): Promise<FinEntry>;
   unpayEntry(id: string): Promise<FinEntry>;

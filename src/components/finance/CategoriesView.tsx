@@ -1,15 +1,20 @@
 import { useId, useState } from "react";
 import type { AccountKind, CategoryScope, EntryKind, FinAccount, FinCategory, FinScope } from "../../types/finance";
-import { ACCOUNT_KIND_LABEL, CATEGORY_SCOPE_LABEL, KIND_LABEL, SCOPE_SHORT } from "../../types/finance";
+import { ACCOUNT_KIND_LABEL, CATEGORY_SCOPE_LABEL, SCOPE_SHORT } from "../../types/finance";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { CurrencyInput } from "../common/CurrencyInput";
+import { AccountEditModal, CategoryEditModal } from "./EditModals";
 import { useToast } from "../../hooks/useToast";
 import { financeService } from "../../services/FinanceService";
 import { formatCents } from "../../utils/finance";
 import styles from "./Finance.module.css";
 
-/** Categorias (com orçamento mensal opcional) e contas/cartões — separadas em PF e PJ. */
+/**
+ * Categorias (com orçamento mensal opcional) e contas/cartões, separadas em PF e PJ. Tudo pode ser
+ * editado; arquivar esconde dos formulários sem apagar o histórico, e dá para desarquivar.
+ * `categories` e `accounts` chegam COM as arquivadas.
+ */
 export function CategoriesView({
   categories,
   accounts,
@@ -36,7 +41,8 @@ function CategoriesSection({ categories, onChanged }: { categories: FinCategory[
   const [color, setColor] = useState("#4aa3ff");
   const [budget, setBudget] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [editingBudget, setEditingBudget] = useState<{ id: string; value: number } | null>(null);
+  const [editing, setEditing] = useState<FinCategory | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   async function create() {
     if (!name.trim()) return;
@@ -60,19 +66,21 @@ function CategoriesSection({ categories, onChanged }: { categories: FinCategory[
     }
   }
 
-  async function patch(id: string, body: Parameters<typeof financeService.updateCategory>[1], message: string) {
+  async function setArchived(c: FinCategory, archived: boolean) {
     try {
-      await financeService.updateCategory(id, body);
-      toast(message);
+      await financeService.updateCategory(c.id, { archived });
+      toast(archived ? "Categoria arquivada" : "Categoria reativada");
       onChanged();
     } catch (err) {
       toastError(err, "Não foi possível atualizar a categoria");
     }
   }
 
+  const active = categories.filter((c) => !c.archived);
+  const archived = categories.filter((c) => c.archived);
   const groups: [EntryKind, FinCategory[]][] = [
-    ["expense", categories.filter((c) => c.kind === "expense")],
-    ["income", categories.filter((c) => c.kind === "income")],
+    ["expense", active.filter((c) => c.kind === "expense")],
+    ["income", active.filter((c) => c.kind === "income")],
   ];
 
   return (
@@ -131,44 +139,8 @@ function CategoriesSection({ categories, onChanged }: { categories: FinCategory[
                     )}
                   </span>
                   <span className={styles.rowActions}>
-                    {c.kind === "expense" &&
-                      (editingBudget?.id === c.id ? (
-                        <>
-                          <CurrencyInput
-                            className={styles.control}
-                            aria-label={`Orçamento de ${c.name}`}
-                            value={editingBudget.value}
-                            onChange={(v) => setEditingBudget({ id: c.id, value: v })}
-                          />
-                          <Button
-                            variant="primary"
-                            onClick={() => {
-                              void patch(
-                                c.id,
-                                { monthlyBudgetCents: editingBudget.value > 0 ? Math.round(editingBudget.value * 100) : null },
-                                "Orçamento atualizado",
-                              );
-                              setEditingBudget(null);
-                            }}
-                          >
-                            Salvar
-                          </Button>
-                          <Button onClick={() => setEditingBudget(null)}>Cancelar</Button>
-                        </>
-                      ) : (
-                        <Button
-                          onClick={() => setEditingBudget({ id: c.id, value: (c.monthlyBudgetCents ?? 0) / 100 })}
-                          aria-label={`Definir orçamento de ${c.name}`}
-                        >
-                          Orçamento
-                        </Button>
-                      ))}
-                    <Button
-                      onClick={() => void patch(c.id, { archived: true }, "Categoria arquivada")}
-                      aria-label={`Arquivar ${c.name}`}
-                    >
-                      Arquivar
-                    </Button>
+                    <Button onClick={() => setEditing(c)} aria-label={`Editar ${c.name}`}>Editar</Button>
+                    <Button onClick={() => void setArchived(c, true)} aria-label={`Arquivar ${c.name}`}>Arquivar</Button>
                   </span>
                 </li>
               ))}
@@ -176,9 +148,39 @@ function CategoriesSection({ categories, onChanged }: { categories: FinCategory[
           )}
         </div>
       ))}
+
+      {archived.length > 0 && (
+        <div className={styles.sectionGap}>
+          <Button onClick={() => setShowArchived((v) => !v)} aria-expanded={showArchived}>
+            {showArchived ? "Ocultar arquivadas" : `Arquivadas (${archived.length})`}
+          </Button>
+          {showArchived && (
+            <ul className={styles.list} style={{ marginTop: 10 }} aria-label="Categorias arquivadas">
+              {archived.map((c) => (
+                <li key={c.id} className={styles.listItem}>
+                  <span className={styles.listMain}>
+                    <span className={styles.dot} style={{ background: c.color }} aria-hidden="true" />
+                    {c.name} <span className={styles.listMeta}>· {c.kind === "income" ? "receita" : "despesa"}</span>
+                  </span>
+                  <span className={styles.rowActions}>
+                    <Button onClick={() => void setArchived(c, false)} aria-label={`Desarquivar ${c.name}`}>
+                      Desarquivar
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       <p className={styles.budgetNote}>
         Arquivar esconde a categoria dos formulários sem apagar o histórico dos lançamentos.
       </p>
+
+      {editing && (
+        <CategoryEditModal category={editing} onClose={() => setEditing(null)} onSaved={onChanged} />
+      )}
     </section>
   );
 }
@@ -190,6 +192,8 @@ function AccountsSection({ accounts, onChanged }: { accounts: FinAccount[]; onCh
   const [scope, setScope] = useState<FinScope>("pj");
   const [kind, setKind] = useState<AccountKind>("conta");
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<FinAccount | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   async function create() {
     if (!name.trim()) return;
@@ -206,14 +210,29 @@ function AccountsSection({ accounts, onChanged }: { accounts: FinAccount[]; onCh
     }
   }
 
-  async function archive(id: string) {
+  async function setArchived(a: FinAccount, archived: boolean) {
     try {
-      await financeService.updateAccount(id, { archived: true });
-      toast("Conta arquivada");
+      await financeService.updateAccount(a.id, { archived });
+      toast(archived ? "Conta arquivada" : "Conta reativada");
       onChanged();
     } catch (err) {
-      toastError(err, "Não foi possível arquivar a conta");
+      toastError(err, "Não foi possível atualizar a conta");
     }
+  }
+
+  const active = accounts.filter((a) => !a.archived);
+  const archived = accounts.filter((a) => a.archived);
+
+  function line(a: FinAccount) {
+    return (
+      <span className={styles.listMain}>
+        {a.name} <Badge label={SCOPE_SHORT[a.scope]} color="var(--tone-blue-text)" bg="var(--tone-blue-bg)" />
+        <span className={styles.listMeta}>
+          {" "}· {ACCOUNT_KIND_LABEL[a.kind]}
+          {a.kind === "cartao" && a.closingDay ? ` · fecha dia ${a.closingDay}, vence dia ${a.dueDay}` : ""}
+        </span>
+      </span>
+    );
   }
 
   return (
@@ -245,28 +264,45 @@ function AccountsSection({ accounts, onChanged }: { accounts: FinAccount[]; onCh
           Adicionar
         </Button>
       </div>
-      {accounts.length === 0 ? (
+      {active.length === 0 ? (
         <p className={styles.empty}>Nenhuma conta ainda. Contas separam o que é da empresa e o que é pessoal.</p>
       ) : (
         <ul className={styles.list}>
-          {accounts.map((a) => (
+          {active.map((a) => (
             <li key={a.id} className={styles.listItem}>
-              <span>
-                {a.name}{" "}
-                <Badge label={SCOPE_SHORT[a.scope]} color="var(--tone-blue-text)" bg="var(--tone-blue-bg)" />
-                <span className={styles.listMeta}>
-                  {" "}· {ACCOUNT_KIND_LABEL[a.kind]}
-                  {a.kind === "cartao" && a.closingDay ? ` · fecha dia ${a.closingDay}, vence dia ${a.dueDay}` : ""}
-                </span>
+              {line(a)}
+              <span className={styles.rowActions}>
+                <Button onClick={() => setEditing(a)} aria-label={`Editar ${a.name}`}>Editar</Button>
+                <Button onClick={() => void setArchived(a, true)} aria-label={`Arquivar ${a.name}`}>Arquivar</Button>
               </span>
-              <Button onClick={() => void archive(a.id)} aria-label={`Arquivar ${a.name}`}>
-                Arquivar
-              </Button>
             </li>
           ))}
         </ul>
       )}
-      <p className={styles.budgetNote}>{KIND_LABEL.income}s e {KIND_LABEL.expense.toLowerCase()}s herdam o PF/PJ da conta escolhida.</p>
+
+      {archived.length > 0 && (
+        <div className={styles.sectionGap}>
+          <Button onClick={() => setShowArchived((v) => !v)} aria-expanded={showArchived}>
+            {showArchived ? "Ocultar arquivadas" : `Arquivadas (${archived.length})`}
+          </Button>
+          {showArchived && (
+            <ul className={styles.list} style={{ marginTop: 10 }} aria-label="Contas arquivadas">
+              {archived.map((a) => (
+                <li key={a.id} className={styles.listItem}>
+                  {line(a)}
+                  <span className={styles.rowActions}>
+                    <Button onClick={() => void setArchived(a, false)} aria-label={`Desarquivar ${a.name}`}>
+                      Desarquivar
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {editing && <AccountEditModal account={editing} onClose={() => setEditing(null)} onSaved={onChanged} />}
     </section>
   );
 }
