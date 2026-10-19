@@ -1,6 +1,8 @@
 import { useEffect, useId, useState } from "react";
 import type {
   CardOverview,
+  FinAccount,
+  FinEntry,
   FinProfile,
   InvoiceStatus,
   InvoiceSummary,
@@ -9,20 +11,23 @@ import { INVOICE_STATUS_LABEL } from "../../types/finance";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { ConfirmDialog } from "../common/ConfirmDialog";
+import { Modal } from "../common/Modal";
+import form from "../common/Form.module.css";
 import { CurrencyInput } from "../common/CurrencyInput";
 import { EmptyState } from "../common/EmptyState";
 import { AccountEditModal } from "./EditModals";
 import { SkeletonRows } from "../common/Skeleton";
-import { useFinanceCards, useInvoice, useInvoices } from "../../hooks/useFinance";
+import { useFinanceAccounts, useFinanceCards, useInvoice, useInvoices } from "../../hooks/useFinance";
 import { useToast } from "../../hooks/useToast";
 import { financeService } from "../../services/FinanceService";
 import { barRatio, budgetTone, formatCents, limitUsage, monthTitle } from "../../utils/finance";
-import { fmtDate } from "../../utils/renewal";
+import { fmtDate, toIsoDate } from "../../utils/renewal";
 import styles from "./Finance.module.css";
 
 const STATUS_TONE: Record<InvoiceStatus, { color: string; bg: string }> = {
   open: { color: "var(--tone-blue-text)", bg: "var(--tone-blue-bg)" },
   closed: { color: "var(--tone-amber-text)", bg: "var(--tone-amber-bg)" },
+  partial: { color: "var(--tone-amber-text)", bg: "var(--tone-amber-bg)" },
   overdue: { color: "var(--tone-red-text)", bg: "var(--tone-red-bg)" },
   paid: { color: "var(--tone-green-text)", bg: "var(--tone-green-bg)" },
   empty: { color: "var(--tone-gray)", bg: "var(--tone-gray-bg)" },
@@ -212,10 +217,11 @@ function CardDetail({
   const invoices = useInvoices(card.account.id);
   const ref = refText ?? card.current.ref;
   const detail = useInvoice(card.account.id, ref);
-  const [confirmPay, setConfirmPay] = useState(false);
-  const [confirmUndo, setConfirmUndo] = useState(false);
+  const accounts = useFinanceAccounts(false);
+  const [paying, setPaying] = useState(false);
+  const [undoing, setUndoing] = useState<{ id: string; amountCents: number } | null>(null);
+  const [refunding, setRefunding] = useState<FinEntry | null>(null);
   const [editingCard, setEditingCard] = useState(false);
-  const [payDate, setPayDate] = useState("");
   const history = invoices.data ?? [];
 
   function changed() {
@@ -224,21 +230,10 @@ function CardDetail({
     onChanged();
   }
 
-  async function pay(): Promise<boolean> {
-    try {
-      const count = await financeService.payInvoice(card.account.id, ref, payDate || undefined);
-      toast(count === 1 ? "1 item baixado" : `${count} itens baixados`);
-      changed();
-      return true;
-    } catch (err) {
-      toastError(err, "Não foi possível pagar a fatura");
-      return false;
-    }
-  }
-
   async function undo(): Promise<boolean> {
+    if (!undoing) return false;
     try {
-      await financeService.unpayInvoice(card.account.id, ref);
+      await financeService.undoInvoicePayment(card.account.id, ref, undoing.id);
       toast("Pagamento da fatura estornado");
       changed();
       return true;
@@ -290,31 +285,45 @@ function CardDetail({
               <p className={styles.kpiLabel}>Pago</p>
               <strong>{formatCents(inv.paidTotal)}</strong>
               <p className={styles.kpiNote}>
-                {inv.status === "paid" && inv.paidOn ? `em ${fmtDate(inv.paidOn)}` : `${inv.unpaidCount} a pagar`}
+                {inv.status === "paid" && inv.paidOn
+                  ? `em ${fmtDate(inv.paidOn)}`
+                  : `faltam ${formatCents(inv.remaining)}`}
               </p>
             </div>
           </div>
 
-          {inv.count > 0 && (
+          {inv.count > 0 && inv.remaining > 0 && (
             <div className={styles.toolbar}>
-              {inv.unpaidCount > 0 && (
-                <>
-                  <label className={styles.filterField}>
-                    Data do pagamento
-                    <input
-                      className={styles.control}
-                      type="date"
-                      value={payDate}
-                      onChange={(e) => setPayDate(e.target.value)}
-                    />
-                  </label>
-                  <Button variant="primary" onClick={() => setConfirmPay(true)}>
-                    Pagar fatura
-                  </Button>
-                </>
-              )}
-              {inv.paidTotal > 0 && <Button onClick={() => setConfirmUndo(true)}>Estornar pagamento</Button>}
+              <Button variant="primary" onClick={() => setPaying(true)}>
+                Pagar fatura
+              </Button>
             </div>
+          )}
+
+          {detail.data.payments.length > 0 && (
+            <ul className={styles.list} aria-label="Pagamentos da fatura" style={{ marginBottom: 14 }}>
+              {detail.data.payments.map((p) => (
+                <li key={p.id} className={styles.listItem}>
+                  <span className={styles.listMain}>
+                    Pagamento de {fmtDate(p.paidOn)}
+                    <span className={styles.listMeta}>
+                      {p.legacy
+                        ? " · anterior à conta pagadora"
+                        : ` · ${accounts.data?.find((a) => a.id === p.payerAccountId)?.name ?? "conta pagadora"}`}
+                    </span>
+                  </span>
+                  <span className={styles.rowActions}>
+                    <strong>{formatCents(p.amountCents)}</strong>
+                    <Button
+                      onClick={() => setUndoing({ id: p.id, amountCents: p.amountCents })}
+                      aria-label={`Estornar pagamento de ${formatCents(p.amountCents)}`}
+                    >
+                      Estornar pagamento
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
 
           {detail.data.byCategory.length > 0 && (
@@ -348,6 +357,7 @@ function CardDetail({
                     <th>Parcela</th>
                     <th>Situação</th>
                     <th className={styles.num}>Valor</th>
+                    <th><span className="sr-only">Ações</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -355,9 +365,16 @@ function CardDetail({
                     <tr key={e.id}>
                       <td>{fmtDate(e.entryDate)}</td>
                       <td>{e.description}</td>
-                      <td>{e.installmentNo ? `${e.installmentNo}/${e.installmentTotal}` : "à vista"}</td>
+                      <td>{e.isRefund ? "estorno" : e.installmentNo ? `${e.installmentNo}/${e.installmentTotal}` : "à vista"}</td>
                       <td>{e.paidAt ? "Paga" : "Em aberto"}</td>
-                      <td className={styles.num}>{formatCents(e.amountCents)}</td>
+                      <td className={styles.num}>{e.isRefund ? "−" : ""}{formatCents(e.amountCents)}</td>
+                      <td>
+                        {!e.isRefund && (
+                          <Button onClick={() => setRefunding(e)} aria-label={`Estornar compra ${e.description}`}>
+                            Estornar
+                          </Button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -370,23 +387,26 @@ function CardDetail({
       {editingCard && (
         <AccountEditModal account={card.account} onClose={() => setEditingCard(false)} onSaved={changed} />
       )}
-      {confirmPay && inv && (
-        <ConfirmDialog
-          title="Pagar a fatura?"
-          message={`Todos os itens em aberto de ${monthTitle(inv.ref)} (${formatCents(inv.total - inv.paidTotal)}) serão baixados${payDate ? ` em ${fmtDate(payDate)}` : " hoje"}. Isso não cria uma despesa nova: as compras já contam no dia em que foram feitas.`}
-          confirmLabel="Pagar fatura"
-          onConfirm={pay}
-          onClose={() => setConfirmPay(false)}
+      {paying && inv && (
+        <PayInvoiceModal
+          card={card}
+          invoice={inv}
+          accounts={accounts.data ?? []}
+          onClose={() => setPaying(false)}
+          onPaid={changed}
         />
       )}
-      {confirmUndo && inv && (
+      {undoing && (
         <ConfirmDialog
           title="Estornar o pagamento?"
-          message="Os itens da fatura voltam para 'em aberto' e o limite do cartão é comprometido de novo."
+          message={`O pagamento de ${formatCents(undoing.amountCents)} é desfeito: o valor volta para a conta pagadora e a fatura volta a ter esse valor em aberto.`}
           confirmLabel="Estornar"
           onConfirm={undo}
-          onClose={() => setConfirmUndo(false)}
+          onClose={() => setUndoing(null)}
         />
+      )}
+      {refunding && (
+        <RefundModal entry={refunding} onClose={() => setRefunding(null)} onDone={changed} />
       )}
     </section>
   );
@@ -438,6 +458,11 @@ function NewCardForm({
   const [profileId, setProfileId] = useState(
     defaultProfileId ?? (activeProfiles.find((p) => p.kind === "pj") ?? activeProfiles[0])?.id ?? "",
   );
+  const accounts = useFinanceAccounts(false);
+  const [payerId, setPayerId] = useState("");
+  const payers = (accounts.data ?? []).filter(
+    (a) => a.kind !== "cartao" && !a.archived && a.profileId === profileId,
+  );
   const [closingDay, setClosingDay] = useState(10);
   const [dueDay, setDueDay] = useState(20);
   const [limit, setLimit] = useState(0);
@@ -451,6 +476,7 @@ function NewCardForm({
         name: name.trim(),
         profileId,
         kind: "cartao",
+        ...(payerId && payers.some((p) => p.id === payerId) ? { payerAccountId: payerId } : {}),
         closingDay,
         dueDay,
         creditLimitCents: limit > 0 ? Math.round(limit * 100) : null,
@@ -482,6 +508,15 @@ function NewCardForm({
           ))}
         </select>
       </label>
+      <label className={styles.filterField} htmlFor={`${uid}-payer`}>
+        Conta pagadora
+        <select id={`${uid}-payer`} className={styles.control} value={payerId} onChange={(e) => setPayerId(e.target.value)}>
+          <option value="">Escolher ao pagar</option>
+          {payers.map((a) => (
+            <option key={a.id} value={a.id}>{a.name}</option>
+          ))}
+        </select>
+      </label>
       <label className={styles.filterField} htmlFor={`${uid}-closing`}>
         Dia do fechamento
         <input id={`${uid}-closing`} className={styles.control} type="number" min={1} max={28} value={closingDay} onChange={(e) => setClosingDay(Number(e.target.value))} />
@@ -502,5 +537,139 @@ function NewCardForm({
       </div>
       {!validDays && <p className={styles.budgetOver}>Fechamento e vencimento ficam entre 1 e 28.</p>}
     </div>
+  );
+}
+
+/** Pagamento total ou parcial da fatura: escolhe a conta pagadora, o valor e a data. */
+function PayInvoiceModal({
+  card,
+  invoice,
+  accounts,
+  onClose,
+  onPaid,
+}: {
+  card: CardOverview;
+  invoice: InvoiceSummary;
+  accounts: FinAccount[];
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const { toast, toastError } = useToast();
+  const uid = useId();
+  const payers = accounts.filter(
+    (a) => a.kind !== "cartao" && !a.archived && a.profileId === card.account.profileId,
+  );
+  const [payerId, setPayerId] = useState(card.account.payerAccountId ?? payers[0]?.id ?? "");
+  const [amount, setAmount] = useState(invoice.remaining / 100);
+  const [date, setDate] = useState(toIsoDate(new Date()));
+  const [busy, setBusy] = useState(false);
+  const cents = Math.round(amount * 100);
+  const invalid = !payerId || cents <= 0 || cents > invoice.remaining;
+
+  async function save() {
+    setBusy(true);
+    try {
+      await financeService.payInvoice(card.account.id, invoice.ref, {
+        payerAccountId: payerId,
+        amountCents: cents,
+        paidAt: date,
+      });
+      toast(cents === invoice.remaining ? "Fatura paga" : "Pagamento parcial registrado");
+      onPaid();
+      onClose();
+    } catch (err) {
+      toastError(err, "Não foi possível pagar a fatura");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Pagar a fatura?" onClose={onClose}>
+      <div className={form.form}>
+        <p className={form.hint}>
+          Fatura de {monthTitle(invoice.ref)}: faltam {formatCents(invoice.remaining)}. O valor sai da conta
+          pagadora e isso não cria uma despesa nova — as compras já contam no dia em que foram feitas.
+        </p>
+        <div className={form.field}>
+          <label className={form.label} htmlFor={`${uid}-payer`}>Conta pagadora</label>
+          <select id={`${uid}-payer`} className={form.select} value={payerId} onChange={(e) => setPayerId(e.target.value)}>
+            {payers.length === 0 && <option value="">Nenhuma conta do mesmo perfil</option>}
+            {payers.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className={form.row}>
+          <div className={form.field}>
+            <label className={form.label} htmlFor={`${uid}-amount`}>Valor a pagar</label>
+            <CurrencyInput id={`${uid}-amount`} className={form.input} value={amount} onChange={setAmount} />
+          </div>
+          <div className={form.field}>
+            <label className={form.label} htmlFor={`${uid}-date`}>Data do pagamento</label>
+            <input id={`${uid}-date`} className={form.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+        </div>
+        {cents > invoice.remaining && (
+          <p className={form.error} role="alert">O pagamento não pode passar do que falta na fatura.</p>
+        )}
+        <div className={form.actions}>
+          <Button onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="primary" onClick={() => void save()} disabled={busy || invalid}>
+            {busy ? "Pagando…" : "Pagar fatura"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** Estorno (total ou parcial) de uma compra: vira crédito na fatura, nunca receita. */
+function RefundModal({ entry, onClose, onDone }: { entry: FinEntry; onClose: () => void; onDone: () => void }) {
+  const { toast, toastError } = useToast();
+  const uid = useId();
+  const [amount, setAmount] = useState(entry.amountCents / 100);
+  const [date, setDate] = useState(toIsoDate(new Date()));
+  const [busy, setBusy] = useState(false);
+  const cents = Math.round(amount * 100);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await financeService.refundPurchase(entry.id, { amountCents: cents, date });
+      toast("Estorno registrado na fatura");
+      onDone();
+      onClose();
+    } catch (err) {
+      toastError(err, "Não foi possível estornar a compra");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Estornar compra" subtitle={entry.description} onClose={onClose}>
+      <div className={form.form}>
+        <div className={form.row}>
+          <div className={form.field}>
+            <label className={form.label} htmlFor={`${uid}-amount`}>Valor estornado</label>
+            <CurrencyInput id={`${uid}-amount`} className={form.input} value={amount} onChange={setAmount} />
+          </div>
+          <div className={form.field}>
+            <label className={form.label} htmlFor={`${uid}-date`}>Data do estorno</label>
+            <input id={`${uid}-date`} className={form.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+        </div>
+        <p className={form.hint}>O estorno reduz a despesa e o valor da fatura. Não conta como receita.</p>
+        <div className={form.actions}>
+          <Button onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="primary" onClick={() => void save()} disabled={busy || cents <= 0}>
+            {busy ? "Estornando…" : "Estornar"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

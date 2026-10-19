@@ -39,5 +39,6 @@ export class FinanceMockRepository implements FinanceRepository {
   listInvoices = async () => unavailable();
   getInvoice = async () => unavailable();
   payInvoice = async () => unavailable();
-  unpayInvoice = async () => unavailable();
+  undoInvoicePayment = async () => unavailable();
+  refundPurchase = async () => unavailable();
 }

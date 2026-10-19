@@ -11,6 +11,8 @@ import type {
   CreateTransferInput,
   BalanceHistoryItem,
   FinTransfer,
+  InvoicePayment,
+  PayInvoiceInput,
   ReconcileResult,
   TransferKind,
   FinProfile,
@@ -65,6 +67,7 @@ interface AccountDto {
   institution?: string | null;
   initial_balance_cents?: number;
   initial_balance_date?: string | null;
+  payer_account_id?: string | null;
   last_reconciled_on?: string | null;
   last_reconciled_balance_cents?: number | null;
   balance_cents?: number | null;
@@ -92,6 +95,7 @@ interface InvoiceDto {
   due_date: string;
   total: number;
   paid_total: number;
+  remaining?: number;
   count: number;
   unpaid_count: number;
   paid_on: string | null;
@@ -117,6 +121,8 @@ interface EntryDto {
   installment_total: number | null;
   plan_id?: string | null;
   tags?: string[];
+  invoice_ref?: string | null;
+  is_refund?: boolean;
   payment_state?: "effective" | "scheduled" | null;
   affected?: number | null;
   status: EntryStatus;
@@ -210,6 +216,7 @@ const toAccount = (d: AccountDto): FinAccount => ({
   dueDay: d.due_day ?? null,
   creditLimitCents: d.credit_limit_cents ?? null,
   institution: d.institution ?? null,
+  payerAccountId: d.payer_account_id ?? null,
   initialBalanceCents: d.initial_balance_cents ?? 0,
   initialBalanceDate: d.initial_balance_date ?? null,
   lastReconciledOn: d.last_reconciled_on ?? null,
@@ -239,6 +246,7 @@ const toInvoice = (d: InvoiceDto): InvoiceSummary => ({
   dueDate: d.due_date,
   total: d.total,
   paidTotal: d.paid_total,
+  remaining: d.remaining ?? Math.max(d.total - d.paid_total, 0),
   count: d.count,
   unpaidCount: d.unpaid_count,
   paidOn: d.paid_on,
@@ -264,6 +272,8 @@ const toEntry = (d: EntryDto): FinEntry => ({
   installmentTotal: d.installment_total,
   isFixed: d.recurrence_id != null,
   tags: d.tags ?? [],
+  invoiceRef: d.invoice_ref ?? null,
+  isRefund: d.is_refund === true,
   paymentState: d.payment_state ?? null,
   status: d.status,
   ...(d.affected != null ? { affected: d.affected } : {}),
@@ -531,6 +541,7 @@ export class FinanceApiRepository implements FinanceRepository {
           institution: input.institution,
           initial_balance_cents: input.initialBalanceCents,
           initial_balance_date: input.initialBalanceDate,
+          payer_account_id: input.payerAccountId,
           closing_day: input.closingDay,
           due_day: input.dueDay,
           credit_limit_cents: input.creditLimitCents,
@@ -546,6 +557,7 @@ export class FinanceApiRepository implements FinanceRepository {
         body: JSON.stringify({
           name: input.name,
           archived: input.archived,
+          payer_account_id: input.payerAccountId,
           institution: input.institution,
           initial_balance_cents: input.initialBalanceCents,
           initial_balance_date: input.initialBalanceDate,
@@ -677,29 +689,63 @@ export class FinanceApiRepository implements FinanceRepository {
       card: AccountDto;
       invoice: InvoiceDto;
       entries: EntryDto[];
+      payments?: {
+        id: string;
+        payer_account_id: string | null;
+        amount_cents: number;
+        paid_on: string;
+        legacy?: boolean;
+      }[];
       by_category: { name: string; color: string; total: number; count: number }[];
     }>(`/api/v1/finance/cards/${accountId}/invoices/${ref}`);
     return {
       card: toAccount(dto.card),
       invoice: toInvoice(dto.invoice),
       entries: dto.entries.map(toEntry),
+      payments: (dto.payments ?? []).map(
+        (p): InvoicePayment => ({
+          id: p.id,
+          payerAccountId: p.payer_account_id,
+          amountCents: p.amount_cents,
+          paidOn: p.paid_on,
+          legacy: p.legacy === true,
+        }),
+      ),
       byCategory: dto.by_category,
     };
   }
 
-  async payInvoice(accountId: string, ref: string, paidAt?: string): Promise<number> {
-    const dto = await apiRequest<{ updated: number }>(
-      `/api/v1/finance/cards/${accountId}/invoices/${ref}/pay`,
-      { method: "POST", body: JSON.stringify({ paid_at: paidAt }) },
+  async payInvoice(
+    accountId: string,
+    ref: string,
+    input: PayInvoiceInput = {},
+  ): Promise<InvoiceSummary> {
+    const dto = await apiRequest<{ invoice: InvoiceDto }>(
+      `/api/v1/finance/cards/${accountId}/invoices/${ref}/payments`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          payer_account_id: input.payerAccountId,
+          amount_cents: input.amountCents,
+          paid_at: input.paidAt,
+        }),
+      },
     );
-    return dto.updated;
+    return toInvoice(dto.invoice);
   }
 
-  async unpayInvoice(accountId: string, ref: string): Promise<number> {
-    const dto = await apiRequest<{ updated: number }>(
-      `/api/v1/finance/cards/${accountId}/invoices/${ref}/payment`,
+  async undoInvoicePayment(accountId: string, ref: string, paymentId: string): Promise<InvoiceSummary> {
+    const dto = await apiRequest<{ invoice: InvoiceDto }>(
+      `/api/v1/finance/cards/${accountId}/invoices/${ref}/payments/${paymentId}`,
       { method: "DELETE" },
     );
-    return dto.updated;
+    return toInvoice(dto.invoice);
+  }
+
+  async refundPurchase(entryId: string, input: { amountCents?: number; date?: string } = {}): Promise<void> {
+    await apiRequest(`/api/v1/finance/entries/${entryId}/refund`, {
+      method: "POST",
+      body: JSON.stringify({ amount_cents: input.amountCents, refund_date: input.date }),
+    });
   }
 }

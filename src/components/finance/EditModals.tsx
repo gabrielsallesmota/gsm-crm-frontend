@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 import type { FinAccount, FinCategory } from "../../types/finance";
+import { useFinanceAccounts } from "../../hooks/useFinance";
 import { Button } from "../common/Button";
 import { CurrencyInput } from "../common/CurrencyInput";
 import { Modal } from "../common/Modal";
@@ -93,6 +94,11 @@ export function AccountEditModal({
   const [closingDay, setClosingDay] = useState(account.closingDay ?? 10);
   const [dueDay, setDueDay] = useState(account.dueDay ?? 20);
   const [limit, setLimit] = useState((account.creditLimitCents ?? 0) / 100);
+  const accounts = useFinanceAccounts(false);
+  const [payerId, setPayerId] = useState(account.payerAccountId ?? "");
+  const payers = (accounts.data ?? []).filter(
+    (a) => a.kind !== "cartao" && !a.archived && a.profileId === account.profileId,
+  );
   const [busy, setBusy] = useState(false);
   const daysOk = !isCard || [closingDay, dueDay].every((d) => Number.isInteger(d) && d >= 1 && d <= 28);
 
@@ -102,7 +108,12 @@ export function AccountEditModal({
       await financeService.updateAccount(account.id, {
         name: name.trim(),
         ...(isCard
-          ? { closingDay, dueDay, creditLimitCents: limit > 0 ? Math.round(limit * 100) : null }
+          ? {
+              closingDay,
+              dueDay,
+              creditLimitCents: limit > 0 ? Math.round(limit * 100) : null,
+              ...(payerId !== (account.payerAccountId ?? "") ? { payerAccountId: payerId || null } : {}),
+            }
           : {}),
       });
       toast(isCard ? "Cartão atualizado" : "Conta atualizada");
@@ -136,12 +147,21 @@ export function AccountEditModal({
               </div>
             </div>
             <div className={form.field}>
+              <label className={form.label} htmlFor={`${uid}-payer`}>Conta pagadora</label>
+              <select id={`${uid}-payer`} className={form.select} value={payerId} onChange={(e) => setPayerId(e.target.value)}>
+                <option value="">Escolher ao pagar</option>
+                {payers.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className={form.field}>
               <label className={form.label} htmlFor={`${uid}-limit`}>Limite</label>
               <CurrencyInput id={`${uid}-limit`} className={form.input} value={limit} onChange={setLimit} />
             </div>
             <p className={form.hint}>
-              Mudar fechamento ou vencimento vale para as próximas compras; as faturas de compras antigas passam a
-              ser calculadas pelos novos dias.
+              Mudar fechamento ou vencimento vale para as faturas que ainda não fecharam; as faturas já fechadas
+              continuam como estavam.
             </p>
             {!daysOk && <p className={form.error} role="alert">Fechamento e vencimento ficam entre 1 e 28.</p>}
           </>

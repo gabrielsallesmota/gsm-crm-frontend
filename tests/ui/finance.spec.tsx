@@ -27,7 +27,8 @@ vi.mock("../../src/services/FinanceService", () => ({
     listInvoices: vi.fn(),
     getInvoice: vi.fn(),
     payInvoice: vi.fn(),
-    unpayInvoice: vi.fn(),
+    undoInvoicePayment: vi.fn(),
+    refundPurchase: vi.fn(),
   },
 }));
 
@@ -129,6 +130,8 @@ function entry(overrides: Partial<FinEntry> = {}): FinEntry {
     installmentTotal: null,
     isFixed: false,
     tags: [],
+    invoiceRef: null,
+    isRefund: false,
     paymentState: null,
     status: "pending",
     ...overrides,
@@ -329,6 +332,7 @@ const CARD: FinAccount = {
   dueDay: 20,
   creditLimitCents: 500_000,
   institution: null,
+  payerAccountId: null,
   initialBalanceCents: 0,
   initialBalanceDate: null,
   lastReconciledOn: null,
@@ -345,6 +349,7 @@ function invoice(overrides: Partial<InvoiceSummary> = {}): InvoiceSummary {
     dueDate: "2031-03-20",
     total: 50_000,
     paidTotal: 0,
+    remaining: 50_000,
     count: 2,
     unpaidCount: 2,
     paidOn: null,
@@ -368,6 +373,7 @@ function detail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetail {
   return {
     card: CARD,
     invoice: invoice(),
+    payments: [],
     entries: [
       entry({ id: "p1", description: "Notebook", amountCents: 30_000, accountId: "card1", installmentNo: 1, installmentTotal: 3 }),
       entry({ id: "p2", description: "Domínio", amountCents: 20_000, accountId: "card1" }),
@@ -398,31 +404,71 @@ describe("Cartões", () => {
     expect(api.getInvoice).toHaveBeenCalledWith("card1", "2031-03");
   });
 
-  it("paga a fatura depois de confirmar e avisa que não duplica a despesa", async () => {
-    api.payInvoice.mockResolvedValue(2);
+  const BANK: FinAccount = { ...CARD, id: "bank1", name: "Banco PJ", kind: "conta", closingDay: null, dueDay: null, creditLimitCents: null };
+
+  it("paga a fatura com a conta pagadora e avisa que não duplica a despesa", async () => {
+    api.listAccounts.mockResolvedValue([CARD, BANK]);
+    api.payInvoice.mockResolvedValue(invoice({ status: "paid", paidTotal: 50_000, remaining: 0 }));
     open("/financeiro?aba=cartoes");
     fireEvent.click(await screen.findByRole("button", { name: "Pagar fatura" }));
     const dialog = await screen.findByRole("dialog", { name: "Pagar a fatura?" });
     expect(within(dialog).getByText(/não cria uma despesa nova/)).toBeTruthy();
+    await waitFor(() => expect((within(dialog).getByLabelText("Conta pagadora") as HTMLSelectElement).value).toBe("bank1"));
     fireEvent.click(within(dialog).getByRole("button", { name: "Pagar fatura" }));
-    await waitFor(() => expect(api.payInvoice).toHaveBeenCalledWith("card1", "2031-03", undefined));
+    await waitFor(() => expect(api.payInvoice).toHaveBeenCalledTimes(1));
+    expect(api.payInvoice).toHaveBeenCalledWith("card1", "2031-03", {
+      payerAccountId: "bank1",
+      amountCents: 50_000,
+      paidAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    });
   });
 
-  it("estorna o pagamento de fatura paga e troca de fatura pelo seletor", async () => {
+  it("aceita pagamento parcial e não deixa passar do que falta", async () => {
+    api.listAccounts.mockResolvedValue([CARD, BANK]);
+    api.payInvoice.mockResolvedValue(invoice({ status: "partial", paidTotal: 20_000, remaining: 30_000 }));
+    open("/financeiro?aba=cartoes");
+    fireEvent.click(await screen.findByRole("button", { name: "Pagar fatura" }));
+    const dialog = await screen.findByRole("dialog", { name: "Pagar a fatura?" });
+    await waitFor(() => expect((within(dialog).getByLabelText("Conta pagadora") as HTMLSelectElement).value).toBe("bank1"));
+    fireEvent.change(within(dialog).getByLabelText("Valor a pagar"), { target: { value: "60000" } });
+    expect(within(dialog).getByRole("alert").textContent).toMatch(/não pode passar/);
+    expect((within(dialog).getByRole("button", { name: "Pagar fatura" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText("Valor a pagar"), { target: { value: "20000" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pagar fatura" }));
+    await waitFor(() => expect(api.payInvoice.mock.calls[0]![2]).toMatchObject({ amountCents: 20_000 }));
+  });
+
+  it("estorna um pagamento da fatura e troca de fatura pelo seletor", async () => {
     api.getInvoice.mockResolvedValue(
-      detail({ invoice: invoice({ status: "paid", paidTotal: 50_000, unpaidCount: 0, paidOn: "2031-03-18" }) }),
+      detail({
+        invoice: invoice({ status: "paid", paidTotal: 50_000, remaining: 0, unpaidCount: 0, paidOn: "2031-03-18" }),
+        payments: [{ id: "pay1", payerAccountId: "bank1", amountCents: 50_000, paidOn: "2031-03-18", legacy: false }],
+      }),
     );
-    api.unpayInvoice.mockResolvedValue(2);
+    api.undoInvoicePayment.mockResolvedValue(invoice());
     open("/financeiro?aba=cartoes");
     expect(screen.queryByRole("button", { name: "Pagar fatura" })).toBeNull();
-    fireEvent.click(await screen.findByRole("button", { name: "Estornar pagamento" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Estornar pagamento de R\$\s500,00/ }));
     const dialog = await screen.findByRole("dialog", { name: "Estornar o pagamento?" });
     fireEvent.click(within(dialog).getByRole("button", { name: "Estornar" }));
-    await waitFor(() => expect(api.unpayInvoice).toHaveBeenCalledWith("card1", "2031-03"));
+    await waitFor(() => expect(api.undoInvoicePayment).toHaveBeenCalledWith("card1", "2031-03", "pay1"));
 
     const picker = screen.getByRole("group", { name: "Escolher fatura" });
     fireEvent.click(within(picker).getAllByRole("button")[1]!);
     await waitFor(() => expect(api.getInvoice).toHaveBeenLastCalledWith("card1", "2031-02"));
+  });
+
+  it("estorna uma compra (total ou parcial) como crédito na fatura", async () => {
+    api.refundPurchase.mockResolvedValue();
+    open("/financeiro?aba=cartoes");
+    fireEvent.click(await screen.findByRole("button", { name: "Estornar compra Notebook" }));
+    const dialog = await screen.findByRole("dialog", { name: "Estornar compra" });
+    expect(within(dialog).getByText(/Não conta como receita/)).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText("Valor estornado"), { target: { value: "10000" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Estornar" }));
+    await waitFor(() => expect(api.refundPurchase).toHaveBeenCalledTimes(1));
+    expect(api.refundPurchase.mock.calls[0]![0]).toBe("p1");
+    expect(api.refundPurchase.mock.calls[0]![1]).toMatchObject({ amountCents: 10_000 });
   });
 
   it("cadastra cartão com fechamento, vencimento e limite — e bloqueia dia inválido", async () => {

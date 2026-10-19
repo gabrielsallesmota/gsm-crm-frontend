@@ -16,6 +16,7 @@ import type {
   FinanceDashboard,
   FinProfile,
   InvoiceDetail,
+  PayInvoiceInput,
   InvoiceSummary,
   UpdateAccountInput,
   UpdateCategoryInput,
@@ -77,6 +78,10 @@ export interface FinanceRepository {
   listInvoices(accountId: string): Promise<InvoiceSummary[]>;
   getInvoice(accountId: string, ref: string): Promise<InvoiceDetail>;
   /** Baixa todos os itens da fatura (data omitida = hoje). Devolve quantos mudaram. */
-  payInvoice(accountId: string, ref: string, paidAt?: string): Promise<number>;
-  unpayInvoice(accountId: string, ref: string): Promise<number>;
+  /** Pagamento total ou PARCIAL com a conta pagadora; não cria despesa nova. */
+  payInvoice(accountId: string, ref: string, input?: PayInvoiceInput): Promise<InvoiceSummary>;
+  /** Estorna um pagamento (o saldo da conta pagadora volta). */
+  undoInvoicePayment(accountId: string, ref: string, paymentId: string): Promise<InvoiceSummary>;
+  /** Estorno de compra no cartão (total ou parcial): crédito na fatura. */
+  refundPurchase(entryId: string, input?: { amountCents?: number; date?: string }): Promise<void>;
 }

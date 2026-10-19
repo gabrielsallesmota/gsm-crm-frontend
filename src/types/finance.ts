@@ -42,6 +42,8 @@ export interface FinAccount {
   dueDay: number | null;
   creditLimitCents: number | null;
   institution: string | null;
+  /** Só cartão: conta que paga a fatura por padrão. */
+  payerAccountId: string | null;
   initialBalanceCents: number;
   initialBalanceDate: string | null;
   lastReconciledOn: string | null;
@@ -57,6 +59,7 @@ export interface CreateAccountInput {
   institution?: string;
   initialBalanceCents?: number;
   initialBalanceDate?: string | null;
+  payerAccountId?: string;
   kind: AccountKind;
   closingDay?: number;
   dueDay?: number;
@@ -68,6 +71,7 @@ export interface UpdateAccountInput {
   institution?: string | null;
   initialBalanceCents?: number;
   initialBalanceDate?: string | null;
+  payerAccountId?: string | null;
   archived?: boolean;
   closingDay?: number;
   dueDay?: number;
@@ -75,7 +79,7 @@ export interface UpdateAccountInput {
 }
 
 /** open = recebendo compras · closed = fechada, a pagar · overdue = venceu sem pagar · paid · empty */
-export type InvoiceStatus = "open" | "closed" | "overdue" | "paid" | "empty";
+export type InvoiceStatus = "open" | "closed" | "partial" | "overdue" | "paid" | "empty";
 
 export interface InvoiceSummary {
   /** "AAAA-MM" do mês em que a fatura fecha. */
@@ -85,6 +89,8 @@ export interface InvoiceSummary {
   dueDate: string;
   total: number;
   paidTotal: number;
+  /** O que ainda falta pagar (compras − estornos − pagamentos). */
+  remaining: number;
   count: number;
   unpaidCount: number;
   paidOn: string | null;
@@ -99,10 +105,28 @@ export interface CardOverview {
   next: InvoiceSummary;
 }
 
+export interface InvoicePayment {
+  id: string;
+  payerAccountId: string | null;
+  amountCents: number;
+  paidOn: string;
+  /** Pagamento anterior à V2 (sem conta pagadora): não mexe em saldo de conta. */
+  legacy: boolean;
+}
+
+export interface PayInvoiceInput {
+  /** Omitida = a conta pagadora padrão do cartão. */
+  payerAccountId?: string;
+  /** Omitido = tudo o que falta. */
+  amountCents?: number;
+  paidAt?: string;
+}
+
 export interface InvoiceDetail {
   card: FinAccount;
   invoice: InvoiceSummary;
   entries: FinEntry[];
+  payments: InvoicePayment[];
   byCategory: { name: string; color: string; total: number; count: number }[];
 }
 
@@ -126,6 +150,10 @@ export interface FinEntry {
   /** Recorrência sem fim (o servidor mantém 12 meses à frente). */
   isFixed: boolean;
   tags: string[];
+  /** Cartão: fatura (AAAA-MM) gravada na compra. */
+  invoiceRef: string | null;
+  /** Estorno de compra no cartão: crédito na fatura (nunca receita). */
+  isRefund: boolean;
   /** Baixa efetiva (já aconteceu) × agendada (data futura); sem baixa = null. */
   paymentState: "effective" | "scheduled" | null;
   status: EntryStatus;
@@ -328,6 +356,7 @@ export const STATUS_LABEL: Record<EntryStatus, string> = {
 export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
   open: "Aberta",
   closed: "Fechada",
+  partial: "Paga em parte",
   overdue: "Atrasada",
   paid: "Paga",
   empty: "Sem compras",
