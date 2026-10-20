@@ -286,7 +286,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     <Avatar
                       name={currentTenantName}
                       bg={currentTenant?.avatarBg ?? "var(--tone-green-bg)"}
-                      color={currentTenant?.avatarColor ?? "var(--tone-green)"}
+                      color={currentTenant?.avatarColor ?? "var(--tone-green-text)"}
                       size={22}
                     />
                     {currentTenantName}

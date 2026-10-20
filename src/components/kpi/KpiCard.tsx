@@ -10,6 +10,7 @@ export function KpiCard({
   highlight = false,
   valueColor,
   definition,
+  delta,
 }: {
   label: string;
   value: string;
@@ -19,6 +20,8 @@ export function KpiCard({
   valueColor?: string;
   /** Como o número é calculado — botão "?" (toque, teclado e mouse). */
   definition?: string;
+  /** Variação contra o período anterior (só com período filtrado). `good` decide a cor. */
+  delta?: { text: string; good: boolean | null };
 }) {
   return (
     <div
@@ -41,6 +44,19 @@ export function KpiCard({
         {value}
       </div>
       <div className={styles.hint}>{hint}</div>
+      {delta && (
+        <div
+          className={
+            delta.good === null
+              ? styles.delta
+              : delta.good
+                ? `${styles.delta} ${styles.deltaGood}`
+                : `${styles.delta} ${styles.deltaBad}`
+          }
+        >
+          {delta.text}
+        </div>
+      )}
     </div>
   );
 }

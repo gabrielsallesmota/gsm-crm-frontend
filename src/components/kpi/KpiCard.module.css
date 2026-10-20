@@ -52,3 +52,18 @@
   color: var(--muted-2);
   margin-top: 2px;
 }
+
+.delta {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.deltaGood {
+  color: var(--tone-green-text, var(--tone-green));
+}
+
+.deltaBad {
+  color: var(--tone-red-text, var(--tone-red));
+}

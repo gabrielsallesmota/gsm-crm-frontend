@@ -17,6 +17,10 @@ const ProspectDashboardSection = lazy(() =>
     default: m.ProspectDashboardSection,
   })),
 );
+import { AttentionPanel } from "../components/dashboard/AttentionPanel";
+import { OwnerRanking } from "../components/dashboard/OwnerRanking";
+import { useTeamDirectory } from "../hooks/useTeamDirectory";
+import type { DashboardMetrics } from "../types/dashboard";
 import { shortCurrency } from "../utils/currency";
 import { EMPTY_PERIOD, type Period } from "../utils/periods";
 import { useAuth } from "../hooks/useAuth";
@@ -31,6 +35,44 @@ const SOURCE_FILTER_LABEL: Record<SourceFilter, string> = {
   ativo: "Ativo (prospecção)",
   passivo: "Passivo (leads)",
 };
+
+type Delta = { text: string; good: boolean | null };
+const VS = "vs período anterior";
+
+/** Variação de uma contagem contra o período anterior; `upIsGood=false` para o que não se quer (perdidos). */
+function countDelta(current: number, previous: number, upIsGood = true): Delta {
+  const diff = current - previous;
+  if (diff === 0) return { text: `= igual ${VS}`, good: null };
+  return { text: `${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)} ${VS}`, good: diff > 0 === upIsGood };
+}
+
+function pointsDelta(current: number, previous: number): Delta {
+  const diff = current - previous;
+  if (diff === 0) return { text: `= igual ${VS}`, good: null };
+  return { text: `${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)} p.p. ${VS}`, good: diff > 0 };
+}
+
+function moneyDelta(current: number, previous: number): Delta {
+  const diff = Math.round(current - previous);
+  if (diff === 0) return { text: `= igual ${VS}`, good: null };
+  return {
+    text: `${diff > 0 ? "▲" : "▼"} R$ ${shortCurrency(Math.abs(diff))} ${VS}`,
+    good: diff > 0,
+  };
+}
+
+/** Deltas só existem com período filtrado (o backend não manda `previous` sem ele). */
+function deltasOf(data: DashboardMetrics) {
+  const p = data.previous;
+  if (!p) return {};
+  return {
+    total: countDelta(data.totalLeads, p.totalLeads),
+    closed: countDelta(data.closed, p.closed),
+    lost: countDelta(data.lost, p.lost, false),
+    conversion: pointsDelta(data.conversionRate, p.conversionRate),
+    revenue: moneyDelta(data.closedRevenue, p.closedRevenue),
+  };
+}
 
 const PASSIVO_BADGE = { label: "Passivo", color: "var(--tone-blue)", bg: "var(--tone-blue-bg)" };
 
@@ -111,6 +153,8 @@ const KPI_DEFINITIONS = {
   closeTime:
     "Média de dias entre a criação e a última mudança de etapa dos leads ganhos. Sem ganhos = indisponível.",
   open: "Leads em etapas que não são de ganho nem de perda.",
+  stalled:
+    "Leads em andamento sem nenhuma interação há 7 dias ou mais (ou nunca contatados, contando da criação). Vale a carteira inteira, não só o período filtrado.",
   lost: "Leads que estão numa etapa marcada como PERDA.",
 } as const;
 
@@ -126,6 +170,7 @@ function LeadsDashboardSection({
   const { user } = useAuth();
   const ownOnly = !can(user, "leads.viewAll");
   const { data: pipelines } = usePipelines();
+  const { data: team } = useTeamDirectory();
   const [pipelineId, setPipelineId] = useState("");
   const { data, loading, error, reload } = useDashboard(period, pipelineId || undefined);
   const scopeHint = ownOnly ? "seus leads" : "toda a equipe";
@@ -134,6 +179,16 @@ function LeadsDashboardSection({
   // falta para o dashboard ganhar vida. Com filtro de período, "vazio" é
   // só "nada neste período".
   const empty = data !== null && data.totalLeads === 0;
+  const deltas = data ? deltasOf(data) : {};
+  const att = data?.attention;
+  const hasPending =
+    !!att &&
+    att.tasksOverdue +
+      att.tasksToday +
+      att.stalledLeads +
+      att.clientsOverdue +
+      att.renewalsNext30Days >
+      0;
 
   return (
     <div>
@@ -193,11 +248,21 @@ function LeadsDashboardSection({
           }
           actions={[
             { label: "Adicionar lead", to: `${ROUTES.leads}?novo=1` },
-            ...(ownOnly ? [] : [{ label: "Importar planilha", to: `${ROUTES.pipeline}?importar=1` }]),
+            ...(ownOnly
+              ? []
+              : [{ label: "Importar planilha", to: `${ROUTES.pipeline}?importar=1` }]),
             ...(can(user, "integrations.manage")
               ? [{ label: "Conectar site ou WhatsApp", to: ROUTES.integracoes }]
               : []),
           ]}
+        />
+      )}
+
+      {data && (!empty || hasPending) && (
+        <AttentionPanel
+          attention={data.attention}
+          stalled={data.stalled}
+          scope={ownOnly ? "seus" : "da equipe"}
         />
       )}
 
@@ -208,6 +273,7 @@ function LeadsDashboardSection({
               label="Total de leads"
               value={String(data.totalLeads)}
               hint="no recorte"
+              {...(deltas.total ? { delta: deltas.total } : {})}
               definition={KPI_DEFINITIONS.total}
               icon="leads"
               highlight
@@ -238,6 +304,7 @@ function LeadsDashboardSection({
               label="Negócios ganhos"
               value={String(data.closed)}
               hint="em etapa de ganho"
+              {...(deltas.closed ? { delta: deltas.closed } : {})}
               definition={KPI_DEFINITIONS.closed}
               icon="closed"
               valueColor="var(--tone-green)"
@@ -246,6 +313,7 @@ function LeadsDashboardSection({
               label="Taxa de conversão"
               value={data.totalLeads > 0 ? `${data.conversionRate}%` : "—"}
               hint={data.totalLeads > 0 ? "ganhos / total" : "sem leads no recorte"}
+              {...(deltas.conversion ? { delta: deltas.conversion } : {})}
               definition={KPI_DEFINITIONS.conversion}
               icon="conversion"
               valueColor="var(--tone-amber)"
@@ -261,7 +329,12 @@ function LeadsDashboardSection({
             <KpiCard
               label="Receita ganha"
               value={`R$ ${shortCurrency(data.closedRevenue)}`}
-              hint="valor dos ganhos"
+              hint={
+                data.wonWithoutValue > 0
+                  ? `valor dos ganhos · ${data.wonWithoutValue} sem valor`
+                  : "valor dos ganhos"
+              }
+              {...(deltas.revenue ? { delta: deltas.revenue } : {})}
               definition={KPI_DEFINITIONS.closedRevenue}
               icon="revenue"
               highlight
@@ -285,10 +358,28 @@ function LeadsDashboardSection({
               label="Perdidos"
               value={String(data.lost)}
               hint="em etapa de perda"
+              {...(deltas.lost ? { delta: deltas.lost } : {})}
               definition={KPI_DEFINITIONS.lost}
               icon="lost"
             />
+            <KpiCard
+              label="Leads parados"
+              value={String(data.attention.stalledLeads)}
+              hint="em aberto, sem contato há 7+ dias"
+              definition={KPI_DEFINITIONS.stalled}
+              icon="open"
+              {...(data.attention.stalledLeads > 0 ? { valueColor: "var(--tone-amber)" } : {})}
+            />
           </div>
+
+          {data.openWithoutValue > 0 && (
+            <p className={styles.dataNote} role="note">
+              <strong>{data.openWithoutValue}</strong>{" "}
+              {data.openWithoutValue === 1 ? "lead em andamento está" : "leads em andamento estão"}{" "}
+              sem valor: a <em>Receita prevista</em> os conta como R$ 0. Preencha o valor esperado
+              no cadastro do lead para a previsão refletir a carteira inteira.
+            </p>
+          )}
 
           <div className={styles.chartsGrid}>
             <WeekBarChart series={data.weekSeries} />
@@ -298,6 +389,8 @@ function LeadsDashboardSection({
           <div className={styles.funnelRow}>
             <SalesFunnel funnel={data.funnel} />
           </div>
+
+          {!ownOnly && <OwnerRanking owners={data.owners} team={team ?? []} />}
         </>
       )}
     </div>

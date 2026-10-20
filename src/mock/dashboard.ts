@@ -1,5 +1,6 @@
 import type { Lead } from "../types/lead";
-import type { DashboardMetrics } from "../types/dashboard";
+import { NO_ATTENTION, type DashboardMetrics } from "../types/dashboard";
+import { shortCurrency } from "../utils/currency";
 import type { PipelineStage } from "../types/pipeline";
 import { ORIGIN, ORIGIN_KEYS } from "../constants/origins";
 import { daysSince, isToday, weekdayShortLabel } from "../utils/dates";
@@ -63,6 +64,8 @@ export function computeDashboardMetrics(leads: Lead[], stages: PipelineStage[]):
       count,
       widthPct: total ? Math.max(6, Math.round((count / total) * 100)) + "%" : "0%",
       pct: total ? Math.round((count / total) * 100) + "%" : "0%",
+      valueLabel: `R$ ${shortCurrency(leads.filter((l) => l.stageId === stage.id).reduce((s, l) => s + l.value, 0))}`,
+      withoutValue: leads.filter((l) => l.stageId === stage.id && !l.value).length,
     };
   });
 
@@ -81,5 +84,11 @@ export function computeDashboardMetrics(leads: Lead[], stages: PipelineStage[]):
     originLegend,
     funnel,
     weekSeries,
+    openWithoutValue: open.filter((l) => !l.value).length,
+    wonWithoutValue: closed.filter((l) => !l.value).length,
+    stalled: [],
+    owners: [],
+    previous: null,
+    attention: NO_ATTENTION,
   };
 }

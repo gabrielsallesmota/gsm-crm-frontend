@@ -4,6 +4,8 @@ import type { Period } from "../../utils/periods";
 import { apiRequest } from "./ApiClient";
 import { originOf } from "../../constants/origins";
 import { isToday, weekdayShortLabel } from "../../utils/dates";
+import { shortCurrency } from "../../utils/currency";
+import { NO_ATTENTION } from "../../types/dashboard";
 
 interface OriginBreakdownDto {
   origin: string;
@@ -17,6 +19,8 @@ interface FunnelStageDto {
   color: string;
   count: number;
   pct: number;
+  value?: number;
+  without_value?: number;
 }
 
 interface WeekBarDto {
@@ -24,7 +28,37 @@ interface WeekBarDto {
   count: number;
 }
 
-interface DashboardMetricsDto {
+interface DashboardExtrasDto {
+  open_without_value?: number;
+  won_without_value?: number;
+  stalled?: { lead_id: string; name: string; days: number }[];
+  owner_breakdown?: {
+    owner_id: string | null;
+    total: number;
+    open: number;
+    closed: number;
+    lost: number;
+    closed_revenue: number;
+  }[];
+  previous?: {
+    date_from: string;
+    date_to: string;
+    total_leads: number;
+    closed: number;
+    lost: number;
+    conversion_rate: number;
+    closed_revenue: number;
+  } | null;
+  attention?: {
+    tasks_overdue: number;
+    tasks_today: number;
+    stalled_leads: number;
+    renewals_next_30_days: number;
+    clients_overdue: number;
+  };
+}
+
+interface DashboardMetricsDto extends DashboardExtrasDto {
   pipeline_id: string | null;
   total_leads: number;
   today: number;
@@ -69,6 +103,8 @@ function toFunnel(stages: FunnelStageDto[], totalLeads: number): DashboardMetric
     // menos 6% de largura (mesmo com 0 leads nela) para continuar visível.
     widthPct: totalLeads > 0 ? `${Math.max(6, Math.round(stage.pct))}%` : "0%",
     pct: pctLabel(stage.pct),
+    valueLabel: `R$ ${shortCurrency(Math.round(stage.value ?? 0))}`,
+    withoutValue: stage.without_value ?? 0,
   }));
 }
 
@@ -104,6 +140,38 @@ function toDashboardMetrics(dto: DashboardMetricsDto): DashboardMetrics {
     originLegend: toOriginLegend(dto.origin_breakdown),
     funnel: toFunnel(dto.funnel, dto.total_leads),
     weekSeries: toWeekSeries(dto.week_series),
+    // API antiga (deploy do front antes do back): campos novos ausentes = sem informação, não zero inventado.
+    openWithoutValue: dto.open_without_value ?? 0,
+    wonWithoutValue: dto.won_without_value ?? 0,
+    stalled: (dto.stalled ?? []).map((s) => ({ id: s.lead_id, name: s.name, days: s.days })),
+    owners: (dto.owner_breakdown ?? []).map((o) => ({
+      ownerId: o.owner_id,
+      total: o.total,
+      open: o.open,
+      closed: o.closed,
+      lost: o.lost,
+      closedRevenue: o.closed_revenue,
+    })),
+    previous: dto.previous
+      ? {
+          dateFrom: dto.previous.date_from,
+          dateTo: dto.previous.date_to,
+          totalLeads: dto.previous.total_leads,
+          closed: dto.previous.closed,
+          lost: dto.previous.lost,
+          conversionRate: Math.round(dto.previous.conversion_rate),
+          closedRevenue: dto.previous.closed_revenue,
+        }
+      : null,
+    attention: dto.attention
+      ? {
+          tasksOverdue: dto.attention.tasks_overdue,
+          tasksToday: dto.attention.tasks_today,
+          stalledLeads: dto.attention.stalled_leads,
+          renewalsNext30Days: dto.attention.renewals_next_30_days,
+          clientsOverdue: dto.attention.clients_overdue,
+        }
+      : NO_ATTENTION,
   };
 }
 

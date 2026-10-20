@@ -23,7 +23,22 @@ export function SalesFunnel({
                 {stage.count}
               </div>
             </div>
-            <div className={styles.pct}>{stage.pct}</div>
+            <div className={styles.pct}>
+              {stage.pct}
+              {stage.valueLabel && (
+                <span
+                  className={styles.value}
+                  title={
+                    stage.withoutValue
+                      ? `${stage.withoutValue} lead(s) sem valor informado entram como R$ 0`
+                      : undefined
+                  }
+                >
+                  {stage.valueLabel}
+                  {stage.withoutValue ? "*" : ""}
+                </span>
+              )}
+            </div>
           </div>
         ))}
       </div>

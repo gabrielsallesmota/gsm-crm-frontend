@@ -62,9 +62,27 @@
 
 .kpiGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
+  /* 12 indicadores: 4 colunas (3 linhas cheias) no desktop, 3 no tablet, 2 no celular. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 13px;
   margin-bottom: 16px;
+}
+
+@media (max-width: 1000px) {
+  .kpiGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.dataNote {
+  margin: -4px 0 16px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--tone-amber);
+  background: var(--tone-amber-bg);
+  color: var(--text);
+  border-radius: 0 var(--radius-input) var(--radius-input) 0;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .chartsGrid {
