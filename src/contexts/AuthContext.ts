@@ -2,6 +2,7 @@ import { createContext } from "react";
 import type {
   AuthUser,
   ChangePasswordInput,
+  UpdateProfileInput,
   LoginInput,
   RequestPasswordResetInput,
   ResetPasswordInput,
@@ -41,6 +42,8 @@ export interface AuthContextValue {
   requestPasswordReset: (input: RequestPasswordResetInput) => Promise<void>;
   confirmPasswordReset: (input: ResetPasswordInput) => Promise<void>;
   changePassword: (input: ChangePasswordInput) => Promise<void>;
+  /** Completar o cadastro (telefone) e atualizar o usuário da sessão. */
+  updateProfile: (input: UpdateProfileInput) => Promise<void>;
   // --- Sessão de suporte (Etapa 2) — só platform staff ---
   /** Abre uma sessão de SUPORTE (somente leitura) no tenant do cliente. A
    * sessão real do staff fica guardada à parte e volta ao encerrar. */

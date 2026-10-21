@@ -15,6 +15,7 @@ import { activeNavTarget, navSections } from "./navigation";
 import { DEFAULT_BRAND } from "../config/brand";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { SupportBanner } from "../components/common/SupportBanner";
+import { CompleteProfileModal } from "../components/common/CompleteProfileModal";
 import styles from "./AppLayout.module.css";
 
 function roleLabel(user: AuthUser | null): string | undefined {
@@ -313,6 +314,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
+      <CompleteProfileModal />
       <ToastHost />
     </div>
   );

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type {
   AuthUser,
   ChangePasswordInput,
+  UpdateProfileInput,
   LoginInput,
   RequestPasswordResetInput,
   ResetPasswordInput,
@@ -386,6 +387,17 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     return authService.changePassword(input);
   }, []);
 
+  const updateProfile = useCallback(
+    async (input: UpdateProfileInput) => {
+      await authService.updateProfile(input);
+      if (!tokens) return;
+      const fresh = await authService.me(tokens.accessToken); // telefone já normalizado pelo servidor
+      setUser(fresh);
+      saveStoredSession({ user: fresh, tokens });
+    },
+    [tokens],
+  );
+
   const tenants = isDemoMode ? mockTenants : EMPTY_TENANTS;
   const currentTenant = isDemoMode ? mockTenants.find((t) => t.id === currentTenantId) : undefined;
   const currentTenantName = isDemoMode
@@ -411,6 +423,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       requestPasswordReset,
       confirmPasswordReset,
       changePassword,
+      updateProfile,
       startImpersonation,
       elevateImpersonation,
       endImpersonation,
@@ -432,6 +445,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       requestPasswordReset,
       confirmPasswordReset,
       changePassword,
+      updateProfile,
       startImpersonation,
       elevateImpersonation,
       endImpersonation,

@@ -25,9 +25,16 @@ export interface AuthUser {
    * Esconder menu é só UX: o backend recusa (403) o que não foi contratado. */
   features?: Record<string, boolean>;
   tenantName?: string | null;
+  /** Telefone de contato (`+5511...`); vazio/ausente = cadastro incompleto (a UI pede no 1º acesso). */
+  phone?: string | null;
   /** Preenchido só quando esta sessão é uma sessão de SUPORTE da GSM
    * (impersonation). */
   impersonation?: ImpersonationInfo | null;
+}
+
+/** Completar o cadastro (PATCH /auth/me). */
+export interface UpdateProfileInput {
+  phone: string;
 }
 
 export type ImpersonationMode = "read_only" | "write";

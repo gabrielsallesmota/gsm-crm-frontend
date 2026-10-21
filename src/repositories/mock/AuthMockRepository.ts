@@ -2,6 +2,7 @@ import type { AuthRepository } from "../AuthRepository";
 import type {
   AuthUser,
   ChangePasswordInput,
+  UpdateProfileInput,
   LoginOutcome,
   LoginInput,
   RequestPasswordResetInput,
@@ -112,6 +113,10 @@ export class AuthMockRepository implements AuthRepository {
   }
 
   async changePassword(_input: ChangePasswordInput): Promise<void> {
+    await delay(200);
+  }
+
+  async updateProfile(_input: UpdateProfileInput): Promise<void> {
     await delay(200);
   }
 }

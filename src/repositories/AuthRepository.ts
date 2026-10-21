@@ -8,6 +8,7 @@ import type {
   SelectTenantInput,
   Session,
   TenantOption,
+  UpdateProfileInput,
 } from "../types/auth";
 
 export interface AuthRepository {
@@ -26,4 +27,5 @@ export interface AuthRepository {
   requestPasswordReset(input: RequestPasswordResetInput): Promise<void>;
   confirmPasswordReset(input: ResetPasswordInput): Promise<void>;
   changePassword(input: ChangePasswordInput): Promise<void>;
+  updateProfile(input: UpdateProfileInput): Promise<void>;
 }

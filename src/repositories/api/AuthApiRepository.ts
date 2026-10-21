@@ -9,6 +9,7 @@ import type {
   SelectTenantInput,
   Session,
   TenantOption,
+  UpdateProfileInput,
 } from "../../types/auth";
 import { apiRequest } from "./ApiClient";
 
@@ -43,6 +44,7 @@ interface UserResponseDto {
   is_platform_staff: boolean;
   features?: Record<string, boolean>;
   tenant_name?: string | null;
+  phone?: string | null;
   impersonation?: {
     session_id: string;
     mode: string;
@@ -74,6 +76,7 @@ function toAuthUser(dto: UserResponseDto): AuthUser {
     isPlatformStaff: dto.is_platform_staff,
     ...(dto.features ? { features: dto.features } : {}),
     tenantName: dto.tenant_name ?? null,
+    phone: dto.phone ?? null,
     impersonation: dto.impersonation
       ? {
           sessionId: dto.impersonation.session_id,
@@ -162,6 +165,13 @@ export class AuthApiRepository implements AuthRepository {
     await apiRequest<{ detail: string }>("/api/v1/auth/reset-password", {
       method: "POST",
       body: JSON.stringify({ token: input.token, new_password: input.newPassword }),
+    });
+  }
+
+  async updateProfile(input: UpdateProfileInput): Promise<void> {
+    await apiRequest<{ detail: string }>("/api/v1/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify({ phone: input.phone }),
     });
   }
 

@@ -5,6 +5,7 @@ import { selectRepository } from "./factory";
 import type {
   AuthUser,
   ChangePasswordInput,
+  UpdateProfileInput,
   LoginInput,
   LoginOutcome,
   RequestPasswordResetInput,
@@ -55,6 +56,10 @@ export class AuthService {
 
   changePassword(input: ChangePasswordInput): Promise<void> {
     return repo.changePassword(input);
+  }
+
+  updateProfile(input: UpdateProfileInput): Promise<void> {
+    return repo.updateProfile(input);
   }
 }
 

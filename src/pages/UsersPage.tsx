@@ -5,7 +5,8 @@ import { EmptyState } from "../components/common/EmptyState";
 import { HelpTip } from "../components/common/HelpTip";
 import { SkeletonRows } from "../components/common/Skeleton";
 import { usePageTitle } from "../hooks/usePageTitle";
-import { emailError } from "../utils/validation";
+import { formatPhone } from "../utils/phone";
+import { emailError, phoneError } from "../utils/validation";
 import { Avatar } from "../components/common/Avatar";
 import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
@@ -220,6 +221,8 @@ function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: (
   const { toast, toastError } = useToast();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
   const [role, setRole] = useState<UserRole>("vendedor");
   const [useTempPassword, setUseTempPassword] = useState(false);
   const [password, setPassword] = useState("");
@@ -228,7 +231,8 @@ function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: (
   const passwordOk = !useTempPassword || password.length >= MIN_PASSWORD_LENGTH;
   const emailProblem = emailError(email, { required: true });
   const [emailTouched, setEmailTouched] = useState(false);
-  const valid = name.trim().length > 0 && !emailProblem && passwordOk;
+  const phoneProblem = phoneError(phone, { required: true });
+  const valid = name.trim().length > 0 && !emailProblem && !phoneProblem && passwordOk;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -238,6 +242,7 @@ function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: (
       const result = await create({
         name: name.trim(),
         email: email.trim(),
+        phone,
         role,
         ...(useTempPassword ? { password } : {}),
       });
@@ -301,6 +306,29 @@ function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: (
           {emailTouched && emailProblem && (
             <span id="invite-email-error" className={form.error}>
               {emailProblem}
+            </span>
+          )}
+        </label>
+        <label className={form.field}>
+          <span className={form.label}>
+            Telefone / WhatsApp <span aria-hidden="true">*</span>
+          </span>
+          <input
+            className={form.input}
+            type="tel"
+            inputMode="tel"
+            autoComplete="off"
+            required
+            placeholder="(11) 91234-5678"
+            value={phone}
+            onChange={(e) => setPhone(formatPhone(e.target.value))}
+            onBlur={() => setPhoneTouched(true)}
+            aria-invalid={phoneTouched && Boolean(phoneProblem)}
+            aria-describedby={phoneTouched && phoneProblem ? "invite-phone-error" : undefined}
+          />
+          {phoneTouched && phoneProblem && (
+            <span id="invite-phone-error" className={form.error}>
+              {phoneProblem}
             </span>
           )}
         </label>

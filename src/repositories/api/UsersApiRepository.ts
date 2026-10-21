@@ -79,6 +79,7 @@ export class UsersApiRepository implements UsersRepository {
         name: input.name,
         email: input.email,
         role: input.role,
+        phone: input.phone || undefined,
         // Sem senha = convite por e-mail (o backend gera o link de primeiro acesso).
         password: input.password || undefined,
       }),

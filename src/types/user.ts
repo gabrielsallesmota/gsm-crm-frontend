@@ -31,6 +31,8 @@ export interface CreateUserInput {
   email: string;
   role: UserRole;
   password?: string;
+  /** Telefone de contato (DDD + número). */
+  phone?: string;
 }
 
 export interface CreateUserResult {
