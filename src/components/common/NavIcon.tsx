@@ -27,6 +27,8 @@ const PATHS = {
   // Integrações (Etapa 3) — plugue/conector.
   integrations: "M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v4",
   // Control plane da GSM (Etapa 2) — escudo.
+  // GSM Private Trading — linha de tendência.
+  trading: "M3 17l6-6 4 4 8-8M15 7h6v6",
   platform: "M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3zM9 12l2 2 4-4",
 };
 

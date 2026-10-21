@@ -47,6 +47,7 @@ const ProfilePage = lazyPage(() => import("../pages/ProfilePage"), "ProfilePage"
 
 const ClientsPage = lazyPage(() => import("../pages/ClientsPage"), "ClientsPage");
 const FinancePage = lazyPage(() => import("../pages/FinancePage"), "FinancePage");
+const TradingPage = lazyPage(() => import("../pages/TradingPage"), "TradingPage");
 const SdrCampaignsPage = lazyPage(() => import("../pages/SdrCampaignsPage"), "SdrCampaignsPage");
 const SdrCampaignFormPage = lazyPage(
   () => import("../pages/SdrCampaignFormPage"),
@@ -157,6 +158,7 @@ export const router = createBrowserRouter([
       { path: ROUTES.clientes, element: contracted("clients", <ClientsPage />) },
       { path: `${ROUTES.clientes}/:id`, element: contracted("clients", <ClientsPage />) },
       { path: ROUTES.financeiro, element: internal(<FinancePage />) },
+      { path: ROUTES.trading, element: internal(<TradingPage />) },
       { path: ROUTES.sdrCampanhas, element: internal(<SdrCampaignsPage />) },
       { path: ROUTES.sdrCampanhaNova, element: internal(<SdrCampaignFormPage />) },
       { path: `${ROUTES.sdrCampanhas}/:id`, element: internal(<SdrCampaignFormPage />) },

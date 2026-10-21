@@ -1,0 +1,25 @@
+.page { display: flex; flex-direction: column; gap: 16px; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.title { margin: 0; font-size: 1.35rem; }
+.sub { margin: 0; color: var(--color-text-muted, #667); font-size: 0.85rem; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--color-border, #ccd); }
+.tab { appearance: none; background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 12px; font: inherit; cursor: pointer; color: inherit; }
+.tab[aria-selected="true"] { border-bottom-color: var(--color-primary, #0f766e); font-weight: 600; }
+.tab:disabled { opacity: 0.5; cursor: not-allowed; }
+.card { border: 1px solid var(--color-border, #ccd); border-radius: 10px; padding: 14px; background: var(--color-surface, transparent); }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.kpi { display: flex; flex-direction: column; gap: 2px; }
+.kpiValue { font-size: 1.3rem; font-weight: 700; }
+.kpiLabel { font-size: 0.78rem; color: var(--color-text-muted, #667); }
+.alert { border-left: 4px solid #b3261e; padding: 10px 12px; border-radius: 6px; background: rgba(179, 38, 30, 0.1); }
+.warn { border-left: 4px solid #8a5a00; padding: 10px 12px; border-radius: 6px; background: rgba(138, 90, 0, 0.1); }
+.ok { border-left: 4px solid #17683b; padding: 10px 12px; border-radius: 6px; background: rgba(23, 104, 59, 0.1); }
+.bar { height: 10px; border-radius: 6px; background: rgba(120, 120, 140, 0.25); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--color-primary, #0f766e); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; }
+.form input, .form select, .field { font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--color-border, #ccd); background: transparent; color: inherit; }
+.table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.table th, .table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--color-border, #ccd); vertical-align: top; }
+.muted { color: var(--color-text-muted, #667); }

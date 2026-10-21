@@ -14,6 +14,7 @@ import { roleLabel as labelForRole } from "../auth/permissions";
 import { activeNavTarget, navSections } from "./navigation";
 import { DEFAULT_BRAND } from "../config/brand";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { useTradingAccess } from "../hooks/useTradingAccess";
 import { SupportBanner } from "../components/common/SupportBanner";
 import styles from "./AppLayout.module.css";
 
@@ -35,7 +36,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const sections = navSections(user);
+  const tradingAccess = useTradingAccess(user);
+  const sections = navSections(user, tradingAccess);
   const activeTo = activeNavTarget(sections.flatMap((s) => s.items), location.pathname);
   const { toastError } = useToast();
   // Sidebar em telas estreitas vira drawer off-canvas (ver media query em

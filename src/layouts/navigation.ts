@@ -29,7 +29,8 @@ export type NavIconName =
   | "clients"
   | "finance"
   | "prospects"
-  | "platform";
+  | "platform"
+  | "trading";
 
 export interface NavItem {
   to: string;
@@ -39,6 +40,8 @@ export interface NavItem {
   feature?: TenantFeature;
   /** Basta UMA destas features (ex.: Integrações = API ou Webhooks). */
   anyFeature?: TenantFeature[];
+  /** Só aparece se o BACKEND confirmou a permissão (ex.: trading:admin) — não revela o módulo. */
+  requiresTrading?: boolean;
 }
 
 export interface NavSection {
@@ -69,21 +72,23 @@ export const CRM_NAV: NavItem[] = [
 export const GSM_NAV: NavItem[] = [
   { to: ROUTES.sdrDashboard, icon: "prospects", label: "SDR", permission: "platform.internal" },
   { to: ROUTES.financeiro, icon: "finance", label: "Financeiro", permission: "platform.internal" },
+  { to: ROUTES.trading, icon: "trading", label: "Trading", permission: "platform.internal", requiresTrading: true },
   { to: ROUTES.platform, icon: "platform", label: "Plataforma GSM", permission: "platform.console" },
 ];
 
 type Principal = AuthUser | null | undefined;
 
-export function isNavItemVisible(user: Principal, item: NavItem): boolean {
+export function isNavItemVisible(user: Principal, item: NavItem, tradingAccess = false): boolean {
+  if (item.requiresTrading && !tradingAccess) return false;
   if (item.permission && !can(user, item.permission)) return false;
   if (item.feature && !hasFeature(user, item.feature)) return false;
   if (item.anyFeature && !item.anyFeature.some((f) => hasFeature(user, f))) return false;
   return true;
 }
 
-export function navSections(user: Principal): NavSection[] {
-  const crm = CRM_NAV.filter((i) => isNavItemVisible(user, i));
-  const gsm = GSM_NAV.filter((i) => isNavItemVisible(user, i));
+export function navSections(user: Principal, tradingAccess = false): NavSection[] {
+  const crm = CRM_NAV.filter((i) => isNavItemVisible(user, i, tradingAccess));
+  const gsm = GSM_NAV.filter((i) => isNavItemVisible(user, i, tradingAccess));
   const sections: NavSection[] = [{ id: "crm", title: null, items: crm }];
   if (gsm.length > 0) sections.push({ id: "gsm", title: "Área interna GSM", items: gsm });
   return sections;
