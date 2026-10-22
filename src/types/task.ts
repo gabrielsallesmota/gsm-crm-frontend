@@ -31,12 +31,19 @@ export interface Task {
   /** Tarefa ligada a um cliente/contrato (ex.: "Renovação — cliente"). */
   clientId?: string | null;
   contractId?: string | null;
+  /** Tarefa do time: sem responsável único; qualquer membro conclui e vale para todos. */
+  teamWide?: boolean;
+  createdByName?: string | null;
+  /** Quem marcou como feita (relevante nas tarefas do time). */
+  completedByName?: string | null;
 }
 
 export interface TaskListQuery {
   scope: TaskScope;
   leadId?: string;
   assigneeUserId?: string;
+  /** `true` = só as do time; `false` = só as individuais; ausente = todas. */
+  team?: boolean;
   source?: ItemSource;
   page?: number;
   pageSize?: number;
@@ -52,6 +59,8 @@ export interface CreateTaskInput {
   description?: string;
   /** Omitido = quem cria vira o responsável. */
   assigneeUserId?: string;
+  /** Tarefa do time (não combina com responsável). */
+  teamWide?: boolean;
 }
 
 export interface UpdateTaskInput {

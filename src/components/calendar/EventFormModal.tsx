@@ -6,6 +6,8 @@ import { PublishTargetSelect } from "../connections/PublishTargetSelect";
 import { connectionsService } from "../../services/ConnectionsService";
 import { useCalendarActions } from "../../hooks/useCalendarActions";
 import { useToast } from "../../hooks/useToast";
+import { useTeamDirectory } from "../../hooks/useTeamDirectory";
+import { useAuth } from "../../hooks/useAuth";
 import { browserTimeZone, defaultDueInput, isoToLocalInput, localInputToIso } from "../../utils/datetime";
 import type { CalEvent, CalEventType } from "../../types/event";
 import form from "../common/Form.module.css";
@@ -29,6 +31,8 @@ export function EventFormModal({
 }) {
   const { create, update } = useCalendarActions();
   const { toast, toastError } = useToast();
+  const { user } = useAuth();
+  const { data: team } = useTeamDirectory();
   const [lead, setLead] = useState<PickedLead | null>(
     fixedLead ?? (event?.leadId ? { id: event.leadId, name: event.leadName ?? "—" } : null),
   );
@@ -37,6 +41,8 @@ export function EventFormModal({
   const [at, setAt] = useState(
     event ? isoToLocalInput(event.at) : initialAt ? isoToLocalInput(initialAt.toISOString()) : defaultDueInput(),
   );
+  // Vazio = fica só comigo; escolher outra pessoa atrela e avisa ela.
+  const [assignee, setAssignee] = useState(event?.assigneeUserId ?? "");
   const [saving, setSaving] = useState(false);
   const [target, setTarget] = useState("");
   // Uma chave por abertura do formulário: reenviar não cria outro evento.
@@ -53,7 +59,12 @@ export function EventFormModal({
     try {
       let saved: CalEvent | null = null;
       if (event) {
-        saved = await update(event.id, { title: title.trim(), type, at: atIso });
+        saved = await update(event.id, {
+          title: title.trim(),
+          type,
+          at: atIso,
+          ...(assignee && assignee !== event.assigneeUserId ? { assigneeUserId: assignee } : {}),
+        });
       } else if (target) {
         const ends = new Date(new Date(atIso).getTime() + 60 * 60 * 1000).toISOString();
         const published = await connectionsService.publishEvent({
@@ -76,6 +87,7 @@ export function EventFormModal({
           title: title.trim(),
           type,
           at: atIso,
+          ...(assignee ? { assigneeUserId: assignee } : {}),
         });
       }
       toast(event ? "Compromisso atualizado" : "Compromisso criado");
@@ -143,6 +155,26 @@ export function EventFormModal({
             </select>
           </label>
         </div>
+        {!event?.readOnly && (
+          <label className={form.field}>
+            <span className={form.label}>Atrelar a</span>
+            <select
+              className={form.select}
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+            >
+              <option value="">Só eu</option>
+              {team
+                ?.filter((m) => m.id !== user?.id)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+            </select>
+            <span className={form.hint}>A pessoa escolhida recebe um aviso no sino do CRM.</span>
+          </label>
+        )}
         {!event && <PublishTargetSelect kind="event" value={target} onChange={setTarget} />}
         {at && atIso === null && (
           <div className={form.error} role="alert">

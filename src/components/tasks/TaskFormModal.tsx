@@ -44,6 +44,7 @@ export function TaskFormModal({
     task ? (task.dueAt ? isoToLocalInput(task.dueAt) : "") : defaultDueInput(),
   );
   const [assignee, setAssignee] = useState(task?.assigneeUserId ?? user?.id ?? "");
+  const [teamWide, setTeamWide] = useState(task?.teamWide ?? false);
   const [saving, setSaving] = useState(false);
   const [target, setTarget] = useState("");
   const [notes, setNotes] = useState(task?.description ?? "");
@@ -52,7 +53,7 @@ export function TaskFormModal({
 
   const dueIso = localInputToIso(due);
   // Tarefa de lead exige vencimento; a pessoal (sem lead) pode ficar sem data.
-  const personal = !lead;
+  const personal = !lead && !teamWide;
   const dueOk = personal ? due === "" || dueIso !== null : dueIso !== null;
   const valid = title.trim().length > 0 && dueOk;
 
@@ -67,7 +68,7 @@ export function TaskFormModal({
           title: title.trim(),
           priority,
           ...(dueIso ? { dueAt: dueIso } : {}),
-          ...(assignee && task.leadId ? { assigneeUserId: assignee } : {}),
+          ...(assignee && task.leadId && !task.teamWide ? { assigneeUserId: assignee } : {}),
         });
       } else if (target) {
         const published = await connectionsService.publishTask({
@@ -91,7 +92,8 @@ export function TaskFormModal({
           priority,
           ...(dueIso ? { dueAt: dueIso } : {}),
           ...(notes.trim() ? { description: notes.trim() } : {}),
-          ...(lead && assignee ? { assigneeUserId: assignee } : {}),
+          ...(lead && !teamWide && assignee ? { assigneeUserId: assignee } : {}),
+          ...(teamWide ? { teamWide: true } : {}),
         });
       }
       toast(task ? "Tarefa atualizada" : "Tarefa criada");
@@ -115,9 +117,25 @@ export function TaskFormModal({
           <span className={form.label}>Lead</span>
           <LeadPicker value={lead} onChange={setLead} disabled={!!fixedLead || !!task} />
           {!lead && !task && (
-            <span className={form.hint}>Sem lead, a tarefa é pessoal (só você vê).</span>
+            <span className={form.hint}>
+              {teamWide
+                ? "Sem lead, a tarefa fica avulsa para o time todo."
+                : "Sem lead, a tarefa é pessoal (só você vê)."}
+            </span>
           )}
         </div>
+        {!task && (
+          <label className={form.check}>
+            <input
+              type="checkbox"
+              checked={teamWide}
+              onChange={(e) => setTeamWide(e.target.checked)}
+            />
+            <span>
+              Tarefa do time — todos veem e, quando alguém marcar como feita, vale para todos
+            </span>
+          </label>
+        )}
         <label className={form.field}>
           <span className={form.label}>
             Título <span aria-hidden="true">*</span>
@@ -159,7 +177,7 @@ export function TaskFormModal({
             </select>
           </label>
         </div>
-        {lead && (
+        {lead && !teamWide && !task?.teamWide && (
         <label className={form.field}>
           <span className={form.label}>Responsável</span>
           <select

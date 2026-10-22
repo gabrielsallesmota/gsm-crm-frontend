@@ -20,6 +20,8 @@ interface CalendarEventDto {
   source?: CalEvent["source"];
   read_only?: boolean;
   external_url?: string | null;
+  assignee_user_id?: string | null;
+  assignee_name?: string | null;
 }
 
 function toCalEvent(dto: CalendarEventDto): CalEvent {
@@ -37,6 +39,8 @@ function toCalEvent(dto: CalendarEventDto): CalEvent {
     source: dto.source ?? "crm",
     readOnly: dto.read_only === true,
     externalUrl: dto.external_url ?? null,
+    assigneeUserId: dto.assignee_user_id ?? null,
+    assigneeName: dto.assignee_name ?? null,
   };
 }
 
@@ -63,6 +67,7 @@ export class CalendarApiRepository implements CalendarRepository {
         type: input.type,
         at: input.at,
         ends_at: input.endsAt,
+        assignee_user_id: input.assigneeUserId,
       }),
     });
     return toCalEvent(dto);
@@ -71,7 +76,12 @@ export class CalendarApiRepository implements CalendarRepository {
   async update(eventId: string, input: UpdateCalEventInput): Promise<CalEvent> {
     const dto = await apiRequest<CalendarEventDto>(`/api/v1/calendar/events/${eventId}`, {
       method: "PATCH",
-      body: JSON.stringify({ title: input.title, type: input.type, at: input.at }),
+      body: JSON.stringify({
+        title: input.title,
+        type: input.type,
+        at: input.at,
+        assignee_user_id: input.assigneeUserId,
+      }),
     });
     return toCalEvent(dto);
   }

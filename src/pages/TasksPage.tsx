@@ -276,8 +276,10 @@ export function TasksPage() {
                         ? "sem data"
                         : `${overdue ? "atrasada — " : ""}vence ${formatDateTime(task.dueAt)}`}
                     </span>
-                    {task.assigneeName ? ` · ${task.assigneeName}` : ""}
-                    {task.done && task.completedAt ? ` · concluída ${formatDateTime(task.completedAt)}` : ""}{" "}
+                    {task.teamWide ? " · Time (todos)" : task.assigneeName ? ` · ${task.assigneeName}` : ""}
+                    {task.done && task.completedAt
+                      ? ` · concluída ${formatDateTime(task.completedAt)}${task.completedByName ? ` por ${task.completedByName}` : ""}`
+                      : ""}{" "}
                     <SourceBadge source={task.source} url={task.externalUrl} readOnly={task.readOnly} />
                   </div>
                 </div>

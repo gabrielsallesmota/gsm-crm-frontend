@@ -41,6 +41,12 @@ export function EventDetailsModal({
             )}
           </dd>
         </div>
+        {event.assigneeName && (
+          <div>
+            <dt>Atrelado a</dt>
+            <dd>{event.assigneeName}</dd>
+          </div>
+        )}
         <div>
           <dt>Origem</dt>
           <dd>

@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { Avatar } from "../components/common/Avatar";
 import { NavIcon } from "../components/common/NavIcon";
 import { ThemeToggle } from "../components/common/ThemeToggle";
+import { NotificationBell } from "../components/common/NotificationBell";
 import { ToastHost } from "../components/common/ToastHost";
 import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import { useToast } from "../hooks/useToast";
@@ -294,6 +295,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   </span>
                 )
               )}
+              {!isDemoMode && <NotificationBell />}
               <ThemeToggle />
               <button
                 type="button"

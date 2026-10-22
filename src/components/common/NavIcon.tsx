@@ -23,6 +23,8 @@ const PATHS = {
   collapse: "M11 17l-5-5 5-5M18 17l-5-5 5-5",
   // Toggle claro/escuro (ver `ThemeToggle.tsx`).
   sun: "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
+  // Sino de avisos (ver `NotificationBell.tsx`).
+  bell: "M6 16V11a6 6 0 0 1 12 0v5l2 2H4l2-2zM10 21h4",
   moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
   // Integrações (Etapa 3) — plugue/conector.
   integrations: "M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v4",

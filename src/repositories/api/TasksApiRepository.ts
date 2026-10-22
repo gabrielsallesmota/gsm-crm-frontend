@@ -26,6 +26,9 @@ interface TaskDto {
   external_url?: string | null;
   client_id?: string | null;
   contract_id?: string | null;
+  team_wide?: boolean;
+  created_by_name?: string | null;
+  completed_by_name?: string | null;
 }
 
 function toTask(dto: TaskDto): Task {
@@ -47,6 +50,9 @@ function toTask(dto: TaskDto): Task {
     externalUrl: dto.external_url ?? null,
     clientId: dto.client_id ?? null,
     contractId: dto.contract_id ?? null,
+    teamWide: dto.team_wide === true,
+    createdByName: dto.created_by_name ?? null,
+    completedByName: dto.completed_by_name ?? null,
   };
 }
 
@@ -55,6 +61,7 @@ export class TasksApiRepository implements TasksRepository {
     const params = new URLSearchParams({ scope: query.scope });
     if (query.leadId) params.set("lead_id", query.leadId);
     if (query.assigneeUserId) params.set("assignee_user_id", query.assigneeUserId);
+    if (query.team !== undefined) params.set("team", String(query.team));
     if (query.source) params.set("source", query.source);
     params.set("page", String(query.page ?? 1));
     params.set("page_size", String(query.pageSize ?? 25));
@@ -74,6 +81,7 @@ export class TasksApiRepository implements TasksRepository {
         due_at: input.dueAt,
         assignee_user_id: input.assigneeUserId,
         description: input.description,
+        team_wide: input.teamWide,
       }),
     });
     return toTask(dto);

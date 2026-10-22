@@ -20,6 +20,9 @@ export interface CalEvent {
   readOnly?: boolean;
   /** Link para abrir o evento no provedor de origem. */
   externalUrl?: string | null;
+  /** Pessoa a quem o compromisso foi atrelado (recebe aviso). */
+  assigneeUserId?: string | null;
+  assigneeName?: string | null;
 }
 
 export interface CreateCalEventInput {
@@ -30,9 +33,11 @@ export interface CreateCalEventInput {
   /** ISO 8601 COM fuso. */
   at: string;
   endsAt?: string;
+  /** Atrela a outra pessoa da equipe (ela é avisada). */
+  assigneeUserId?: string;
 }
 
-export type UpdateCalEventInput = Partial<Pick<CreateCalEventInput, "title" | "type" | "at">>;
+export type UpdateCalEventInput = Partial<Pick<CreateCalEventInput, "title" | "type" | "at" | "assigneeUserId">>;
 
 /** Janela de datas (ISO 8601): `from` inclusivo, `to` exclusivo. */
 export interface CalendarRange {
