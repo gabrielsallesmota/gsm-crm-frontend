@@ -5,7 +5,7 @@ import { EmptyState } from "../components/common/EmptyState";
 import { HelpTip } from "../components/common/HelpTip";
 import { SkeletonRows } from "../components/common/Skeleton";
 import { usePageTitle } from "../hooks/usePageTitle";
-import { formatPhone } from "../utils/phone";
+import { formatPhone, formatPhoneDisplay } from "../utils/phone";
 import { emailError, phoneError } from "../utils/validation";
 import { Avatar } from "../components/common/Avatar";
 import { Badge } from "../components/common/Badge";
@@ -149,6 +149,7 @@ export function UsersPage() {
                     {isSelf ? " (você)" : ""}
                   </div>
                   <div className={styles.email}>{member.email}</div>
+                  <div className={styles.email}>{member.phone ? formatPhoneDisplay(member.phone) : "Sem telefone"}</div>
                 </div>
                 <div className={styles.badges}>
                   {suspended && <Badge {...SUSPENDED_BADGE} />}

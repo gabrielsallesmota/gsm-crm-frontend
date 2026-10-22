@@ -96,3 +96,16 @@ describe("convite", () => {
     expect(users.create.mock.calls[0]![0]).toMatchObject({ email: "nova@example.com", phone: "(11) 98888-7777" });
   });
 });
+
+describe("lista da equipe", () => {
+  it("mostra o telefone formatado e 'Sem telefone' para quem ainda não informou", async () => {
+    const base = { tenantId: "t1", role: "vendedor", status: "active", pendingFirstAccess: false } as const;
+    users.list.mockResolvedValue([
+      { ...base, id: "u1", name: "Com Fone", email: "com@example.com", phone: "+5511912345678" } as never,
+      { ...base, id: "u2", name: "Sem Fone", email: "sem@example.com", phone: null } as never,
+    ]);
+    renderApp(<UsersPage />, { user: ADMIN });
+    expect(await screen.findByText("(11) 91234-5678")).toBeTruthy();
+    expect(screen.getByText("Sem telefone")).toBeTruthy();
+  });
+});

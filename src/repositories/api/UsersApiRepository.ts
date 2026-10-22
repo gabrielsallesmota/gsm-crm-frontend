@@ -18,6 +18,7 @@ interface TenantMemberDto {
   role: string;
   status: string;
   pending_first_access: boolean;
+  phone?: string | null;
 }
 
 /** `POST /api/v1/users` — `UserResponse` + `invitation_sent`. */
@@ -57,6 +58,7 @@ function fromTenantMember(dto: TenantMemberDto): User {
     role: toRole(dto.role),
     status: toStatus(dto.status),
     pendingFirstAccess: dto.pending_first_access,
+    phone: dto.phone ?? null,
     ...AVATAR,
   };
 }

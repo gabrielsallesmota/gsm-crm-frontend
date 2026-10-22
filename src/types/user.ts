@@ -13,6 +13,8 @@ export interface User {
   status: MemberStatus;
   /** Convite ainda não aceito / senha temporária ainda não trocada. */
   pendingFirstAccess: boolean;
+  /** Telefone de contato (`+5511...`); ausente = ainda não informado. */
+  phone?: string | null;
   bg: string;
   color: string;
 }

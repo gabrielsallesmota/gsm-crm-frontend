@@ -27,3 +27,10 @@ export function toWhatsappPhone(raw: string): string {
   const national = digits.replace(/^0+/, "");
   return national ? `55${national}` : digits;
 }
+
+/** Telefone guardado como `+5511912345678` → "(11) 91234-5678" para mostrar na tela. Outros países
+ * (ou formatos fora do padrão BR) aparecem como foram guardados. */
+export function formatPhoneDisplay(stored: string): string {
+  const m = /^\+55(\d{10,11})$/.exec(stored.trim());
+  return m ? formatPhone(m[1]!) : stored;
+}
