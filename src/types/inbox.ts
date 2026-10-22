@@ -1,4 +1,4 @@
-export type InboxKind = "task_assigned" | "task_team" | "event_assigned";
+export type InboxKind = "task_assigned" | "task_team" | "event_assigned" | "lead_queue";
 
 /** Aviso no sino do CRM (ex.: “Ana atribuiu uma tarefa a você”). */
 export interface InboxItem {

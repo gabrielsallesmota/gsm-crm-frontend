@@ -16,7 +16,12 @@ vi.mock("../../src/services/PipelinesService", () => ({ pipelinesService: { list
 vi.mock("../../src/services/LeadsService", () => ({
   leadsService: { list: vi.fn(), listMessageTemplates: vi.fn(), timeline: vi.fn(), bulkImport: vi.fn() },
 }));
-vi.mock("../../src/services/UsersService", () => ({ usersService: { directory: vi.fn() } }));
+vi.mock("../../src/services/UsersService", () => ({
+  usersService: { directory: vi.fn(), list: vi.fn().mockResolvedValue([]) },
+}));
+vi.mock("../../src/services/LeadServicesService", () => ({
+  leadServicesService: { list: vi.fn().mockResolvedValue([]) },
+}));
 vi.mock("../../src/services/TagsService", () => ({ tagsService: { list: vi.fn() } }));
 vi.mock("../../src/services/TasksService", () => ({ tasksService: { list: vi.fn() } }));
 vi.mock("../../src/services/LeadCommentsService", () => ({ leadCommentsService: { create: vi.fn() } }));

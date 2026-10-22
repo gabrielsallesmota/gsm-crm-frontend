@@ -12,7 +12,8 @@ export function TasksSection({
 }: {
   tasks: AsyncResourceState<Page<Task>>;
   onToggle: (task: Task) => void;
-  onCreate: () => void;
+  /** Ausente = quem vê não pode criar tarefa aqui (lead da fila, ainda sem dono). */
+  onCreate?: () => void;
 }) {
   const items = [...(tasks.data?.items ?? [])].sort(
     (a, b) =>
@@ -26,9 +27,13 @@ export function TasksSection({
     <section className={styles.section} aria-label="Tarefas">
       <div className={styles.sectionHeader}>
         <h3 className={styles.sectionTitle}>Tarefas</h3>
-        <button type="button" className={styles.linkBtn} onClick={onCreate}>
-          + Nova tarefa
-        </button>
+        {onCreate ? (
+          <button type="button" className={styles.linkBtn} onClick={onCreate}>
+            + Nova tarefa
+          </button>
+        ) : (
+          <span className={styles.empty}>Vincule o lead a você para criar tarefas</span>
+        )}
       </div>
       {tasks.loading && !tasks.data && <div className={styles.empty}>Carregando…</div>}
       {tasks.error && <div className={styles.empty}>Não foi possível carregar as tarefas.</div>}

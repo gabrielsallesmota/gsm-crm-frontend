@@ -8,6 +8,7 @@ import type { Pipeline } from "../../types/pipeline";
 import type { User } from "../../types/user";
 import type { Tenant } from "../../types/tenant";
 import type { Tag } from "../../types/tag";
+import type { LeadService } from "../../types/leadService";
 import type { LeadComment } from "../../types/lead";
 import type { Task } from "../../types/task";
 import type { CalEvent } from "../../types/event";
@@ -22,6 +23,7 @@ export const mockState: {
   users: User[];
   tenants: Tenant[];
   tags: Tag[];
+  leadServices: LeadService[];
   // Comentários de lead vivem à parte de `leads` de propósito (mesma
   // divisão do backend: `LeadComment` não é embutido em `Lead`) — indexado
   // por `leadId`, mais recente primeiro.
@@ -35,6 +37,7 @@ export const mockState: {
   users: clone(mockUsers),
   tenants: clone(mockTenants),
   tags: clone(mockTags),
+  leadServices: [],
   leadComments: {},
   tasks: clone(mockTaskSeeds),
   events: clone(mockEventSeeds),

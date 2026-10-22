@@ -13,6 +13,8 @@ export interface LeadActions {
   update(id: string, input: UpdateLeadInput): Promise<Lead>;
   /** `stageId` é o UUID REAL da etapa (nunca um nome/chave). */
   move(id: string, stageId: string): Promise<Lead>;
+  /** Assume um lead sem dono (fila do nicho). */
+  claim(id: string): Promise<Lead>;
   delete(id: string): Promise<void>;
   bulkImport(
     rows: ImportRowInput[],
@@ -35,6 +37,7 @@ export function useLeadActions(): LeadActions {
     create: (input) => leadsService.create(input),
     update: (id, input) => leadsService.update(id, input),
     move: (id, stageId) => leadsService.move(id, stageId),
+    claim: (id) => leadsService.claim(id),
     delete: (id) => leadsService.delete(id),
     bulkImport: (rows, pipelineId, defaultStageId, defaultOwnerId, dedupeStrategy, idempotencyKey) =>
       leadsService.bulkImport(

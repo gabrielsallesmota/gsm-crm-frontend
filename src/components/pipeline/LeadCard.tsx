@@ -15,6 +15,8 @@ export interface LeadCardProps {
   stages: PipelineStage[];
   /** Nome do responsável; `null` com `ownerId` = dono que saiu da equipe ("—"). */
   ownerName: string | null;
+  /** Nicho do lead (serviço de interesse); `null`/ausente = sem nicho. */
+  nicheName?: string | null;
   /** Há um movimento em voo para este lead. */
   pending: boolean;
   /** Este card está sendo arrastado. */
@@ -41,6 +43,7 @@ function LeadCardView({
   lead,
   stages,
   ownerName,
+  nicheName = null,
   pending,
   dragging,
   templates,
@@ -101,6 +104,7 @@ function LeadCardView({
         )}
         <div className={styles.meta}>
           <Badge label={origin.label} color={origin.color} bg={origin.bg} />
+          {nicheName && <Badge label={nicheName} color="var(--tone-purple)" bg="var(--tone-purple-bg)" />}
           {age.short && (
             <span className={styles.age} title={age.title}>
               {age.short}
@@ -113,6 +117,7 @@ function LeadCardView({
             lead.company ? `Empresa ${lead.company}` : null,
             lead.value > 0 ? `Valor R$ ${brl(lead.value)}` : null,
             unassigned ? "Sem responsável" : `Responsável ${owner}`,
+            nicheName ? `Nicho ${nicheName}` : null,
             age.long || null,
           ]
             .filter(Boolean)

@@ -15,6 +15,10 @@ import { Modal } from "../components/common/Modal";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { can } from "../auth/permissions";
+import { useLeadServices } from "../hooks/useLeadServices";
+import { leadServicesService } from "../services/LeadServicesService";
+import { NichesSection } from "../components/users/NichesSection";
+import type { LeadService } from "../types/leadService";
 import type { User, UserRole } from "../types/user";
 import styles from "./UsersPage.module.css";
 import form from "../components/common/Form.module.css";
@@ -47,7 +51,14 @@ export function UsersPage() {
   const [inviting, setInviting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmSuspend, setConfirmSuspend] = useState<User | null>(null);
+  // Nichos: admin e gestor configuram (o convite de pessoas continua só do admin).
+  const canManageNiches = can(currentUser, "settings.manage");
+  const niches = useLeadServices();
+  const [editingNiches, setEditingNiches] = useState<User | null>(null);
   usePageTitle("Equipe");
+
+  const nichesOf = (userId: string) =>
+    (niches.data ?? []).filter((n) => n.memberUserIds.includes(userId));
 
   async function handleRole(member: User, role: UserRole) {
     if (role === member.role) return;
@@ -150,6 +161,24 @@ export function UsersPage() {
                   </div>
                   <div className={styles.email}>{member.email}</div>
                   <div className={styles.email}>{member.phone ? formatPhoneDisplay(member.phone) : "Sem telefone"}</div>
+                  {(niches.data?.length ?? 0) > 0 && (
+                    <div className={styles.email}>
+                      Nichos: {nichesOf(member.id).map((n) => n.name).join(", ") || "nenhum"}
+                      {canManageNiches && !suspended && (
+                        <>
+                          {" "}
+                          <button
+                            type="button"
+                            className={styles.linkBtn}
+                            onClick={() => setEditingNiches(member)}
+                            aria-label={`Editar nichos de ${member.name}`}
+                          >
+                            Editar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className={styles.badges}>
                   {suspended && <Badge {...SUSPENDED_BADGE} />}
@@ -203,7 +232,36 @@ export function UsersPage() {
         </div>
       )}
 
-      {inviting && <InviteModal onClose={() => setInviting(false)} onInvited={reload} />}
+      {data && (
+        <div className={styles.nichesBlock}>
+          <NichesSection
+            services={niches.data}
+            error={niches.error}
+            reload={niches.reload}
+            users={data}
+            canManage={canManageNiches}
+          />
+        </div>
+      )}
+
+      {inviting && (
+        <InviteModal
+          niches={niches.data ?? []}
+          onClose={() => setInviting(false)}
+          onInvited={() => {
+            reload();
+            niches.reload();
+          }}
+        />
+      )}
+      {editingNiches && (
+        <MemberNichesModal
+          member={editingNiches}
+          niches={niches.data ?? []}
+          onClose={() => setEditingNiches(null)}
+          onSaved={niches.reload}
+        />
+      )}
       {confirmSuspend && (
         <ConfirmDialog
           title="Desativar usuário?"
@@ -217,7 +275,103 @@ export function UsersPage() {
   );
 }
 
-function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: () => void }) {
+/** Marcar os nichos de uma pessoa (lista de checkboxes). */
+function NichePicker({
+  niches,
+  selected,
+  onChange,
+}: {
+  niches: LeadService[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  return (
+    <fieldset className={form.field} style={{ border: 0, padding: 0, margin: 0 }}>
+      <legend className={form.label}>Nichos</legend>
+      {niches.map((niche) => (
+        <label key={niche.id} className={form.hint} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={selected.includes(niche.id)}
+            onChange={() =>
+              onChange(
+                selected.includes(niche.id) ? selected.filter((id) => id !== niche.id) : [...selected, niche.id],
+              )
+            }
+          />
+          {niche.name}
+          {niche.isDefault ? " (padrão)" : ""}
+          {!niche.active ? " — desativado" : ""}
+        </label>
+      ))}
+      <span className={form.hint}>
+        Recebe o aviso dos leads novos desses nichos e vê a fila deles no pipeline.
+      </span>
+    </fieldset>
+  );
+}
+
+function MemberNichesModal({
+  member,
+  niches,
+  onClose,
+  onSaved,
+}: {
+  member: User;
+  niches: LeadService[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { toast, toastError } = useToast();
+  const [selected, setSelected] = useState(() =>
+    niches.filter((n) => n.memberUserIds.includes(member.id)).map((n) => n.id),
+  );
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await leadServicesService.setUserServices(member.id, selected);
+      toast(`Nichos de ${member.name} atualizados`);
+      onSaved();
+      onClose();
+    } catch (err) {
+      toastError(err, "Não foi possível salvar os nichos.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title={`Nichos de ${member.name}`} onClose={onClose}>
+      <form className={form.form} onSubmit={(e) => void handleSave(e)}>
+        {!member.phone && (
+          <p className={form.hint}>Sem telefone cadastrado: a pessoa vê a fila, mas não recebe o aviso no WhatsApp.</p>
+        )}
+        <NichePicker niches={niches} selected={selected} onChange={setSelected} />
+        <div className={form.actions}>
+          <Button type="button" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button type="submit" variant="primary" disabled={saving}>
+            {saving ? "Salvando…" : "Salvar"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function InviteModal({
+  niches,
+  onClose,
+  onInvited,
+}: {
+  niches: LeadService[];
+  onClose: () => void;
+  onInvited: () => void;
+}) {
   const { create } = useUserActions();
   const { toast, toastError } = useToast();
   const [name, setName] = useState("");
@@ -228,6 +382,7 @@ function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: (
   const [useTempPassword, setUseTempPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [nicheIds, setNicheIds] = useState<string[]>([]);
 
   const passwordOk = !useTempPassword || password.length >= MIN_PASSWORD_LENGTH;
   const emailProblem = emailError(email, { required: true });
@@ -247,6 +402,13 @@ function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: (
         role,
         ...(useTempPassword ? { password } : {}),
       });
+      if (nicheIds.length > 0) {
+        try {
+          await leadServicesService.setUserServices(result.user.id, nicheIds);
+        } catch (err) {
+          toastError(err, "Pessoa criada, mas os nichos não foram salvos. Use \"Editar\" na lista.");
+        }
+      }
       if (result.invitationSent === true) {
         toast(`Convite enviado para ${email.trim()} — o link vale por 72 horas.`);
       } else if (result.invitationSent === false) {
@@ -341,6 +503,7 @@ function InviteModal({ onClose, onInvited }: { onClose: () => void; onInvited: (
             <option value="admin">Admin — tudo, inclusive usuários</option>
           </select>
         </label>
+        {niches.length > 0 && <NichePicker niches={niches} selected={nicheIds} onChange={setNicheIds} />}
         <label className={form.hint} style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <input
             type="checkbox"

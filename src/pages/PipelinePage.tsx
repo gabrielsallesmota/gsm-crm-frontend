@@ -34,6 +34,9 @@ import { useStageReorder } from "../hooks/useStageReorder";
 import { serverSortFor, type BoardSortOption } from "../utils/boardSort";
 import { findLead, needsLostConfirmation } from "../utils/pipelineBoard";
 import { ConfirmLostDialog } from "../components/leads/ConfirmLostDialog";
+import { ClaimLeadDialog } from "../components/leads/ClaimLeadDialog";
+import { useLeadServices } from "../hooks/useLeadServices";
+import { initialStageOf, needsClaimPrompt } from "../utils/leadClaim";
 import { CreateClientFromLeadDialog } from "../components/clients/CreateClientFromLeadDialog";
 import { hasFeature } from "../auth/features";
 import { boardSummary } from "../utils/pipelineView";
@@ -125,7 +128,9 @@ function LeadsPipelineBoard({
     error: pipelineError,
     reload: reloadPipelines,
   } = usePipelines();
-  const { exportCsv } = useLeadActions();
+  const { exportCsv, claim } = useLeadActions();
+  const { data: niches } = useLeadServices();
+  const nicheNames = new Map((niches ?? []).map((n) => [n.id, n.name]));
   const { data: templates } = useLeadMessageTemplates();
   const { data: team } = useTeamDirectory();
   const { toast, toastError } = useToast();
@@ -134,6 +139,7 @@ function LeadsPipelineBoard({
   // não vê a alça de arrastar coluna. Ver auth/permissions.ts.
   const canReorderStages = can(user, "pipeline.reorder");
   const canFilterByOwner = can(user, "leads.viewAll");
+  const myId = user?.id ?? "";
   const isMobile = useIsMobile();
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const pipeline =
@@ -141,6 +147,7 @@ function LeadsPipelineBoard({
     pipelines?.find((p) => p.isDefault) ??
     pipelines?.[0];
   const stages = pipeline?.stages ?? [];
+  const initialStage = initialStageOf(stages);
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
@@ -178,8 +185,33 @@ function LeadsPipelineBoard({
   const [pendingLost, setPendingLost] = useState<{ leadId: string; stage: PipelineStage } | null>(null);
   // "Criar cliente?" depois de ganhar um lead (pergunta, não impõe).
   const [clientFor, setClientFor] = useState<Lead | null>(null);
+  // "Vincular a você?" ao tirar um lead SEM dono da etapa inicial.
+  const [pendingClaim, setPendingClaim] = useState<{ lead: Lead; stage: PipelineStage } | null>(null);
 
   async function moveLead(leadId: string, stage: PipelineStage) {
+    const current = findLead(board.board, leadId);
+    if (current && needsClaimPrompt(current, stage, initialStage)) {
+      setPendingClaim({ lead: current, stage });
+      return;
+    }
+    await continueMove(leadId, stage);
+  }
+
+  async function claimAndMove(leadId: string, stage: PipelineStage): Promise<boolean> {
+    try {
+      board.applyLead(await claim(leadId));
+      toast("Lead vinculado a você");
+    } catch (err) {
+      // 409: outra pessoa assumiu antes — o quadro é recarregado e nada é movido.
+      toastError(err, "Não foi possível vincular o lead.");
+      board.reload();
+      return true;
+    }
+    await continueMove(leadId, stage);
+    return true;
+  }
+
+  async function continueMove(leadId: string, stage: PipelineStage) {
     const current = findLead(board.board, leadId);
     const from = current ? stages.find((s) => s.id === current.stageId) : undefined;
     if (current && needsLostConfirmation(from, stage)) {
@@ -301,6 +333,30 @@ function LeadsPipelineBoard({
         onExport={handleExport}
       />
 
+      {canFilterByOwner && myId && (
+        <div className={styles.sourceFilter} role="group" aria-label="Leads exibidos">
+          {(
+            [
+              ["", "Todos"],
+              [myId, "Meus"],
+            ] as const
+          ).map(([value, label]) => {
+            const active = value ? ownerFilter === myId : ownerFilter !== myId;
+            return (
+              <button
+                key={label}
+                type="button"
+                className={active ? `${styles.sourceFilterBtn} ${styles.sourceFilterBtnActive}` : styles.sourceFilterBtn}
+                onClick={() => setOwnerFilter(value)}
+                aria-pressed={active}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <PipelineFilters
         search={search}
         onSearch={setSearch}
@@ -364,6 +420,7 @@ function LeadsPipelineBoard({
                   lead={lead}
                   stages={stages}
                   ownerName={lead.ownerId ? (ownerNames.get(lead.ownerId) ?? null) : null}
+                  nicheName={lead.serviceId ? (nicheNames.get(lead.serviceId) ?? null) : null}
                   pending={board.isMoving(lead.id)}
                   dragging={drag.dragId === lead.id}
                   templates={templates ?? []}
@@ -391,6 +448,20 @@ function LeadsPipelineBoard({
       )}
 
       {clientFor && <CreateClientFromLeadDialog lead={clientFor} onClose={() => setClientFor(null)} />}
+
+      {pendingClaim && (
+        <ClaimLeadDialog
+          leadName={pendingClaim.lead.name}
+          nicheName={pendingClaim.lead.serviceId ? (nicheNames.get(pendingClaim.lead.serviceId) ?? null) : null}
+          stageLabel={pendingClaim.stage.label}
+          onClaim={() => claimAndMove(pendingClaim.lead.id, pendingClaim.stage)}
+          onSkip={async () => {
+            await continueMove(pendingClaim.lead.id, pendingClaim.stage);
+            return true;
+          }}
+          onClose={() => setPendingClaim(null)}
+        />
+      )}
 
       {pendingLost && (
         <ConfirmLostDialog

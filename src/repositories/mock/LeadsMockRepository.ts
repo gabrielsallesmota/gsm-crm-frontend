@@ -102,6 +102,14 @@ export class LeadsMockRepository implements LeadsRepository {
     return lead;
   }
 
+  async claim(id: string): Promise<Lead> {
+    await delay(150);
+    const lead = mockState.leads.find((l) => l.id === id);
+    if (!lead) throw new Error(`Lead ${id} não encontrado.`);
+    lead.ownerId ??= mockState.users[0]?.id ?? null;
+    return lead;
+  }
+
   async move(id: string, stageId: string): Promise<Lead> {
     await delay(200);
     const lead = mockState.leads.find((l) => l.id === id);

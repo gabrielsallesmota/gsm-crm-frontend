@@ -134,3 +134,18 @@
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-card);
 }
+
+/* Nichos: seção abaixo da lista e link "Editar" na linha da pessoa. */
+.nichesBlock {
+  margin-top: var(--space-6);
+}
+
+.linkBtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

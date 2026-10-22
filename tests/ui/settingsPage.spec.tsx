@@ -38,16 +38,22 @@ vi.mock("../../src/services/ProspectsService", () => ({
     reorderStages: vi.fn(),
   },
 }));
+vi.mock("../../src/services/LeadServicesService", () => ({
+  leadServicesService: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+}));
+vi.mock("../../src/services/UsersService", () => ({ usersService: { list: vi.fn() } }));
 vi.mock("../../src/services/SdrService", () => ({
   sdrService: { getAiSettings: vi.fn(), updateAiSettings: vi.fn() },
 }));
 
 import { SettingsPage } from "../../src/pages/SettingsPage";
+import { leadServicesService } from "../../src/services/LeadServicesService";
 import { leadsService } from "../../src/services/LeadsService";
 import { pipelinesService } from "../../src/services/PipelinesService";
 import { prospectsService } from "../../src/services/ProspectsService";
 import { sdrService } from "../../src/services/SdrService";
 import { tagsService } from "../../src/services/TagsService";
+import { usersService } from "../../src/services/UsersService";
 import { ApiError } from "../../src/types/common";
 import {
   ADMIN,
@@ -80,6 +86,8 @@ beforeEach(() => {
   tags.list.mockResolvedValue([{ id: "tg1", label: "VIP", color: "#ff0000", bg: "rgba(255,0,0,.14)" }]);
   leads.listMessageTemplates.mockResolvedValue([]);
   vi.mocked(prospectsService.listStages).mockResolvedValue([]);
+  vi.mocked(leadServicesService.list).mockResolvedValue([]);
+  vi.mocked(usersService.list).mockResolvedValue([]);
   vi.mocked(prospectsService.listMessageTemplates).mockResolvedValue([]);
   vi.mocked(sdrService.getAiSettings).mockResolvedValue({
     chatTarget: "chatgpt",
@@ -641,3 +649,4 @@ describe("Prompt 08 — navegação por categorias (uma rota, `?secao=`)", () =>
     expect(within(nav()).queryByRole("button", { name: /Prospecção \(GSM\)/ })).toBeNull();
   });
 });
+

@@ -640,3 +640,10 @@
     margin-left: 0;
   }
 }
+
+/* Faixa do nicho / fila (informativa, não é erro). */
+.bannerInfo {
+  border-color: var(--tone-purple);
+  background: var(--tone-purple-bg);
+  justify-content: space-between;
+}

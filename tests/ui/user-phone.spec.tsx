@@ -1,5 +1,5 @@
 // Telefone do usuário: obrigatório no convite e pedido no primeiro login de quem ainda não tem.
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -83,7 +83,9 @@ describe("convite", () => {
     });
     renderApp(<UsersPage />, { user: ADMIN });
     fireEvent.click((await screen.findAllByRole("button", { name: /Convidar pessoa/ }))[0]!);
-    fireEvent.change(await screen.findByLabelText(/Nome/), { target: { value: "Nova Pessoa" } });
+    // escopo no diálogo: a página também tem o campo "Nome do novo nicho"
+    const dialog = within(await screen.findByRole("dialog", { name: "Convidar pessoa" }));
+    fireEvent.change(dialog.getByLabelText(/^Nome/), { target: { value: "Nova Pessoa" } });
     fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: "nova@example.com" } });
     const enviar = screen.getByRole("button", { name: "Enviar convite" }) as HTMLButtonElement;
     expect(enviar.disabled).toBe(true); // sem telefone o convite não pode ser enviado

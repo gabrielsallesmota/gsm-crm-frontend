@@ -45,6 +45,8 @@ export interface Lead {
   stageId: string;
   /** `null` = lead de intake público (API Key) ainda sem responsável. */
   ownerId: string | null;
+  /** Nicho (serviço de interesse — `GET /lead-services`). Sem dono + nicho = fila do nicho. */
+  serviceId?: string | null;
   value: number;
   probability: number;
   origin: string;

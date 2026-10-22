@@ -45,6 +45,7 @@ interface LeadDto {
   stage_id: string;
   // null = lead de intake público (backend Fase 6) ainda sem responsável.
   owner_id: string | null;
+  service_id?: string | null;
   expected_value: number | null;
   probability: number | null;
   origin: string;
@@ -117,6 +118,7 @@ function toLead(dto: LeadDto): Lead {
     pipelineId: dto.pipeline_id,
     stageId: dto.stage_id,
     ownerId: dto.owner_id,
+    serviceId: dto.service_id ?? null,
     value: dto.expected_value ?? 0,
     probability: dto.probability ?? 0,
     origin: dto.origin,
@@ -214,6 +216,10 @@ export class LeadsApiRepository implements LeadsRepository {
       }),
     });
     return toLead(dto);
+  }
+
+  async claim(id: string): Promise<Lead> {
+    return toLead(await apiRequest<LeadDto>(`/api/v1/leads/${id}/claim`, { method: "POST" }));
   }
 
   async move(id: string, stageId: string): Promise<Lead> {

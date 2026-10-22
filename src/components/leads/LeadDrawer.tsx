@@ -6,6 +6,9 @@ import { ApiError } from "../../types/common";
 import { Button } from "../common/Button";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { ConfirmLostDialog } from "./ConfirmLostDialog";
+import { ClaimLeadDialog } from "./ClaimLeadDialog";
+import { useLeadServices } from "../../hooks/useLeadServices";
+import { initialStageOf, needsClaimPrompt } from "../../utils/leadClaim";
 import { needsLostConfirmation } from "../../utils/pipelineBoard";
 import { TaskFormModal } from "../tasks/TaskFormModal";
 import { CreateClientFromLeadDialog } from "../clients/CreateClientFromLeadDialog";
@@ -69,7 +72,8 @@ export function LeadDrawer({
   const { user } = useAuth();
   const canAssign = can(user, "leads.assign");
   const { toast, toastError } = useToast();
-  const { update, move, delete: deleteLead } = useLeadActions();
+  const { update, move, claim, delete: deleteLead } = useLeadActions();
+  const { data: niches } = useLeadServices();
   const { create: createComment } = useLeadCommentActions();
   const { setDone } = useTaskActions();
   const { data: availableTags } = useTags();
@@ -85,6 +89,9 @@ export function LeadDrawer({
   const ownerName = lead.ownerId
     ? (team?.find((m) => m.id === lead.ownerId)?.name ?? "—")
     : "Sem responsável";
+  const nicheName = lead.serviceId ? (niches?.find((n) => n.id === lead.serviceId)?.name ?? null) : null;
+  // Vendedor num lead da fila (sem dono) ainda não cria tarefa: o backend só libera tarefas ao dono.
+  const canCreateTask = Boolean(lead.ownerId) || can(user, "leads.viewAll");
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -98,6 +105,8 @@ export function LeadDrawer({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState<Discard | null>(null);
   const [confirmLostStage, setConfirmLostStage] = useState<string | null>(null);
+  const [claimStage, setClaimStage] = useState<string | null>(null);
+  const [claiming, setClaiming] = useState(false);
   // "Criar cliente?" — ao ganhar o lead (pergunta, não impõe) ou pelo botão do cabeçalho.
   const [clientDialog, setClientDialog] = useState(false);
   const offersClient = hasFeature(user, "clients");
@@ -149,12 +158,31 @@ export function LeadDrawer({
     }
   }
 
-  /** D-03: marcar como perdido pede confirmação (sem motivo obrigatório). */
-  function requestMove(stageId: string) {
+  /** D-03: marcar como perdido pede confirmação (sem motivo obrigatório). Lead sem dono saindo
+   * da etapa inicial pergunta antes "Vincular a você?". */
+  function requestMove(stageId: string, askClaim = true) {
     if (stageId === lead.stageId) return;
     const target = pipelineStages.find((s) => s.id === stageId);
-    if (target && needsLostConfirmation(stage, target)) setConfirmLostStage(stageId);
+    if (askClaim && target && needsClaimPrompt(lead, target, initialStageOf(pipelineStages))) {
+      setClaimStage(stageId);
+    } else if (target && needsLostConfirmation(stage, target)) setConfirmLostStage(stageId);
     else void handleMove(stageId);
+  }
+
+  /** Assume o lead; `false` = não conseguiu (409: outra pessoa assumiu antes). */
+  async function handleClaim(): Promise<boolean> {
+    setClaiming(true);
+    try {
+      const updated = await claim(lead.id);
+      toast("Lead vinculado a você");
+      afterChange(updated);
+      return true;
+    } catch (err) {
+      fail(err, "Não foi possível vincular o lead.");
+      return false;
+    } finally {
+      setClaiming(false);
+    }
   }
 
   async function handleAssign(ownerId: string) {
@@ -319,6 +347,20 @@ export function LeadDrawer({
             </div>
           )}
 
+          {(nicheName || !lead.ownerId) && (
+            <div className={`${styles.banner} ${styles.bannerInfo}`} role="note">
+              <span>
+                {nicheName ? `Nicho: ${nicheName}` : "Sem nicho"}
+                {!lead.ownerId ? " · na fila, sem responsável" : ""}
+              </span>
+              {!lead.ownerId && (
+                <Button variant="primary" onClick={() => void handleClaim()} disabled={claiming}>
+                  {claiming ? "Vinculando…" : "Vincular a mim"}
+                </Button>
+              )}
+            </div>
+          )}
+
           <LeadSummary
             lead={lead}
             stages={pipelineStages}
@@ -353,7 +395,7 @@ export function LeadDrawer({
           <TasksSection
             tasks={tasks}
             onToggle={(t) => void handleToggleTask(t)}
-            onCreate={() => setCreatingTask(true)}
+            {...(canCreateTask ? { onCreate: () => setCreatingTask(true) } : {})}
           />
 
           <ActivitySection
@@ -434,6 +476,24 @@ export function LeadDrawer({
       {clientDialog && (
         <div onClick={(e) => e.stopPropagation()}>
           <CreateClientFromLeadDialog lead={lead} onClose={() => setClientDialog(false)} />
+        </div>
+      )}
+      {claimStage && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ClaimLeadDialog
+            leadName={lead.name}
+            nicheName={nicheName}
+            stageLabel={pipelineStages.find((s) => s.id === claimStage)?.label ?? "a nova etapa"}
+            onClaim={async () => {
+              if (await handleClaim()) requestMove(claimStage, false);
+              return true;
+            }}
+            onSkip={async () => {
+              requestMove(claimStage, false);
+              return true;
+            }}
+            onClose={() => setClaimStage(null)}
+          />
         </div>
       )}
       {confirmLostStage && (

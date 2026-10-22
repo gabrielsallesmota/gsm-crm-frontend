@@ -68,6 +68,7 @@ describe("LeadsApiRepository — mapeamento do DTO", () => {
       pipelineId: "pipe-1",
       stageId: "stage-1",
       ownerId: null,
+      serviceId: null,
       value: 0,
       probability: 40,
       origin: "instagram",
