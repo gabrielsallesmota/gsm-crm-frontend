@@ -1,5 +1,5 @@
 // Extensão `.ts` de propósito: roda também no Node (`npm test`), sem Vite.
-import type { FeatureDefinition, PlanOption } from "../types/platform.ts";
+import type { FeatureDefinition, N8nHistoryItem, PlanOption } from "../types/platform.ts";
 
 /**
  * Assistente de provisionamento (Etapa 2): dados básicos → primeiro admin →
@@ -101,6 +101,8 @@ const AUDIT_LABELS: Record<string, string> = {
   "platform_staff.granted": "Acesso de plataforma concedido",
   "platform_staff.revoked": "Acesso de plataforma revogado",
   "platform.internal_tenant_set": "Tenant interno definido",
+  "n8n_integration.updated": "Workflow n8n alterado",
+  "n8n_integration.tested": "Workflow n8n testado",
 };
 
 export function describeAuditAction(action: string): string {
@@ -109,4 +111,20 @@ export function describeAuditAction(action: string): string {
 
 export function formatPrice(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+/** Resumo legível de uma linha do histórico (a auditoria guarda só o host, nunca a URL). */
+export function describeN8nChange(item: N8nHistoryItem): string {
+  const m = item.metadata;
+  const env = m.environment === "production" ? "Produção" : "QA";
+  const parts = [`${env} · ${String(m.workflow ?? "")}`];
+  if (item.action === "n8n_integration.tested") {
+    parts.push(m.ok === true ? "ok" : "falhou", String(m.detail ?? ""));
+  } else {
+    const enabled = m.enabled as { from?: boolean; to?: boolean } | undefined;
+    if (enabled && enabled.from !== enabled.to) parts.push(enabled.to ? "ligado" : "desligado");
+    const host = m.host as { to?: string | null } | undefined;
+    if (m.url_changed === true) parts.push(`URL → ${host?.to ?? "removida"}`);
+  }
+  return parts.filter(Boolean).join(" · ");
 }

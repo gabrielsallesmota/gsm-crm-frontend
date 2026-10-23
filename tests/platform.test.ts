@@ -150,3 +150,34 @@ describe("assistente de provisionamento", () => {
     assert.equal(describeAuditAction("algo.novo"), "algo.novo");
   });
 });
+
+describe("Integrações n8n — histórico legível (sem URL)", () => {
+  it("resume alteração e teste", async () => {
+    const { describeN8nChange } = await import("../src/platform/provisioning.ts");
+    assert.equal(
+      describeN8nChange({
+        at: "2026-10-23T12:00:00Z",
+        action: "n8n_integration.updated",
+        actorUserId: null,
+        metadata: {
+          environment: "production",
+          workflow: "new_lead",
+          enabled: { from: false, to: true },
+          host: { from: null, to: "n8n.example" },
+          url_changed: true,
+        },
+      }),
+      "Produção · new_lead · ligado · URL → n8n.example",
+    );
+    assert.equal(
+      describeN8nChange({
+        at: "2026-10-23T12:00:00Z",
+        action: "n8n_integration.tested",
+        actorUserId: null,
+        metadata: { environment: "qa", workflow: "daily_digest", ok: false, detail: "HTTP 401" },
+      }),
+      "QA · daily_digest · falhou · HTTP 401",
+    );
+    assert.equal(describeAuditAction("n8n_integration.tested"), "Workflow n8n testado");
+  });
+});

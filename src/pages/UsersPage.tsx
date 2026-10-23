@@ -15,7 +15,7 @@ import { Modal } from "../components/common/Modal";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { can } from "../auth/permissions";
-import { useLeadServices } from "../hooks/useLeadServices";
+import { useLeadAvailability, useLeadServices } from "../hooks/useLeadServices";
 import { leadServicesService } from "../services/LeadServicesService";
 import { NichesSection } from "../components/users/NichesSection";
 import type { LeadService } from "../types/leadService";
@@ -30,6 +30,7 @@ const ROLE_BADGE: Record<UserRole, { label: string; color: string; bg: string }>
 };
 
 const PENDING_BADGE = { label: "Convite pendente", color: "var(--tone-amber)", bg: "var(--tone-amber-bg)" };
+const UNAVAILABLE_BADGE = { label: "Indisponível", color: "var(--tone-amber)", bg: "var(--tone-amber-bg)" };
 const SUSPENDED_BADGE = { label: "Desativado", color: "var(--tone-gray)", bg: "var(--tone-gray-bg)" };
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -54,6 +55,8 @@ export function UsersPage() {
   // Nichos: admin e gestor configuram (o convite de pessoas continua só do admin).
   const canManageNiches = can(currentUser, "settings.manage");
   const niches = useLeadServices();
+  const availability = useLeadAvailability(canManageNiches);
+  const unavailable = new Set(availability.data ?? []);
   const [editingNiches, setEditingNiches] = useState<User | null>(null);
   usePageTitle("Equipe");
 
@@ -69,6 +72,23 @@ export function UsersPage() {
       reload();
     } catch (err) {
       toastError(err, "Não foi possível alterar o papel.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleAvailability(member: User, available: boolean) {
+    setBusyId(member.id);
+    try {
+      await leadServicesService.setAvailability(member.id, available);
+      toast(
+        available
+          ? `${member.name} volta a receber leads`
+          : `${member.name} não recebe leads novos até ser marcado como disponível`,
+      );
+      availability.reload();
+    } catch (err) {
+      toastError(err, "Não foi possível alterar a disponibilidade.");
     } finally {
       setBusyId(null);
     }
@@ -179,9 +199,26 @@ export function UsersPage() {
                       )}
                     </div>
                   )}
+                  {canManageNiches && !suspended && availability.data && (
+                    <label className={styles.email} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={!unavailable.has(member.id)}
+                        disabled={busy}
+                        onChange={(e) => void handleAvailability(member, e.target.checked)}
+                      />
+                      Disponível para receber leads
+                      <HelpTip label="Disponibilidade para leads">
+                        Indisponível (férias, folga) continua acessando o CRM, mas não é avisado de
+                        leads novos. Sem ninguém disponível no nicho, os gestores são avisados; sem
+                        gestores, os administradores.
+                      </HelpTip>
+                    </label>
+                  )}
                 </div>
                 <div className={styles.badges}>
                   {suspended && <Badge {...SUSPENDED_BADGE} />}
+                  {!suspended && unavailable.has(member.id) && <Badge {...UNAVAILABLE_BADGE} />}
                   {!suspended && member.pendingFirstAccess && <Badge {...PENDING_BADGE} />}
                 </div>
                 {canManage && !isSelf ? (
