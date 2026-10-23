@@ -4,9 +4,6 @@ import type {
   AuditFilter,
   FeatureDefinition,
   ImpersonationSession,
-  N8nEnvironment,
-  N8nHistoryItem,
-  N8nIntegrations,
   OrganizationDetail,
   OrganizationFilter,
   OrganizationSummary,
@@ -54,12 +51,4 @@ export function useSupportSessions(
   page: number,
 ): AsyncResourceState<Page<ImpersonationSession>> {
   return useAsyncResource(() => platformService.sessions(openOnly, page), [openOnly, page]);
-}
-
-export function useN8nIntegrations(environment: N8nEnvironment): AsyncResourceState<N8nIntegrations> {
-  return useAsyncResource(() => platformService.n8nIntegrations(environment), [environment]);
-}
-
-export function useN8nHistory(): AsyncResourceState<N8nHistoryItem[]> {
-  return useAsyncResource(() => platformService.n8nHistory(), []);
 }

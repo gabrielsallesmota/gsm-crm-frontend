@@ -105,7 +105,6 @@ describe("F-32 mapa de guards por rota (o que cada tela exige)", () => {
       "/platform/organizations/:id",
       ROUTES.platformAudit,
       ROUTES.platformSessions,
-      ROUTES.platformN8n,
       "/platform/*",
     ];
     expect(open.filter((p) => !allowedOpen.includes(p)).sort()).toEqual([]);

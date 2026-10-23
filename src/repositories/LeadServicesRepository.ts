@@ -7,7 +7,4 @@ export interface LeadServicesRepository {
   delete(id: string): Promise<void>;
   /** Substitui os nichos de uma pessoa da equipe; devolve todos os nichos atualizados. */
   setUserServices(userId: string, serviceIds: string[]): Promise<LeadService[]>;
-  /** Quem está INDISPONÍVEL para receber leads (férias, folga) — independe de a conta estar ativa. */
-  unavailableUserIds(): Promise<string[]>;
-  setAvailability(userId: string, available: boolean): Promise<void>;
 }

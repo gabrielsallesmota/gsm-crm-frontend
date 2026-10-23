@@ -13,8 +13,6 @@ function slug(name: string): string {
     .slice(0, 60);
 }
 
-const unavailable = new Set<string>();
-
 export class LeadServicesMockRepository implements LeadServicesRepository {
   async list(): Promise<LeadService[]> {
     await delay(150);
@@ -55,17 +53,6 @@ export class LeadServicesMockRepository implements LeadServicesRepository {
       service.memberUserIds = serviceIds.includes(service.id) ? [...others, userId] : others;
     }
     return mockState.leadServices;
-  }
-
-  async unavailableUserIds(): Promise<string[]> {
-    await delay(150);
-    return [...unavailable];
-  }
-
-  async setAvailability(userId: string, available: boolean): Promise<void> {
-    await delay(150);
-    if (available) unavailable.delete(userId);
-    else unavailable.add(userId);
   }
 
   async delete(id: string): Promise<void> {

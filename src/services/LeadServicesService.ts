@@ -29,14 +29,6 @@ export class LeadServicesService {
   setUserServices(userId: string, serviceIds: string[]): Promise<LeadService[]> {
     return repo.setUserServices(userId, serviceIds);
   }
-
-  unavailableUserIds(): Promise<string[]> {
-    return repo.unavailableUserIds();
-  }
-
-  setAvailability(userId: string, available: boolean): Promise<void> {
-    return repo.setAvailability(userId, available);
-  }
 }
 
 export const leadServicesService = new LeadServicesService();

@@ -61,18 +61,6 @@ export class LeadServicesApiRepository implements LeadServicesRepository {
     return dtos.map(toLeadService);
   }
 
-  async unavailableUserIds(): Promise<string[]> {
-    const dto = await apiRequest<{ unavailable_user_ids: string[] }>("/api/v1/lead-services/availability");
-    return dto.unavailable_user_ids;
-  }
-
-  async setAvailability(userId: string, available: boolean): Promise<void> {
-    await apiRequest<void>(`/api/v1/lead-services/users/${userId}/availability`, {
-      method: "PUT",
-      body: JSON.stringify({ available }),
-    });
-  }
-
   async delete(id: string): Promise<void> {
     await apiRequest<void>(`/api/v1/lead-services/${id}`, { method: "DELETE" });
   }

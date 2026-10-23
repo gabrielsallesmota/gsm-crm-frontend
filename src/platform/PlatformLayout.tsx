@@ -13,7 +13,6 @@ const NAV = [
   { to: ROUTES.platform, label: "Visão geral", end: true },
   { to: ROUTES.platformOrganizations, label: "Organizações", end: false },
   { to: ROUTES.platformSessions, label: "Sessões de suporte", end: false },
-  { to: ROUTES.platformN8n, label: "Integrações n8n", end: false },
   { to: ROUTES.platformAudit, label: "Auditoria", end: false },
 ];
 

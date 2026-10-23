@@ -118,7 +118,6 @@ const OrganizationDetailPage = lazyPage(
   "OrganizationDetailPage",
 );
 const PlatformAuditPage = lazyPage(() => import("../platform/PlatformAuditPage"), "PlatformAuditPage");
-const N8nIntegrationsPage = lazyPage(() => import("../platform/N8nIntegrationsPage"), "N8nIntegrationsPage");
 const SupportSessionsPage = lazyPage(
   () => import("../platform/SupportSessionsPage"),
   "SupportSessionsPage",
@@ -143,7 +142,6 @@ export const router = createBrowserRouter([
       { path: ROUTES.platformOrganizationNew, element: platformPage(<OrganizationNewPage />) },
       { path: "/platform/organizations/:id", element: platformPage(<OrganizationDetailPage />) },
       { path: ROUTES.platformAudit, element: platformPage(<PlatformAuditPage />) },
-      { path: ROUTES.platformN8n, element: platformPage(<N8nIntegrationsPage />) },
       { path: ROUTES.platformSessions, element: platformPage(<SupportSessionsPage />) },
       { path: "/platform/*", element: <NotFoundPage /> },
     ],

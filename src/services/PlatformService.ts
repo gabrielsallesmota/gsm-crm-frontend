@@ -4,11 +4,6 @@ import type {
   AuditFilter,
   FeatureDefinition,
   ImpersonationSession,
-  N8nEnvironment,
-  N8nHistoryItem,
-  N8nIntegration,
-  N8nIntegrations,
-  N8nWorkflow,
   OrganizationDetail,
   OrganizationFilter,
   OrganizationSummary,
@@ -139,21 +134,6 @@ function qs(params: Record<string, string | number | boolean | undefined | null>
   }
   const text = search.toString();
   return text ? `?${text}` : "";
-}
-
-function toN8nIntegration(d: Dto): N8nIntegration {
-  return {
-    environment: str(d.environment) as N8nEnvironment,
-    workflow: str(d.workflow) as N8nWorkflow,
-    label: str(d.label),
-    url: strOrNull(d.url),
-    enabled: d.enabled === true,
-    version: num(d.version),
-    updatedAt: strOrNull(d.updated_at),
-    lastTestAt: strOrNull(d.last_test_at),
-    lastTestOk: typeof d.last_test_ok === "boolean" ? d.last_test_ok : null,
-    lastTestDetail: strOrNull(d.last_test_detail),
-  };
 }
 
 const json = (method: string, body?: unknown): RequestInit => ({
@@ -331,46 +311,5 @@ export const platformService = {
 
   async endImpersonation(sessionId: string): Promise<void> {
     await platformRequest(`${P}/impersonation-sessions/${sessionId}/end`, json("POST"));
-  },
-
-  async n8nIntegrations(environment: N8nEnvironment): Promise<N8nIntegrations> {
-    const d = await platformRequest<Dto>(`${P}/n8n-integrations?environment=${environment}`);
-    const items = Array.isArray(d.items) ? (d.items as Dto[]) : [];
-    return {
-      environment: str(d.environment) as N8nEnvironment,
-      activeEnvironment: str(d.active_environment) as N8nEnvironment,
-      signingSecretConfigured: d.signing_secret_configured === true,
-      items: items.map(toN8nIntegration),
-    };
-  },
-
-  async saveN8nIntegration(
-    environment: N8nEnvironment,
-    workflow: N8nWorkflow,
-    input: { version: number; url: string | null; enabled: boolean },
-  ): Promise<N8nIntegration> {
-    const d = await platformRequest<Dto>(
-      `${P}/n8n-integrations/${environment}/${workflow}`,
-      json("PUT", input),
-    );
-    return toN8nIntegration(d);
-  },
-
-  async testN8nIntegration(environment: N8nEnvironment, workflow: N8nWorkflow): Promise<N8nIntegration> {
-    const d = await platformRequest<Dto>(
-      `${P}/n8n-integrations/${environment}/${workflow}/test`,
-      json("POST"),
-    );
-    return toN8nIntegration(d);
-  },
-
-  async n8nHistory(): Promise<N8nHistoryItem[]> {
-    const list = await platformRequest<Dto[]>(`${P}/n8n-integrations/history`);
-    return list.map((d) => ({
-      at: str(d.at),
-      action: str(d.action),
-      actorUserId: strOrNull(d.actor_user_id),
-      metadata: (d.metadata ?? {}) as Record<string, unknown>,
-    }));
   },
 };

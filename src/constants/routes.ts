@@ -46,5 +46,4 @@ export const ROUTES = {
   platformOrganization: (id: string) => `/platform/organizations/${id}`,
   platformAudit: "/platform/audit",
   platformSessions: "/platform/support-sessions",
-  platformN8n: "/platform/n8n-integrations",
 } as const;
