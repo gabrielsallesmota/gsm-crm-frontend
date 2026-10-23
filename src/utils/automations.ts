@@ -3,7 +3,8 @@ import type { AutomationKey, AutomationRule, ParamLimits } from "../types/automa
 
 const KEYS: readonly AutomationKey[] = [
   "follow_up",
-  "overdue_task",
+  "follow_up_due",
+  "unassigned_lead",
   "stalled_opportunity",
   "renewal",
 ];
@@ -81,17 +82,24 @@ export const RULE_COPY: Record<AutomationKey, RuleCopy> = {
       },
     },
   },
-  overdue_task: {
-    title: "Tarefa atrasada",
-    summary: "Avisa o responsável quando uma tarefa vence.",
+  follow_up_due: {
+    title: "Follow-up pendente",
+    summary: "Avisa o responsável quando chega a data de retornar ao lead.",
     detail:
-      "Um aviso por pessoa por hora, com as tarefas atrasadas juntas. Só vale para tarefas que venceram nas últimas 48 horas.",
+      "Vale para os retornos da cadência do lead. Um aviso por retorno — os pendentes vão juntos, no máximo um aviso a cada 4 horas.",
+    notifies: true,
+    params: {},
+  },
+  unassigned_lead: {
+    title: "Lead sem responsável",
+    summary: "Avisa gestores e administradores quando um lead fica sem ninguém atendendo.",
+    detail: "Um aviso por lead. Leads ganhos ou perdidos não entram.",
     notifies: true,
     params: {
-      grace_minutes: {
-        label: "Tolerância após o vencimento",
-        unit: "minutos",
-        hint: "Quanto esperar depois do prazo antes de avisar.",
+      hours_without_owner: {
+        label: "Horas sem responsável",
+        unit: "horas",
+        hint: "Depois de quantas horas na fila sem dono o gestor é avisado.",
       },
     },
   },

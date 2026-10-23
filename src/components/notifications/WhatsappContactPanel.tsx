@@ -61,7 +61,7 @@ export function WhatsappContactPanel({
   async function save() {
     setPhoneError(null);
     if (typed && !normalized) {
-      setPhoneError("Telefone inválido. Use o formato internacional, ex.: +5511987654321.");
+      setPhoneError("Telefone inválido. Informe DDD + número, ex.: (11) 91234-5678.");
       return;
     }
     if (agree && !normalized && !contact.phone) {
@@ -86,7 +86,7 @@ export function WhatsappContactPanel({
       </p>
       <div className={form.field}>
         <label className={form.label} htmlFor="wa-phone">
-          Telefone com DDI
+          Telefone (o mesmo do seu cadastro)
         </label>
         <input
           id="wa-phone"
@@ -94,7 +94,7 @@ export function WhatsappContactPanel({
           type="tel"
           inputMode="tel"
           autoComplete="tel"
-          placeholder="+5511987654321"
+          placeholder="(11) 91234-5678"
           value={phone}
           disabled={disabled || saving}
           aria-invalid={Boolean(phoneError)}
@@ -104,6 +104,9 @@ export function WhatsappContactPanel({
             setPhoneError(null);
           }}
         />
+        <span className={form.hint}>
+          O WhatsApp usa o telefone do seu cadastro: trocar aqui troca no seu perfil também.
+        </span>
         {phoneError && (
           <span id="wa-phone-error" className={form.error} role="alert">
             {phoneError}

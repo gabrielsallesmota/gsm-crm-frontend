@@ -42,6 +42,11 @@ function num(v: unknown, fallback = 0): number {
 function bool(v: unknown): boolean {
   return v === true;
 }
+
+/** Booleano com padrão para documento antigo (campo ainda não existia). */
+function flag(v: unknown, fallback: boolean): boolean {
+  return typeof v === "boolean" ? v : fallback;
+}
 function mode(v: unknown): SectionMode {
   return v === "off" || v === "count" || v === "list" ? v : "off";
 }
@@ -80,7 +85,12 @@ export function toPolicy(raw: unknown): NotificationPolicy {
         maxItems: num(opportunities.max_items, 5),
       },
     },
-    triggers: { newLead: { enabled: bool(obj(obj(d.triggers).new_lead).enabled) } },
+    triggers: {
+      newLead: { enabled: bool(obj(obj(d.triggers).new_lead).enabled) },
+      dailyDigest: { enabled: flag(obj(obj(d.triggers).daily_digest).enabled, true) },
+      weeklyReport: { enabled: flag(obj(obj(d.triggers).weekly_report).enabled, false) },
+      monthlyReport: { enabled: flag(obj(obj(d.triggers).monthly_report).enabled, false) },
+    },
   };
 }
 
@@ -194,9 +204,13 @@ export function toPreview(raw: unknown): DigestPreview {
 
 const DELIVERY_KINDS: readonly DeliveryKind[] = [
   "daily_digest",
+  "weekly_report",
+  "monthly_report",
   "new_lead_alert",
-  "overdue_task_alert",
+  "follow_up_alert",
+  "unassigned_lead_alert",
   "stalled_lead_alert",
+  "overdue_task_alert",
 ];
 
 function toKind(value: unknown): DeliveryKind {
@@ -274,9 +288,8 @@ export function policyPatch(
     enabled: diff(base.content.opportunities.enabled, draft.content.opportunities.enabled),
     max_items: diff(base.content.opportunities.maxItems, draft.content.opportunities.maxItems),
   });
-  const newLead = prune({
-    enabled: diff(base.triggers.newLead.enabled, draft.triggers.newLead.enabled),
-  });
+  const toggle = (key: keyof NotificationPolicy["triggers"]) =>
+    prune({ enabled: diff(base.triggers[key].enabled, draft.triggers[key].enabled) });
   return prune<PolicyPatch>({
     enabled: diff(base.enabled, draft.enabled),
     schedule: prune({
@@ -298,19 +311,29 @@ export function policyPatch(
       calendar,
       opportunities,
     }),
-    triggers: newLead ? { new_lead: newLead } : undefined,
+    triggers: prune({
+      new_lead: toggle("newLead"),
+      daily_digest: toggle("dailyDigest"),
+      weekly_report: toggle("weeklyReport"),
+      monthly_report: toggle("monthlyReport"),
+    }),
   });
 }
 
 // ---- telefone ---------------------------------------------------------------------
 
-const E164 = /^\+[1-9]\d{7,14}$/;
+const E164_DIGITS = /^[1-9]\d{7,14}$/;
 
-/** Mesma regra do backend (`normalize_e164`): `+` + DDI + número, 8 a 15
- * dígitos; separadores de digitação são aceitos. `null` = inválido. */
+/** Mesma regra do backend (`app.shared.phone.to_e164`, a do cadastro do usuário): com `+` o DDI
+ * vem no número; sem `+`, 10/11 dígitos (DDD + número) ou 12/13 começando com 55 são do Brasil.
+ * Separadores de digitação são aceitos. `null` = inválido. */
 export function normalizeE164(raw: string): string | null {
-  const candidate = raw.replace(/[\s().-]/g, "");
-  return E164.test(candidate) ? candidate : null;
+  const compact = raw.trim().replace(/[\s().-]/g, "");
+  let digits = "";
+  if (compact.startsWith("+")) digits = compact.slice(1);
+  else if (/^\d{10,11}$/.test(compact)) digits = `55${compact}`;
+  else if (/^55\d{10,11}$/.test(compact)) digits = compact;
+  return E164_DIGITS.test(digits) ? `+${digits}` : null;
 }
 
 // ---- rótulos -------------------------------------------------------------------------
@@ -336,9 +359,13 @@ export const CHANNEL_STATUS_LABELS: Record<ChannelStatus, string> = {
 
 export const DELIVERY_KIND_LABELS: Record<DeliveryKind, string> = {
   daily_digest: "Resumo diário",
+  weekly_report: "Resumo semanal",
+  monthly_report: "Resumo mensal",
   new_lead_alert: "Alerta de novos leads",
-  overdue_task_alert: "Aviso de tarefa atrasada",
+  follow_up_alert: "Aviso de retorno pendente",
+  unassigned_lead_alert: "Aviso de lead sem responsável",
   stalled_lead_alert: "Aviso de oportunidade parada",
+  overdue_task_alert: "Aviso de tarefa atrasada (antigo)",
 };
 
 /** Nenhum destes é "enviado": `skipped`/`channel_unavailable` são estados
@@ -477,6 +504,15 @@ export function applyPatch(
     },
     triggers: {
       newLead: { enabled: patch.triggers?.new_lead?.enabled ?? policy.triggers.newLead.enabled },
+      dailyDigest: {
+        enabled: patch.triggers?.daily_digest?.enabled ?? policy.triggers.dailyDigest.enabled,
+      },
+      weeklyReport: {
+        enabled: patch.triggers?.weekly_report?.enabled ?? policy.triggers.weeklyReport.enabled,
+      },
+      monthlyReport: {
+        enabled: patch.triggers?.monthly_report?.enabled ?? policy.triggers.monthlyReport.enabled,
+      },
     },
   };
 }

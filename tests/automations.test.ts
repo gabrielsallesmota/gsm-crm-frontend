@@ -94,12 +94,14 @@ describe("o que muda no PUT", () => {
 
 describe("textos e permissões", () => {
   it("toda regra tem texto para cada parâmetro e diz se avisa pessoas", () => {
-    for (const key of ["follow_up", "overdue_task", "stalled_opportunity"] as const) {
+    for (const key of ["follow_up", "unassigned_lead", "stalled_opportunity"] as const) {
       assert.ok(RULE_COPY[key].title.length > 0);
       assert.ok(Object.keys(RULE_COPY[key].params).length > 0);
     }
+    assert.ok(RULE_COPY.follow_up_due.title.length > 0); // sem parâmetro: só liga/desliga
     assert.equal(RULE_COPY.follow_up.notifies, false); // só cria tarefa interna
-    assert.equal(RULE_COPY.overdue_task.notifies, true);
+    assert.equal(RULE_COPY.follow_up_due.notifies, true);
+    assert.equal(RULE_COPY.unassigned_lead.notifies, true);
   });
 
   it("admin gerencia, gestor só consulta, vendedor nada; suporte da GSM nunca altera", () => {

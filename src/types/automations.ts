@@ -1,6 +1,12 @@
-/** Automações comerciais (CRM-003C). Quatro regras próprias por empresa (a de renovação é do módulo Clientes); o resumo diário e o
- * aviso de novo lead já vivem na Central de Notificações e são só apresentados junto. */
-export type AutomationKey = "follow_up" | "overdue_task" | "stalled_opportunity" | "renewal";
+/** Automações comerciais. Regras próprias por empresa (a de renovação é do módulo Clientes); os
+ * resumos e o aviso de novo lead vivem na Central de Notificações e são só apresentados junto.
+ * "Tarefa atrasada" foi aposentada: tarefas e compromissos vão consolidados nos resumos. */
+export type AutomationKey =
+  | "follow_up"
+  | "follow_up_due"
+  | "unassigned_lead"
+  | "stalled_opportunity"
+  | "renewal";
 
 export interface ParamLimits {
   minimum: number;

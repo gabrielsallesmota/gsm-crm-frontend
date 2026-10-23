@@ -348,8 +348,8 @@ describe("WhatsappContactPanel", () => {
 
   it("telefone inválido é recusado no cliente, sem chamar a API", () => {
     renderPanel();
-    fireEvent.change(screen.getByLabelText("Telefone com DDI"), {
-      target: { value: "11987654321" },
+    fireEvent.change(screen.getByLabelText("Telefone (o mesmo do seu cadastro)"), {
+      target: { value: "987654321" }, // sem DDD (mesma regra do cadastro)
     });
     fireEvent.click(screen.getByRole("button", { name: "Salvar telefone" }));
     expect(screen.getByRole("alert").textContent).toContain("Telefone inválido");
@@ -369,7 +369,7 @@ describe("WhatsappContactPanel", () => {
       ),
     );
     const { onSaved } = renderPanel();
-    fireEvent.change(screen.getByLabelText("Telefone com DDI"), {
+    fireEvent.change(screen.getByLabelText("Telefone (o mesmo do seu cadastro)"), {
       target: { value: "+55 (11) 98765-4321" },
     });
     fireEvent.click(screen.getByRole("checkbox"));
@@ -387,7 +387,7 @@ describe("WhatsappContactPanel", () => {
       prefs({ version: 3 }, { phone: "+5511987654321", status: "no_consent" }),
     );
     renderPanel();
-    fireEvent.change(screen.getByLabelText("Telefone com DDI"), {
+    fireEvent.change(screen.getByLabelText("Telefone (o mesmo do seu cadastro)"), {
       target: { value: "+5511987654321" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Salvar telefone" }));
@@ -442,7 +442,7 @@ describe("WhatsappContactPanel", () => {
       prefs({ version: 3 }, { phone: "+5521912345678", consent: false, status: "no_consent" }),
     );
     render(<StatefulWhatsapp initial={granted} />);
-    fireEvent.change(screen.getByLabelText("Telefone com DDI"), {
+    fireEvent.change(screen.getByLabelText("Telefone (o mesmo do seu cadastro)"), {
       target: { value: "+5521912345678" },
     });
     expect(screen.getByRole("alert").textContent).toContain("deixam de valer");
@@ -458,7 +458,7 @@ describe("WhatsappContactPanel", () => {
 
   it("sessão de suporte: tudo desabilitado", () => {
     renderPanel(prefs(), true);
-    expect((screen.getByLabelText("Telefone com DDI") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Telefone (o mesmo do seu cadastro)") as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByRole("checkbox") as HTMLInputElement).disabled).toBe(true);
   });
 });
@@ -969,7 +969,7 @@ describe("MyNotificationsPage", () => {
   it("vendedor gerencia a própria preferência, telefone e consentimento", async () => {
     renderAs(user({ role: "vendedor" }), <MyNotificationsPage />);
     expect(await screen.findByRole("button", { name: "Salvar preferências" })).toBeTruthy();
-    expect(screen.getByLabelText("Telefone com DDI")).toBeTruthy();
+    expect(screen.getByLabelText("Telefone (o mesmo do seu cadastro)")).toBeTruthy();
     for (const name of ["Preferências", "Prévia", "Meu histórico"]) {
       expect(screen.getByRole("tab", { name })).toBeTruthy();
     }
@@ -981,7 +981,7 @@ describe("MyNotificationsPage", () => {
       <MyNotificationsPage />,
     );
     expect(await screen.findByText(/Sessão de suporte/)).toBeTruthy();
-    expect((screen.getByLabelText("Telefone com DDI") as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Telefone (o mesmo do seu cadastro)") as HTMLInputElement).disabled).toBe(true);
     expect(screen.queryByRole("button", { name: "Salvar preferências" })).toBeNull();
   });
 

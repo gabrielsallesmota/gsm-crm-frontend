@@ -39,7 +39,13 @@ export interface NotificationPolicy {
     calendar: ToggleSection;
     opportunities: ToggleSection;
   };
-  triggers: { newLead: { enabled: boolean } };
+  /** Cada automação da Central liga/desliga sozinha (`enabled` acima é a chave geral). */
+  triggers: {
+    newLead: { enabled: boolean };
+    dailyDigest: { enabled: boolean };
+    weeklyReport: { enabled: boolean };
+    monthlyReport: { enabled: boolean };
+  };
 }
 
 /** Alterações PARCIAIS no formato aninhado da API (só o que mudou).
@@ -64,7 +70,14 @@ export interface PolicyPatch {
           { enabled?: boolean | undefined; max_items?: number | undefined } | undefined;
       }
     | undefined;
-  triggers?: { new_lead?: { enabled?: boolean | undefined } | undefined } | undefined;
+  triggers?:
+    | {
+        new_lead?: { enabled?: boolean | undefined } | undefined;
+        daily_digest?: { enabled?: boolean | undefined } | undefined;
+        weekly_report?: { enabled?: boolean | undefined } | undefined;
+        monthly_report?: { enabled?: boolean | undefined } | undefined;
+      }
+    | undefined;
 }
 
 export type NotReceivingReason = "company_disabled" | "role_not_recipient" | "user_opted_out";
@@ -164,9 +177,14 @@ export interface DigestPreview {
 
 export type DeliveryKind =
   | "daily_digest"
+  | "weekly_report"
+  | "monthly_report"
   | "new_lead_alert"
-  | "overdue_task_alert"
-  | "stalled_lead_alert";
+  | "follow_up_alert"
+  | "unassigned_lead_alert"
+  | "stalled_lead_alert"
+  /** Histórico: tarefa atrasada não avisa mais sozinha (vai nos resumos). */
+  | "overdue_task_alert";
 export type DeliveryStatus =
   "skipped" | "channel_unavailable" | "pending" | "sent" | "failed" | "expired";
 

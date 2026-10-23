@@ -41,14 +41,25 @@ const RULES = {
       updated_at: null,
     },
     {
-      key: "overdue_task",
+      key: "unassigned_lead",
       enabled: true,
-      params: { grace_minutes: 60 },
-      limits: { grace_minutes: { minimum: 0, maximum: 1440, default: 60 } },
+      params: { hours_without_owner: 2 },
+      limits: { hours_without_owner: { minimum: 1, maximum: 72, default: 2 } },
       version: 2,
       persisted: true,
       updated_at: "2026-10-13T12:00:00Z",
     },
+    {
+      key: "follow_up_due",
+      enabled: false,
+      params: {},
+      limits: {},
+      version: 0,
+      persisted: false,
+      updated_at: null,
+    },
+    // regra aposentada que um backend antigo ainda mande: a tela ignora
+    { key: "overdue_task", enabled: true, params: {}, limits: {}, version: 1, persisted: true },
     {
       key: "stalled_opportunity",
       enabled: false,
@@ -122,20 +133,25 @@ function card(name: RegExp) {
 }
 
 describe("AutomationsPage", () => {
-  it("mostra as cinco automações e deixa claro que nada vai para o cliente", async () => {
+  it("mostra as sete automações padronizadas e deixa claro que nada vai para o cliente", async () => {
     renderAs(user(), <AutomationsPage />);
     expect(await screen.findByRole("heading", { name: /Follow-up automático/ })).toBeTruthy();
     for (const title of [
       /Novo lead/,
-      /Follow-up automático/,
-      /Tarefa atrasada/,
-      /Resumo diário/,
+      /Follow-up pendente/,
+      /Lead sem responsável/,
       /Oportunidade parada/,
+      /Resumo diário/,
+      /Resumo semanal/,
+      /Resumo mensal/,
+      /Follow-up automático/,
     ]) {
       expect(screen.getByRole("heading", { name: title })).toBeTruthy();
     }
+    // tarefa atrasada foi aposentada: tarefas vão consolidadas nos resumos
+    expect(screen.queryByRole("heading", { name: /Tarefa atrasada/ })).toBeNull();
     expect(screen.getByText(/Nenhuma delas envia mensagem para o cliente/)).toBeTruthy();
-    expect(screen.getAllByText("Central de Notificações")).toHaveLength(2); // as 2 reaproveitadas
+    expect(screen.getAllByText("Central de Notificações")).toHaveLength(4); // resumos + novo lead
   });
 
   it("admin liga o follow-up, ajusta os dias e salva só o que mudou, com a versão lida", async () => {
@@ -188,14 +204,14 @@ describe("AutomationsPage", () => {
   it("409 não sobrescreve: avisa e oferece recarregar", async () => {
     automations.update.mockRejectedValue(new ApiError(409, "conflito"));
     renderAs(user(), <AutomationsPage />);
-    await screen.findByRole("heading", { name: /Tarefa atrasada/ });
-    const overdue = card(/Tarefa atrasada/);
-    fireEvent.change(within(overdue).getByLabelText("Tolerância após o vencimento"), {
-      target: { value: "30" },
+    await screen.findByRole("heading", { name: /Lead sem responsável/ });
+    const unassigned = card(/Lead sem responsável/);
+    fireEvent.change(within(unassigned).getByLabelText("Horas sem responsável"), {
+      target: { value: "5" },
     });
-    fireEvent.click(within(overdue).getByRole("button", { name: "Salvar" }));
-    expect((await within(overdue).findByRole("alert")).textContent).toMatch(/NÃO foram salvas/);
-    fireEvent.click(within(overdue).getByRole("button", { name: "Recarregar configurações" }));
+    fireEvent.click(within(unassigned).getByRole("button", { name: "Salvar" }));
+    expect((await within(unassigned).findByRole("alert")).textContent).toMatch(/NÃO foram salvas/);
+    fireEvent.click(within(unassigned).getByRole("button", { name: "Recarregar configurações" }));
     await waitFor(() => expect(automations.list).toHaveBeenCalledTimes(2));
   });
 
@@ -243,10 +259,18 @@ describe("AutomationsPage", () => {
     expect(automations.update).not.toHaveBeenCalled();
   });
 
-  it("avisa que desligar o resumo pausa todas as notificações", async () => {
+  it("cada resumo liga e desliga sozinho (sem pausar a Central inteira)", async () => {
+    notifications.updateSettings.mockResolvedValue(settings(POLICY, 5));
     renderAs(user(), <AutomationsPage />);
-    await screen.findByRole("heading", { name: /Resumo diário/ });
-    expect(within(card(/Resumo diário/)).getByText(/pausa TODAS as notificações/)).toBeTruthy();
+    await screen.findByRole("heading", { name: /Resumo semanal/ });
+    const weekly = card(/Resumo semanal/);
+    fireEvent.click(within(weekly).getByRole("checkbox", { name: "Ativar Resumo semanal" }));
+    fireEvent.click(within(weekly).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(notifications.updateSettings).toHaveBeenCalledTimes(1));
+    expect(notifications.updateSettings).toHaveBeenCalledWith({
+      version: 4,
+      policy: { triggers: { weekly_report: { enabled: true } } },
+    });
   });
 
   it("sem a Central de Notificações contratada, as duas reaproveitadas ficam indisponíveis", async () => {

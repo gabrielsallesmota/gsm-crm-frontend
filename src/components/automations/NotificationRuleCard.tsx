@@ -9,36 +9,52 @@ import type { NotificationSettings, PolicyPatch } from "../../types/notification
 import notify from "../notifications/Notifications.module.css";
 import styles from "./Automations.module.css";
 
-export type NotificationRuleId = "daily_digest" | "new_lead";
+export type NotificationRuleId = "new_lead" | "daily_digest" | "weekly_report" | "monthly_report";
 
 const COPY: Record<
   NotificationRuleId,
   { title: string; summary: string; detail: string; note?: string }
 > = {
+  new_lead: {
+    title: "Novo lead",
+    summary: "Avisa o responsável — e, sem dono, os vendedores do nicho — quando um lead chega.",
+    detail:
+      "Os avisos chegam agrupados, a cada poucos minutos. Quem atribui a si mesmo não é avisado.",
+  },
   daily_digest: {
     title: "Resumo diário",
     summary: "Junta tarefas, compromissos e leads pendentes em uma mensagem por pessoa.",
     detail: "Horário, conteúdo e quem recebe ficam na Central de Notificações.",
-    note: "Desligar aqui pausa TODAS as notificações da empresa: resumo diário, novo lead, tarefa atrasada e oportunidade parada.",
   },
-  new_lead: {
-    title: "Novo lead",
-    summary: "Avisa o responsável quando um lead é criado ou atribuído a ele.",
-    detail:
-      "Os avisos chegam agrupados, a cada poucos minutos. Quem atribui a si mesmo não é avisado.",
+  weekly_report: {
+    title: "Resumo semanal",
+    summary: "Toda segunda: resultados da semana, retornos, tarefas atrasadas e próximos compromissos.",
+    detail: "Sai no horário do resumo diário. Gestores recebem o da equipe; vendedores, o deles.",
+  },
+  monthly_report: {
+    title: "Resumo mensal",
+    summary: "Todo dia 1º: leads novos, ganhos, perdidos e a conversão do mês anterior.",
+    detail: "Sai no horário do resumo diário. Gestores recebem o da equipe; vendedores, o deles.",
   },
 };
 
+const TRIGGER = {
+  new_lead: "newLead",
+  daily_digest: "dailyDigest",
+  weekly_report: "weeklyReport",
+  monthly_report: "monthlyReport",
+} as const;
+
 function isOn(id: NotificationRuleId, settings: NotificationSettings): boolean {
-  return id === "daily_digest" ? settings.policy.enabled : settings.policy.triggers.newLead.enabled;
+  return settings.policy.triggers[TRIGGER[id]].enabled;
 }
 
 function patchFor(id: NotificationRuleId, enabled: boolean): PolicyPatch {
-  return id === "daily_digest" ? { enabled } : { triggers: { new_lead: { enabled } } };
+  return { triggers: { [id]: { enabled } } };
 }
 
 /**
- * Resumo diário e novo lead JÁ EXISTEM na Central de Notificações (CRM-003B): este cartão
+ * Resumos (diário, semanal, mensal) e novo lead vivem na Central de Notificações: este cartão
  * só apresenta o mesmo interruptor junto das demais automações e grava pela MESMA API
  * (`PATCH /notifications/settings`) — sem uma segunda fonte de verdade.
  * `settings === null` = a empresa não tem a Central de Notificações ou a pessoa não tem acesso.

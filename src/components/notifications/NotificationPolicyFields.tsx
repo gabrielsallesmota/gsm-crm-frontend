@@ -309,7 +309,7 @@ export function NotificationPolicyFields({
             checked={value.triggers.newLead.enabled}
             disabled={Boolean(locks.newLead) && !value.triggers.newLead.enabled}
             onChange={(e) =>
-              set((d) => ({ ...d, triggers: { newLead: { enabled: e.target.checked } } }))
+              set((d) => ({ ...d, triggers: { ...d.triggers, newLead: { enabled: e.target.checked } } }))
             }
           />
           <span>Avisar quando chegarem novos leads (agrupados a cada 5 minutos)</span>

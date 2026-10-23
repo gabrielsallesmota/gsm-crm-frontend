@@ -295,12 +295,14 @@ describe("ajuste por perfil esparso", () => {
 });
 
 describe("telefone E.164", () => {
-  it("aceita formato internacional com separadores", () => {
+  it("aceita formato internacional e o do cadastro (DDD + número = Brasil)", () => {
     assert.equal(normalizeE164("+5511987654321"), "+5511987654321");
     assert.equal(normalizeE164("+55 (11) 98765-4321"), "+5511987654321");
+    assert.equal(normalizeE164("(11) 98765-4321"), "+5511987654321");
+    assert.equal(normalizeE164("5511987654321"), "+5511987654321");
   });
   it("recusa o que o backend recusaria", () => {
-    for (const raw of ["11987654321", "5511987654321", "+0123456789", "+55", "abc", ""]) {
+    for (const raw of ["987654321", "+0123456789", "+55", "abc", ""]) {
       assert.equal(normalizeE164(raw), null, raw);
     }
   });

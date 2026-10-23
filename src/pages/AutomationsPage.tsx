@@ -10,7 +10,10 @@ import { hasFeature } from "../auth/features";
 import { isImpersonating } from "../auth/impersonation";
 import { ROUTES } from "../constants/routes";
 import { notificationsService } from "../services/NotificationsService";
-import { NotificationRuleCard } from "../components/automations/NotificationRuleCard";
+import {
+  NotificationRuleCard,
+  type NotificationRuleId,
+} from "../components/automations/NotificationRuleCard";
 import { RuleCard } from "../components/automations/RuleCard";
 import { ResourceGate } from "../components/notifications/ResourceGate";
 import type { AutomationKey, AutomationRule } from "../types/automations";
@@ -20,11 +23,12 @@ import styles from "../components/integrations/Integrations.module.css";
 import local from "../components/automations/Automations.module.css";
 
 /**
- * Configurações → Automações comerciais (CRM-003C). Seis automações, uma lista: quatro regras
- * próprias (follow-up, renovação de contrato, tarefa atrasada, oportunidade parada — `/automations`) e duas que já
- * existiam na Central de Notificações (resumo diário e novo lead), mostradas aqui e gravadas
- * pela MESMA API de lá. Admin edita; gestor consulta; o backend recusa o resto (403).
- * Nenhuma regra envia mensagem para cliente final.
+ * Configurações → Automações comerciais. As sete automações padronizadas — novo lead, follow-up
+ * pendente, lead sem responsável, lead parado e os resumos diário/semanal/mensal — mais as duas
+ * que criam tarefas (follow-up automático e renovação). Regras próprias em `/automations`; os
+ * resumos e o novo lead são gravados pela MESMA API da Central de Notificações. Admin edita;
+ * gestor consulta; o backend recusa o resto (403). Nenhuma regra fala com o cliente final, e
+ * tarefas/compromissos não geram aviso individual: vão consolidados nos resumos.
  */
 export function AutomationsPage() {
   const { user } = useAuth();
@@ -64,7 +68,7 @@ export function AutomationsPage() {
     );
   }
 
-  function notificationCard(id: "daily_digest" | "new_lead") {
+  function notificationCard(id: NotificationRuleId) {
     const current = settings.value;
     return (
       <NotificationRuleCard
@@ -104,11 +108,14 @@ export function AutomationsPage() {
         {() => (
           <ul className={local.list} aria-label="Automações">
             {notificationCard("new_lead")}
+            {ruleCard("follow_up_due")}
+            {ruleCard("unassigned_lead")}
+            {ruleCard("stalled_opportunity")}
+            {notificationCard("daily_digest")}
+            {notificationCard("weekly_report")}
+            {notificationCard("monthly_report")}
             {ruleCard("follow_up")}
             {hasFeature(user, "clients") && ruleCard("renewal")}
-            {ruleCard("overdue_task")}
-            {notificationCard("daily_digest")}
-            {ruleCard("stalled_opportunity")}
           </ul>
         )}
       </ResourceGate>

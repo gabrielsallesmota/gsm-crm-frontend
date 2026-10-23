@@ -25,8 +25,11 @@ const STATUS_OPTIONS: DeliveryStatus[] = [
 ];
 const KIND_OPTIONS: DeliveryKind[] = [
   "daily_digest",
+  "weekly_report",
+  "monthly_report",
   "new_lead_alert",
-  "overdue_task_alert",
+  "follow_up_alert",
+  "unassigned_lead_alert",
   "stalled_lead_alert",
 ];
 
