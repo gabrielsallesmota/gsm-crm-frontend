@@ -31,9 +31,10 @@ import type {
 } from "../types/connections";
 
 /**
- * Conexões Google/Microsoft (CRM-003B.4 a B.6). O navegador NUNCA vê token,
+ * Conexões Google/Microsoft/Apple (CRM-003B.4 a B.6). O navegador NUNCA vê token,
  * segredo ou código de troca: ele só recebe a URL de consentimento e devolve
- * ao backend o que o provedor mandou de volta. Autorização, escopo e
+ * ao backend o que o provedor mandou de volta. Na Apple a pessoa digita a senha de
+ * app, que vai uma única vez ao backend e nunca volta. Autorização, escopo e
  * isolamento por usuário/empresa são do backend.
  */
 
@@ -53,7 +54,7 @@ export interface CompleteAuthorizationInput {
 
 export interface ConnectionsApi {
   overview(): Promise<ProvidersOverview>;
-  updatePolicy(googleAllowed: boolean, microsoftAllowed: boolean): Promise<CompanyPolicy>;
+  updatePolicy(policy: Omit<CompanyPolicy, "persisted">): Promise<CompanyPolicy>;
   list(): Promise<Connection[]>;
   /** Devolve a URL de consentimento do provedor (o app redireciona o navegador). */
   authorize(provider: ProviderId, features: ConnectionFeature[]): Promise<string>;
@@ -61,6 +62,8 @@ export interface ConnectionsApi {
     provider: ProviderId,
     input: CompleteAuthorizationInput,
   ): Promise<CallbackResult>;
+  /** Apple: Apple ID + senha de app (conectar ou reconectar a mesma conta). */
+  connectWithPassword(provider: ProviderId, username: string, appPassword: string): Promise<Connection>;
   update(connectionId: string, patch: ConnectionPatch): Promise<Connection>;
   disconnect(connectionId: string, purgeImported: boolean): Promise<DisconnectResult>;
   calendars(connectionId: string): Promise<CalendarChoice[]>;
@@ -77,10 +80,14 @@ class ConnectionsApiClient implements ConnectionsApi {
     return toOverview(await apiRequest<Dto>(`${BASE}/providers`));
   }
 
-  async updatePolicy(googleAllowed: boolean, microsoftAllowed: boolean): Promise<CompanyPolicy> {
+  async updatePolicy(policy: Omit<CompanyPolicy, "persisted">): Promise<CompanyPolicy> {
     const dto = await apiRequest<Dto>(
       `${BASE}/policy`,
-      json("PUT", { google_allowed: googleAllowed, microsoft_allowed: microsoftAllowed }),
+      json("PUT", {
+        google_allowed: policy.googleAllowed,
+        microsoft_allowed: policy.microsoftAllowed,
+        apple_allowed: policy.appleAllowed,
+      }),
     );
     return toPolicy(dto);
   }
@@ -105,6 +112,19 @@ class ConnectionsApiClient implements ConnectionsApi {
     if (input.errorDescription) body.error_description = input.errorDescription;
     return toCallbackResult(
       await apiRequest<Dto>(`${BASE}/${provider}/callback`, json("POST", body)),
+    );
+  }
+
+  async connectWithPassword(
+    provider: ProviderId,
+    username: string,
+    appPassword: string,
+  ): Promise<Connection> {
+    return toConnection(
+      await apiRequest<Dto>(
+        `${BASE}/${provider}/connect`,
+        json("POST", { username, app_password: appPassword }),
+      ),
     );
   }
 
@@ -196,7 +216,7 @@ class ConnectionsApiClient implements ConnectionsApi {
 function unavailable(): never {
   throw new NotImplementedError(
     "Conexões",
-    "As conexões com Google e Microsoft não estão disponíveis na demonstração.",
+    "As conexões com Google, Microsoft e Apple não estão disponíveis na demonstração.",
   );
 }
 
@@ -206,6 +226,7 @@ const demo: ConnectionsApi = {
   list: async () => unavailable(),
   authorize: async () => unavailable(),
   completeAuthorization: async () => unavailable(),
+  connectWithPassword: async () => unavailable(),
   update: async () => unavailable(),
   disconnect: async () => unavailable(),
   calendars: async () => unavailable(),

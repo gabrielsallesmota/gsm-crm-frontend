@@ -36,20 +36,22 @@ export function RequirePermission({
 }
 
 /** Rota de um módulo CONTRATÁVEL (Etapa 2): sem a feature, mostra "não
- * contratado" em vez da tela (o backend responde 403 de qualquer jeito). */
+ * contratado" em vez da tela (o backend responde 403 de qualquer jeito).
+ * Com uma lista, basta UMA (ex.: Conversas = WhatsApp ou Instagram). */
 export function RequireFeature({
   feature,
   children,
 }: {
-  feature: TenantFeature;
+  feature: TenantFeature | TenantFeature[];
   children: ReactNode;
 }) {
   const { user } = useAuth();
-  if (hasFeature(user, feature)) return <>{children}</>;
+  const features = Array.isArray(feature) ? feature : [feature];
+  if (features.some((f) => hasFeature(user, f))) return <>{children}</>;
   return (
     <EmptyState
       tone="forbidden"
-      title={`${FEATURE_LABELS[feature]} não contratado`}
+      title={`${features.map((f) => FEATURE_LABELS[f]).join(" / ")} não contratado`}
       message="Este módulo não faz parte do plano da sua organização. Fale com a GSM para habilitá-lo."
       actions={[{ label: "Voltar ao início", to: ROUTES.dashboard }]}
     />

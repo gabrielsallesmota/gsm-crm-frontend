@@ -7,6 +7,8 @@ export const ROUTES = {
   pipeline: "/pipeline",
   leads: "/leads",
   leadDetail: (id: string) => `/leads/${id}`,
+  conversas: "/conversas",
+  conversaDetail: (id: string) => `/conversas/${id}`,
   clientes: "/clientes",
   financeiro: "/financeiro",
   clienteDetail: (id: string) => `/clientes/${id}`,
@@ -26,6 +28,7 @@ export const ROUTES = {
   relatorios: "/relatorios",
   configuracoes: "/configuracoes",
   integracoes: "/configuracoes/integracoes",
+  instagramRetorno: "/configuracoes/integracoes/instagram/callback",
   // Central de Notificações (CRM-003B.3).
   notificacoes: "/configuracoes/notificacoes",
   minhasNotificacoes: "/perfil/notificacoes",

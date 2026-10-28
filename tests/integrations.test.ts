@@ -156,3 +156,23 @@ describe("timeline: atividade de integração", () => {
     assert.equal(view.detail, "Cliente respondeu");
   });
 });
+
+describe("Instagram — situação da conexão", () => {
+  it("diz o que a pessoa precisa saber", async () => {
+    const { describeInstagram } = await import("../src/utils/instagram.ts");
+    const base = {
+      username: "loja",
+      accountType: "BUSINESS",
+      tokenExpiresAt: null,
+      lastWebhookAt: null,
+      error: null,
+      connectedAt: "2026-10-27T10:00:00Z",
+    };
+    assert.deepEqual(describeInstagram({ ...base, status: "active", receiving: true }), {
+      tone: "ok",
+      label: "Recebendo Directs",
+    });
+    assert.equal(describeInstagram({ ...base, status: "active", receiving: false }).tone, "warn");
+    assert.equal(describeInstagram({ ...base, status: "needs_reconnect", receiving: false }).label, "Precisa reconectar");
+  });
+});

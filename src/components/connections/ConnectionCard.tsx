@@ -11,6 +11,7 @@ import {
   describeConnectionError,
   connectionAttention,
   FEATURE_LABEL,
+  isCalendarOnly,
   PROVIDER_LABEL,
   SYNC_STATUS_LABEL,
 } from "../../utils/connections";
@@ -38,6 +39,7 @@ export function ConnectionCard({
   const [selecting, setSelecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [showRuns, setShowRuns] = useState(false);
+  const calendarOnly = isCalendarOnly(connection.provider);
 
   const attention = connectionAttention(connection);
   const provider = PROVIDER_LABEL[connection.provider];
@@ -77,7 +79,9 @@ export function ConnectionCard({
       onRemoved(connection.id);
       toast(
         result.providerRevoked === false
-          ? "Conexão removida. Revogue o acesso também nas configurações da conta do provedor."
+          ? connection.provider === "apple"
+            ? "Conexão removida. Apague também a senha de app “GSM CRM” em account.apple.com."
+            : "Conexão removida. Revogue o acesso também nas configurações da conta do provedor."
           : "Conta desconectada.",
       );
       return true;
@@ -140,14 +144,16 @@ export function ConnectionCard({
           />
           {FEATURE_LABEL.calendar}
         </label>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={connection.tasksEnabled}
-            onChange={(e) => void patch({ tasksEnabled: e.target.checked }, "Preferência salva.")}
-          />
-          {FEATURE_LABEL.tasks}
-        </label>
+        {!calendarOnly && (
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={connection.tasksEnabled}
+              onChange={(e) => void patch({ tasksEnabled: e.target.checked }, "Preferência salva.")}
+            />
+            {FEATURE_LABEL.tasks}
+          </label>
+        )}
         <label className={styles.check}>
           <input
             type="checkbox"
@@ -178,7 +184,7 @@ export function ConnectionCard({
         ) : (
           <>
             <Button disabled={readOnly || busy} onClick={() => setSelecting(true)}>
-              Escolher calendários e listas
+              {calendarOnly ? "Escolher calendários" : "Escolher calendários e listas"}
             </Button>
             <Button
               variant="primary"

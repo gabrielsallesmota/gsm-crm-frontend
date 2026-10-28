@@ -23,7 +23,9 @@ export type TenantFeature =
   | "api"
   | "webhooks"
   | "notifications"
-  | "calendar_task_integrations";
+  | "calendar_task_integrations"
+  | "instagram"
+  | "whatsapp";
 
 export const FEATURE_DEFAULTS: Record<TenantFeature, boolean> = {
   crm: true,
@@ -34,6 +36,8 @@ export const FEATURE_DEFAULTS: Record<TenantFeature, boolean> = {
   webhooks: false,
   notifications: false,
   calendar_task_integrations: false,
+  instagram: false,
+  whatsapp: false,
 };
 
 export const FEATURE_LABELS: Record<TenantFeature, string> = {
@@ -45,6 +49,8 @@ export const FEATURE_LABELS: Record<TenantFeature, string> = {
   webhooks: "Webhooks",
   notifications: "Central de Notificações",
   calendar_task_integrations: "Agendas e tarefas Google/Microsoft",
+  instagram: "Instagram Direct",
+  whatsapp: "WhatsApp",
 };
 
 type WithFeatures = Pick<AuthUser, "features"> | null | undefined;

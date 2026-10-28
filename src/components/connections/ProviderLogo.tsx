@@ -9,7 +9,13 @@ import styles from "./ProviderLogo.module.css";
 export function ProviderLogo({ provider, size = 22 }: { provider: ProviderId; size?: number }) {
   return (
     <span className={styles.badge} style={{ width: size + 12, height: size + 12 }} aria-hidden="true">
-      {provider === "google" ? <GoogleG size={size} /> : <MicrosoftSquares size={size} />}
+      {provider === "google" ? (
+        <GoogleG size={size} />
+      ) : provider === "apple" ? (
+        <AppleMark size={size} />
+      ) : (
+        <MicrosoftSquares size={size} />
+      )}
     </span>
   );
 }
@@ -32,6 +38,17 @@ function GoogleG({ size }: { size: number }) {
       <path
         fill="#34A853"
         d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </svg>
+  );
+}
+
+function AppleMark({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" focusable="false">
+      <path
+        fill="#000"
+        d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.19-1.73-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.88-.76-1.48.02-2.85.86-3.61 2.19-1.54 2.67-.39 6.62 1.11 8.79.73 1.06 1.6 2.25 2.75 2.2 1.1-.04 1.52-.71 2.85-.71 1.33 0 1.71.71 2.88.69 1.19-.02 1.94-1.08 2.66-2.15.84-1.23 1.19-2.42 1.21-2.48-.03-.01-2.31-.89-2.32-3.53zM14.18 6.13c.61-.74 1.02-1.76.9-2.78-.88.04-1.94.58-2.57 1.32-.56.65-1.06 1.69-.93 2.69.98.08 1.98-.5 2.6-1.23z"
       />
     </svg>
   );

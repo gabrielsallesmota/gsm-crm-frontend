@@ -42,6 +42,8 @@ const TasksPage = lazyPage(() => import("../pages/TasksPage"), "TasksPage");
 const AgendaPage = lazyPage(() => import("../pages/AgendaPage"), "AgendaPage");
 const ReportsPage = lazyPage(() => import("../pages/ReportsPage"), "ReportsPage");
 const SettingsPage = lazyPage(() => import("../pages/SettingsPage"), "SettingsPage");
+const ConversationsPage = lazyPage(() => import("../pages/ConversationsPage"), "ConversationsPage");
+const InstagramCallbackPage = lazyPage(() => import("../pages/InstagramCallbackPage"), "InstagramCallbackPage");
 const UsersPage = lazyPage(() => import("../pages/UsersPage"), "UsersPage");
 const ProfilePage = lazyPage(() => import("../pages/ProfilePage"), "ProfilePage");
 
@@ -97,7 +99,7 @@ function guarded(permission: Permission, page: ReactNode) {
 }
 
 const internal = (page: ReactNode) => guarded("platform.internal", page);
-const contracted = (feature: TenantFeature, page: ReactNode) => (
+const contracted = (feature: TenantFeature | TenantFeature[], page: ReactNode) => (
   <RequireFeature feature={feature}>
     <Suspense fallback={<Loading />}>{page}</Suspense>
   </RequireFeature>
@@ -156,6 +158,11 @@ export const router = createBrowserRouter([
       { path: ROUTES.pipeline, element: contracted("crm", <PipelinePage />) },
       { path: ROUTES.leads, element: contracted("crm", <LeadsPage />) },
       { path: `${ROUTES.leads}/:id`, element: contracted("crm", <LeadsPage />) },
+      { path: ROUTES.conversas, element: contracted(["whatsapp", "instagram"], <ConversationsPage />) },
+      {
+        path: `${ROUTES.conversas}/:id`,
+        element: contracted(["whatsapp", "instagram"], <ConversationsPage />),
+      },
       { path: ROUTES.clientes, element: contracted("clients", <ClientsPage />) },
       { path: `${ROUTES.clientes}/:id`, element: contracted("clients", <ClientsPage />) },
       { path: ROUTES.financeiro, element: internal(<FinancePage />) },
@@ -179,6 +186,10 @@ export const router = createBrowserRouter([
       { path: ROUTES.relatorios, element: contracted("reports", <ReportsPage />) },
       { path: ROUTES.configuracoes, element: guarded("settings.manage", <SettingsPage />) },
       { path: ROUTES.integracoes, element: guarded("integrations.manage", <IntegrationsPage />) },
+      {
+        path: ROUTES.instagramRetorno,
+        element: contractedAndGuarded("instagram", "integrations.manage", <InstagramCallbackPage />),
+      },
       {
         path: ROUTES.automacoes,
         element: contractedAndGuarded("crm", "automations.view", <AutomationsPage />),

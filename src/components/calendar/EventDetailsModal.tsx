@@ -4,13 +4,14 @@ import { Button } from "../common/Button";
 import { SourceBadge } from "../connections/SourceBadge";
 import { ROUTES } from "../../constants/routes";
 import { whenLabel } from "../../utils/calendarGrid";
+import { sourceLabel } from "../../utils/connections";
 import type { CalEvent } from "../../types/event";
 import form from "../common/Form.module.css";
 import styles from "./EventDetailsModal.module.css";
 
 const TYPE_LABEL: Record<string, string> = { reuniao: "Reunião", retorno: "Retorno", visita: "Visita" };
 
-/** Detalhes de um compromisso. Os de Google/Microsoft são somente leitura aqui. */
+/** Detalhes de um compromisso. Os de Google/Microsoft/Apple são somente leitura aqui. */
 export function EventDetailsModal({
   event,
   onClose,
@@ -60,8 +61,10 @@ export function EventDetailsModal({
       </dl>
       {event.readOnly && (
         <p className={styles.note} role="note">
-          Este compromisso vem do {event.source === "microsoft" ? "Microsoft" : "Google"} e é somente leitura no
-          CRM. Para alterar, use o link “Abrir no {event.source === "microsoft" ? "Microsoft" : "Google"}”.
+          Este compromisso vem do {sourceLabel(event.source ?? "crm")} e é somente leitura no CRM.{" "}
+          {event.source === "apple"
+            ? "Para alterar, use o app Calendário no iPhone, iPad ou Mac."
+            : `Para alterar, use o link “Abrir no ${sourceLabel(event.source ?? "crm")}”.`}
         </p>
       )}
       <div className={form.actions}>

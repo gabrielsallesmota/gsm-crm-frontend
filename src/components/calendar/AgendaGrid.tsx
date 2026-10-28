@@ -9,6 +9,7 @@ import {
   startOfDay,
   timeLabel,
 } from "../../utils/calendarGrid";
+import { sourceLabel } from "../../utils/connections";
 import type { CalEvent } from "../../types/event";
 import { eventTone } from "./eventTone";
 import styles from "./AgendaGrid.module.css";
@@ -19,7 +20,7 @@ const MAX_CHIPS = 3;
 
 function eventLabel(event: CalEvent): string {
   const when = event.allDay ? "dia inteiro" : timeLabel(event.at);
-  const origin = event.source === "google" ? ", Google" : event.source === "microsoft" ? ", Microsoft" : "";
+  const origin = event.source && event.source !== "crm" ? `, ${sourceLabel(event.source)}` : "";
   return `${event.title}, ${when}${origin}`;
 }
 

@@ -10,13 +10,14 @@ import { ROUTES } from "../constants/routes";
 import { ResourceGate } from "../components/notifications/ResourceGate";
 import { CompanyPolicyPanel } from "../components/connections/CompanyPolicyPanel";
 import { ProviderSection } from "../components/connections/ProviderSection";
+import { providerAllowed } from "../utils/connections";
 import type { CompanyPolicy, Connection } from "../types/connections";
 import styles from "../components/integrations/Integrations.module.css";
 import local from "../components/notifications/Notifications.module.css";
 
 /**
  * Meu perfil → Conexões (CRM-003B.4/B.5). Cada pessoa conecta e gerencia
- * SOMENTE as próprias contas Google/Microsoft; o administrador define quais
+ * SOMENTE as próprias contas Google/Microsoft/Apple; o administrador define quais
  * provedores a empresa permite. Tokens e segredos nunca chegam ao navegador.
  * Em sessão de suporte a tela é só de consulta (o backend também bloqueia).
  */
@@ -41,7 +42,13 @@ export function MyConnectionsPage() {
   };
 
   function replace(updated: Connection) {
-    setLoaded((loaded ?? []).map((c) => (c.id === updated.id ? updated : c)));
+    const current = loaded ?? [];
+    // Apple conecta sem sair da tela: a conta nova (ou reconectada) entra aqui mesmo.
+    setLoaded(
+      current.some((c) => c.id === updated.id)
+        ? current.map((c) => (c.id === updated.id ? updated : c))
+        : [...current, updated],
+    );
   }
   function remove(id: string) {
     setLoaded((loaded ?? []).filter((c) => c.id !== id));
@@ -52,7 +59,8 @@ export function MyConnectionsPage() {
       <header className={styles.header}>
         <h1 className={styles.title}>Minhas conexões</h1>
         <p className={styles.subtitle}>
-          Conecte seu Google ou Microsoft para ver seus compromissos e tarefas junto com os do CRM.
+          Conecte seu Google, Microsoft ou Apple (iCloud) para ver seus compromissos e tarefas junto
+          com os do CRM.
           A sincronização é automática (a cada 15 minutos) e você pode sincronizar na hora. O CRM
           nunca lê nem envia e-mails.
         </p>
@@ -70,7 +78,7 @@ export function MyConnectionsPage() {
           const current = policy ?? data.overview.policy;
           const providers = data.overview.providers.map((p) => ({
             ...p,
-            allowed: p.provider === "google" ? current.googleAllowed : current.microsoftAllowed,
+            allowed: providerAllowed(current, p.provider),
           }));
           return (
             <>

@@ -289,3 +289,60 @@
   color: var(--muted);
   font-size: 13.5px;
 }
+
+/* WhatsApp: QR Code de conexão. Fundo branco fixo: o leitor do celular precisa do contraste. */
+.qrBox {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+
+.qrImage {
+  width: 240px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  background: #fff;
+  padding: 8px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--border);
+}
+
+.qrSteps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  max-width: 380px;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 10px 18px;
+  border-radius: var(--radius-input);
+  background: var(--accent);
+  color: var(--on-accent);
+  text-decoration: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+  max-width: 260px;
+  margin-bottom: 6px;
+}
+
+.field select {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--border-strong);
+  background: var(--card-bg);
+  color: var(--text);
+}

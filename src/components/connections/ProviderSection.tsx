@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "../common/Button";
+import { AppleConnectForm } from "./AppleConnectForm";
 import { ConnectionCard } from "./ConnectionCard";
 import { ProviderLogo } from "./ProviderLogo";
 import { useToast } from "../../hooks/useToast";
@@ -23,7 +24,8 @@ import styles from "./Connections.module.css";
 
 /** Um provedor: estado no ambiente/empresa, “Conectar conta” e as contas do
  * usuário. O navegador só segue a URL de consentimento devolvida pelo
- * backend (state e PKCE ficam presos à sessão no servidor). */
+ * backend (state e PKCE ficam presos à sessão no servidor). A Apple não tem
+ * essa tela: conecta pelo formulário de senha de app (`AppleConnectForm`). */
 export function ProviderSection({
   info,
   connections,
@@ -42,6 +44,9 @@ export function ProviderSection({
   const { toast } = useToast();
   const [wanted, setWanted] = useState<ConnectionFeature[]>(["calendar", "tasks"]);
   const [starting, setStarting] = useState(false);
+  // Senha de app: formulário aberto (`""` = conta nova; e-mail = reconectar aquela conta).
+  const [passwordFor, setPasswordFor] = useState<string | null>(null);
+  const usesPassword = info.authKind === "app_password";
   const label = PROVIDER_LABEL[info.provider];
   const blocked = !info.configured ? "unconfigured" : !info.allowed ? "blocked" : null;
 
@@ -87,7 +92,27 @@ export function ProviderSection({
         </p>
       )}
 
-      {!blocked && (
+      {!blocked && usesPassword && (connections.length === 0 || passwordFor !== null) && (
+        <AppleConnectForm
+          key={passwordFor ?? ""}
+          initialAppleId={passwordFor ?? ""}
+          disabled={readOnly}
+          onConnected={(c) => {
+            setPasswordFor(null);
+            onChanged(c);
+          }}
+          {...(connections.length > 0 ? { onCancel: () => setPasswordFor(null) } : {})}
+        />
+      )}
+      {!blocked && usesPassword && connections.length > 0 && passwordFor === null && (
+        <div className={styles.actions}>
+          <Button disabled={readOnly} onClick={() => setPasswordFor("")}>
+            Conectar outra conta
+          </Button>
+        </div>
+      )}
+
+      {!blocked && !usesPassword && (
         <>
           <fieldset className={styles.toggles} disabled={readOnly || starting}>
             <legend>O que conectar</legend>
@@ -122,7 +147,11 @@ export function ProviderSection({
           readOnly={readOnly}
           onChanged={onChanged}
           onRemoved={onRemoved}
-          onReconnect={(conn) => void start(conn.provider, reconnectFeatures(conn))}
+          onReconnect={(conn) =>
+            usesPassword
+              ? setPasswordFor(conn.accountEmail ?? "")
+              : void start(conn.provider, reconnectFeatures(conn))
+          }
         />
       ))}
       {connections.length === 0 && !blocked && (

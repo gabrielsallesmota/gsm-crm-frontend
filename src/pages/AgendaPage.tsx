@@ -18,7 +18,7 @@ import { shiftAnchor, startOfDay, viewRange, viewTitle, type GridView } from "..
 import type { CalEvent, CalendarRange } from "../types/event";
 import styles from "./AgendaPage.module.css";
 
-type SourceFilter = "" | "crm" | "google" | "microsoft";
+type SourceFilter = "" | "crm" | "google" | "microsoft" | "apple";
 type View = GridView | "list";
 
 const VIEWS: { id: View; label: string }[] = [
@@ -172,6 +172,7 @@ export function AgendaPage() {
               <option value="crm">Somente CRM</option>
               <option value="google">Google</option>
               <option value="microsoft">Microsoft</option>
+              <option value="apple">Apple</option>
             </select>
           )}
           <div className={styles.views} role="tablist" aria-label="Visualização da agenda">

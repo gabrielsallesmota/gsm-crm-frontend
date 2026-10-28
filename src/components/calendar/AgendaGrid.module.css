@@ -21,6 +21,10 @@
   --ev: #00a4a6;
   --ev-bg: rgba(0, 164, 166, 0.16);
 }
+.toneApple {
+  --ev: #8e8e93;
+  --ev-bg: rgba(142, 142, 147, 0.18);
+}
 
 .chip,
 .block {

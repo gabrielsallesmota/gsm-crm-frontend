@@ -1,4 +1,6 @@
-export type ProviderId = "google" | "microsoft";
+export type ProviderId = "google" | "microsoft" | "apple";
+/** Como a conta conecta: tela do provedor (OAuth) ou senha de app (Apple). */
+export type AuthKind = "oauth" | "app_password";
 export type ConnectionFeature = "calendar" | "tasks";
 
 /** Origem de um compromisso/tarefa na agenda unificada. */
@@ -12,11 +14,13 @@ export interface ProviderInfo {
   /** A empresa permite este provedor? */
   allowed: boolean;
   features: ConnectionFeature[];
+  authKind: AuthKind;
 }
 
 export interface CompanyPolicy {
   googleAllowed: boolean;
   microsoftAllowed: boolean;
+  appleAllowed: boolean;
   persisted: boolean;
 }
 
@@ -96,7 +100,7 @@ export interface SyncRun {
 }
 
 export interface DisconnectResult {
-  /** `null` = o provedor não oferece revogação (Microsoft). */
+  /** `false` = o provedor não revoga por API (Microsoft, Apple): revogar na conta. */
   providerRevoked: boolean | null;
   purgedEvents: number;
   purgedTasks: number;

@@ -13,6 +13,7 @@ vi.mock("../../src/services/ConnectionsService", () => ({
     list: vi.fn(),
     authorize: vi.fn(),
     completeAuthorization: vi.fn(),
+    connectWithPassword: vi.fn(),
     update: vi.fn(),
     disconnect: vi.fn(),
     calendars: vi.fn(),
@@ -133,7 +134,12 @@ describe("Meu perfil → Conexões", () => {
     expect(screen.queryByText("Integrações permitidas pela empresa")).toBeNull();
     cleanup();
 
-    api.updatePolicy.mockResolvedValue({ googleAllowed: true, microsoftAllowed: false, persisted: true });
+    api.updatePolicy.mockResolvedValue({
+      googleAllowed: true,
+      microsoftAllowed: false,
+      appleAllowed: true,
+      persisted: true,
+    });
     renderAs(user({ role: "admin" }), <MyConnectionsPage />);
     expect(await screen.findByText("Integrações permitidas pela empresa")).toBeTruthy();
     const save = screen.getByRole("button", { name: "Salvar política" }) as HTMLButtonElement;
@@ -141,7 +147,13 @@ describe("Meu perfil → Conexões", () => {
     const microsoft = screen.getAllByRole("checkbox", { name: "Microsoft" })[0] as HTMLInputElement;
     fireEvent.click(microsoft);
     fireEvent.click(save);
-    await waitFor(() => expect(api.updatePolicy).toHaveBeenCalledWith(true, false));
+    await waitFor(() =>
+      expect(api.updatePolicy).toHaveBeenCalledWith({
+        googleAllowed: true,
+        microsoftAllowed: false,
+        appleAllowed: true,
+      }),
+    );
   });
 
   it("sessão de suporte: somente consulta", async () => {
@@ -292,6 +304,88 @@ describe("conta conectada", () => {
     );
     expect(onChanged).not.toHaveBeenCalled();
     expect(screen.getByText("ana@example.com")).toBeTruthy();
+  });
+});
+
+describe("Apple (senha de app)", () => {
+  const appleInfo = toOverview({
+    providers: [
+      {
+        provider: "apple",
+        label: "Apple",
+        configured: true,
+        allowed: true,
+        features: ["calendar"],
+        auth_kind: "app_password",
+      },
+    ],
+    policy: {},
+  }).providers[0]!;
+  const appleConn = (extra: Record<string, unknown> = {}) =>
+    conn({ id: "a1", provider: "apple", account_email: "ana@icloud.com", tasks_enabled: false, ...extra });
+
+  function section(connections: ReturnType<typeof conn>[], onChanged = vi.fn()) {
+    renderAs(
+      user(),
+      <ProviderSection
+        info={appleInfo}
+        connections={connections}
+        readOnly={false}
+        onChanged={onChanged}
+        onRemoved={vi.fn()}
+        redirect={vi.fn()}
+      />,
+    );
+    return onChanged;
+  }
+
+  it("conecta pelo formulário, sem redirecionar e sem guardar a senha na tela", async () => {
+    api.connectWithPassword.mockResolvedValue(appleConn());
+    const onChanged = section([]);
+    expect(screen.queryByText("O que conectar")).toBeNull(); // sem escolha de tarefas
+    expect(screen.getByRole("link", { name: "account.apple.com" }).getAttribute("rel")).toContain("noopener");
+    // AP-03: a pessoa sabe o que a senha de app libera e como cortar o acesso
+    const note = screen.getByRole("note");
+    expect(note.textContent).toMatch(/e-mail e os contatos do iCloud/);
+    expect(note.textContent).toMatch(/não revoga a senha na Apple/);
+    const submit = screen.getByRole("button", { name: "Conectar agenda da Apple" }) as HTMLButtonElement;
+    fireEvent.change(screen.getByLabelText("Apple ID (e-mail)"), { target: { value: "ana@icloud.com" } });
+    const password = screen.getByLabelText("Senha de app") as HTMLInputElement;
+    expect(password.type).toBe("password");
+    fireEvent.change(password, { target: { value: "MinhaSenha123" } });
+    expect(submit.disabled).toBe(true);
+    expect(screen.getByText(/não parece uma senha de app/)).toBeTruthy();
+    fireEvent.change(password, { target: { value: "abcd-efgh-ijkl-mnop" } });
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(submit);
+    await waitFor(() =>
+      expect(api.connectWithPassword).toHaveBeenCalledWith("apple", "ana@icloud.com", "abcd-efgh-ijkl-mnop"),
+    );
+    await waitFor(() => expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ id: "a1" })));
+    expect(api.authorize).not.toHaveBeenCalled();
+    expect(document.body.innerHTML).not.toContain("abcd-efgh-ijkl-mnop");
+  });
+
+  it("senha recusada mostra o motivo e limpa o campo", async () => {
+    api.connectWithPassword.mockRejectedValue(
+      new ApiError(422, "O Apple ID ou a senha de app não conferem."),
+    );
+    section([]);
+    fireEvent.change(screen.getByLabelText("Apple ID (e-mail)"), { target: { value: "ana@icloud.com" } });
+    fireEvent.change(screen.getByLabelText("Senha de app"), { target: { value: "abcdefghijklmnop" } });
+    fireEvent.click(screen.getByRole("button", { name: "Conectar agenda da Apple" }));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect((screen.getByLabelText("Senha de app") as HTMLInputElement).value).toBe("");
+  });
+
+  it("conta Apple só agenda; reconectar reabre o formulário com o Apple ID", async () => {
+    section([appleConn({ needs_reconnect: true, status: "needs_reconnect" })]);
+    expect(screen.getByText(/A Apple recusou a senha de app/)).toBeTruthy();
+    expect(screen.queryByRole("checkbox", { name: "Tarefas" })).toBeNull();
+    expect(screen.queryByLabelText("Senha de app")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Reconectar" }));
+    expect((screen.getByLabelText("Apple ID (e-mail)") as HTMLInputElement).value).toBe("ana@icloud.com");
+    expect(api.authorize).not.toHaveBeenCalled();
   });
 });
 

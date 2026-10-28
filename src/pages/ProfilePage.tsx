@@ -96,6 +96,16 @@ export function ProfilePage() {
                 →
               </span>
             </Link>
+            <Link className={styles.providerLink} to={ROUTES.minhasConexoes}>
+              <ProviderLogo provider="apple" />
+              <span className={styles.providerText}>
+                <strong>Apple</strong>
+                <span>Calendário do iCloud</span>
+              </span>
+              <span className={styles.providerArrow} aria-hidden="true">
+                →
+              </span>
+            </Link>
           </div>
         </div>
       )}

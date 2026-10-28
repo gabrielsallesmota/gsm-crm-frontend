@@ -7,9 +7,13 @@ import { hasFeature } from "../auth/features";
 import { isImpersonating, isReadOnlySupport } from "../auth/impersonation";
 import { ApiCredentialsTab } from "../components/integrations/ApiCredentialsTab";
 import { WebhooksTab } from "../components/integrations/WebhooksTab";
+import { InstagramTab } from "../components/integrations/InstagramTab";
+import { WhatsappTab } from "../components/integrations/WhatsappTab";
+import { MessagingSettingsTab } from "../components/integrations/MessagingSettingsTab";
 import styles from "../components/integrations/Integrations.module.css";
 
-type Tab = "api" | "webhooks";
+type Tab = "api" | "webhooks" | "whatsapp" | "instagram" | "conversas";
+const TABS: Tab[] = ["api", "webhooks", "whatsapp", "instagram", "conversas"];
 
 /**
  * Configurações → Integrações (Etapa 3) — só Admin do tenant (rota
@@ -21,7 +25,11 @@ export function IntegrationsPage() {
   const { user } = useAuth();
   const apiEnabled = hasFeature(user, "api");
   const webhooksEnabled = hasFeature(user, "webhooks");
-  const [tab, setTab] = useState<Tab>(apiEnabled ? "api" : "webhooks");
+  const instagramEnabled = hasFeature(user, "instagram");
+  const whatsappEnabled = hasFeature(user, "whatsapp");
+  // `?aba=instagram` (volta do login do Instagram) / `?aba=whatsapp` abre direto na aba
+  const pedida = new URLSearchParams(window.location.search).get("aba") as Tab | null;
+  const [tab, setTab] = useState<Tab>(pedida && TABS.includes(pedida) ? pedida : "api");
   const supporting = isImpersonating(user);
   const readOnly = isReadOnlySupport(user?.impersonation);
   usePageTitle("Integrações");
@@ -29,6 +37,9 @@ export function IntegrationsPage() {
   const available: { id: Tab; label: string }[] = [
     ...(apiEnabled ? [{ id: "api" as const, label: "API" }] : []),
     ...(webhooksEnabled ? [{ id: "webhooks" as const, label: "Webhooks" }] : []),
+    ...(whatsappEnabled ? [{ id: "whatsapp" as const, label: "WhatsApp" }] : []),
+    ...(instagramEnabled ? [{ id: "instagram" as const, label: "Instagram" }] : []),
+    ...(whatsappEnabled || instagramEnabled ? [{ id: "conversas" as const, label: "Conversas" }] : []),
   ];
   const current = available.some((t) => t.id === tab) ? tab : available[0]?.id;
 
@@ -56,7 +67,7 @@ export function IntegrationsPage() {
         <EmptyState
           tone="forbidden"
           title="Integrações não contratadas"
-          message="API e webhooks não fazem parte do plano desta organização. Fale com a GSM para ativar."
+          message="API, webhooks, WhatsApp e Instagram não fazem parte do plano desta organização. Fale com a GSM para ativar."
         />
       ) : (
         <>
@@ -78,6 +89,9 @@ export function IntegrationsPage() {
           {current === "webhooks" && (
             <WebhooksTab canWrite={!readOnly} canManageSecrets={!supporting} />
           )}
+          {current === "whatsapp" && <WhatsappTab readOnly={supporting} />}
+          {current === "instagram" && <InstagramTab readOnly={supporting} />}
+          {current === "conversas" && <MessagingSettingsTab readOnly={supporting} instagram={instagramEnabled} />}
         </>
       )}
     </div>

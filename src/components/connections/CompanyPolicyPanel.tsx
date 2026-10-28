@@ -20,15 +20,25 @@ export function CompanyPolicyPanel({
 }) {
   const [google, setGoogle] = useState(policy.googleAllowed);
   const [microsoft, setMicrosoft] = useState(policy.microsoftAllowed);
+  const [apple, setApple] = useState(policy.appleAllowed);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const dirty = google !== policy.googleAllowed || microsoft !== policy.microsoftAllowed;
+  const dirty =
+    google !== policy.googleAllowed ||
+    microsoft !== policy.microsoftAllowed ||
+    apple !== policy.appleAllowed;
 
   async function save() {
     setSaving(true);
     setMessage(null);
     try {
-      onSaved(await connectionsService.updatePolicy(google, microsoft));
+      onSaved(
+        await connectionsService.updatePolicy({
+          googleAllowed: google,
+          microsoftAllowed: microsoft,
+          appleAllowed: apple,
+        }),
+      );
       setMessage({ ok: true, text: "Política da empresa salva." });
     } catch (err) {
       setMessage({ ok: false, text: describeError(err, "Não foi possível salvar a política.") });
@@ -59,6 +69,10 @@ export function CompanyPolicyPanel({
             onChange={(e) => setMicrosoft(e.target.checked)}
           />
           {PROVIDER_LABEL.microsoft}
+        </label>
+        <label className={styles.check}>
+          <input type="checkbox" checked={apple} onChange={(e) => setApple(e.target.checked)} />
+          {PROVIDER_LABEL.apple}
         </label>
       </fieldset>
       {message && (

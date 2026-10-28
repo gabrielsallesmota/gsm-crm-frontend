@@ -1,6 +1,6 @@
 // Extensão `.ts` de propósito: roda também no Node (`npm test`), sem Vite.
 /**
- * Conexões Google/Microsoft (CRM-003B.4 a B.6) — regras PURAS do frontend:
+ * Conexões Google/Microsoft/Apple (CRM-003B.4 a B.6) — regras PURAS do frontend:
  * mapeamento DTO → tipos, leitura segura do retorno do OAuth, rótulos e
  * `mailto:`. Quem autoriza, valida e sincroniza é sempre o backend; nada aqui
  * guarda token ou segredo.
@@ -44,7 +44,7 @@ function list(v: unknown): unknown[] {
 }
 
 export function isProvider(v: unknown): v is ProviderId {
-  return v === "google" || v === "microsoft";
+  return v === "google" || v === "microsoft" || v === "apple";
 }
 
 function features(v: unknown): ConnectionFeature[] {
@@ -91,6 +91,7 @@ export function toProviderInfo(raw: unknown): ProviderInfo {
     configured: d.configured === true,
     allowed: d.allowed === true,
     features: features(d.features),
+    authKind: d.auth_kind === "app_password" ? "app_password" : "oauth",
   };
 }
 
@@ -99,6 +100,7 @@ export function toPolicy(raw: unknown): CompanyPolicy {
   return {
     googleAllowed: d.google_allowed !== false,
     microsoftAllowed: d.microsoft_allowed !== false,
+    appleAllowed: d.apple_allowed !== false,
     persisted: d.persisted === true,
   };
 }
@@ -199,23 +201,44 @@ export function isUsableOAuthReturn(r: OAuthReturn): boolean {
 export const PROVIDER_LABEL: Record<ProviderId, string> = {
   google: "Google",
   microsoft: "Microsoft",
+  apple: "Apple",
 };
 
 export const PROVIDER_SERVICES: Record<ProviderId, string> = {
   google: "Google Agenda e Google Tarefas",
   microsoft: "Outlook Calendário e Microsoft To Do",
+  apple: "Calendário do iCloud (iPhone, iPad e Mac)",
 };
 
 export const SOURCE_LABEL: Record<ItemSource, string> = {
   crm: "CRM",
   google: "Google",
   microsoft: "Microsoft",
+  apple: "Apple",
 };
 
 export function sourceLabel(source: string): string {
-  return source === "google" || source === "microsoft" || source === "crm"
-    ? SOURCE_LABEL[source]
-    : "CRM";
+  return source === "crm" || isProvider(source) ? SOURCE_LABEL[source] : "CRM";
+}
+
+/** A empresa permite este provedor? */
+export function providerAllowed(policy: CompanyPolicy, provider: ProviderId): boolean {
+  if (provider === "google") return policy.googleAllowed;
+  if (provider === "apple") return policy.appleAllowed;
+  return policy.microsoftAllowed;
+}
+
+/** Só a agenda (Apple: os Lembretes não têm API web). */
+export function isCalendarOnly(provider: ProviderId): boolean {
+  return provider === "apple";
+}
+
+const APP_PASSWORD = /^[a-z]{16}$/;
+
+/** Senha de app da Apple (`abcd-efgh-ijkl-mnop`, com ou sem hífen/espaço). A senha
+ * principal do Apple ID não passa aqui — o backend confere de novo no iCloud. */
+export function isAppPassword(value: string): boolean {
+  return APP_PASSWORD.test(value.replace(/[\s-]/g, "").toLowerCase());
 }
 
 export const SYNC_STATUS_LABEL: Record<SyncStatus, string> = {
@@ -234,7 +257,9 @@ export const FEATURE_LABEL: Record<ConnectionFeature, string> = {
 /** O que fazer quando a conexão precisa de atenção (texto acionável). */
 export function connectionAttention(c: Connection): string | null {
   if (c.needsReconnect) {
-    return "O acesso a esta conta expirou ou foi revogado. Conecte novamente para voltar a sincronizar.";
+    return c.provider === "apple"
+      ? "A Apple recusou a senha de app (ela foi revogada ou trocada). Gere uma nova em account.apple.com e conecte novamente."
+      : "O acesso a esta conta expirou ou foi revogado. Conecte novamente para voltar a sincronizar.";
   }
   if (c.syncStatus === "failed") {
     return c.lastErrorMessage ?? "A última sincronização falhou. Tentaremos de novo automaticamente.";
@@ -254,6 +279,7 @@ export function hasSelection(c: Connection): boolean {
 export function reconnectFeatures(c: Connection): ConnectionFeature[] {
   const used: ConnectionFeature[] = [];
   if (c.calendarEnabled) used.push("calendar");
+  if (isCalendarOnly(c.provider)) return ["calendar"];
   if (c.tasksEnabled) used.push("tasks");
   return used.length ? used : ["calendar", "tasks"];
 }

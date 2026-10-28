@@ -28,6 +28,8 @@ const PATHS = {
   moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
   // Integrações (Etapa 3) — plugue/conector.
   integrations: "M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0V8zM12 17v4",
+  // Conversas (WhatsApp/Instagram) — balão de mensagem.
+  conversations: "M4 5h16v11H9l-5 4V5zM8 9h8M8 12h5",
   // Control plane da GSM (Etapa 2) — escudo.
   platform: "M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3zM9 12l2 2 4-4",
 };

@@ -8,8 +8,11 @@ import {
   canSyncNow,
   connectionAttention,
   eligibleTargets,
+  isAppPassword,
+  isCalendarOnly,
   isUsableOAuthReturn,
   parseOAuthReturn,
+  providerAllowed,
   reconnectFeatures,
   rememberPendingProvider,
   safeExternalUrl,
@@ -86,6 +89,8 @@ describe("contratos do backend", () => {
     assert.deepEqual(o.providers[0]?.features, ["calendar"]);
     assert.equal(o.policy.googleAllowed, false);
     assert.equal(toOverview({}).policy.googleAllowed, true);
+    assert.equal(toOverview({}).policy.appleAllowed, true);
+    assert.equal(toOverview({ policy: { apple_allowed: false } }).policy.appleAllowed, false);
   });
 
   it("retorno do consentimento traz as funcionalidades não concedidas", () => {
@@ -228,5 +233,31 @@ describe("mensagens de erro das conexões", () => {
     assert.match(describeConnectionError(new ApiError(503, ""), "x"), /temporariamente indisponível/);
     assert.match(describeConnectionError(new ApiError(500, "detalhe interno"), "x"), /Erro inesperado/);
     assert.equal(describeConnectionError(new ApiError(422, "Autorização inválida"), "x"), "Autorização inválida");
+  });
+});
+
+describe("Apple", () => {
+  it("reconhece senha de app e recusa a senha principal", () => {
+    for (const ok of ["abcd-efgh-ijkl-mnop", "ABCD EFGH IJKL MNOP", "abcdefghijklmnop"]) {
+      assert.equal(isAppPassword(ok), true, ok);
+    }
+    for (const bad of ["Senha@2026", "abcd-efgh-ijkl", "abcd-efgh-ijkl-mno1", ""]) {
+      assert.equal(isAppPassword(bad), false, bad);
+    }
+  });
+
+  it("política, origem, só agenda e reconexão", () => {
+    const policy = { googleAllowed: true, microsoftAllowed: true, appleAllowed: false, persisted: true };
+    assert.equal(providerAllowed(policy, "apple"), false);
+    assert.equal(providerAllowed(policy, "google"), true);
+    assert.equal(sourceLabel("apple"), "Apple");
+    assert.equal(isCalendarOnly("apple"), true);
+    assert.equal(isCalendarOnly("google"), false);
+    const apple = toConnection({ provider: "apple", calendar_enabled: true, tasks_enabled: true });
+    assert.equal(apple.provider, "apple");
+    assert.deepEqual(reconnectFeatures(apple), ["calendar"]);
+    const info = toOverview({ providers: [{ provider: "apple", auth_kind: "app_password" }] }).providers[0];
+    assert.equal(info?.authKind, "app_password");
+    assert.equal(toOverview({ providers: [{ provider: "google" }] }).providers[0]?.authKind, "oauth");
   });
 });
