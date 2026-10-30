@@ -130,7 +130,7 @@
 }
 
 .itemActive {
-  background: var(--accent-soft);
+  background: var(--accent-bg);
 }
 
 .channel {
@@ -324,7 +324,7 @@
 }
 
 .out .bubble {
-  background: var(--accent-soft);
+  background: var(--accent-bg);
   border-color: var(--accent-border);
 }
 
